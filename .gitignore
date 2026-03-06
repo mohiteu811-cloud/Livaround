@@ -4,3 +4,4 @@ dist/
 *.env
 backend/prisma/dev.db
 backend/prisma/*.db-journal
+*.tsbuildinfo
