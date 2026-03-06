@@ -19,6 +19,8 @@ export const hi = {
   noActiveJobs: 'कोई सक्रिय काम नहीं',
   noAvailableJobs: 'कोई उपलब्ध काम नहीं',
   tapRefresh: 'रिफ्रेश टैप करें',
+  history: 'इतिहास',
+  noHistory: 'कोई पिछले काम नहीं',
 
   // Job detail
   back: '← वापस',
@@ -89,6 +91,8 @@ export const en = {
   noActiveJobs: 'No active jobs',
   noAvailableJobs: 'No available jobs',
   tapRefresh: 'Tap Refresh to check for updates',
+  history: 'History',
+  noHistory: 'No past jobs yet',
 
   back: '← Back',
   scheduled: 'Scheduled',

@@ -25,7 +25,7 @@ function formatDate(iso: string) {
   });
 }
 
-type Tab = 'my' | 'available';
+type Tab = 'my' | 'available' | 'history';
 
 export default function WorkerJobsPage() {
   const router = useRouter();
@@ -42,6 +42,9 @@ export default function WorkerJobsPage() {
       if (tab === 'my') {
         const data = await api.jobs.list();
         setJobs(data.filter(j => ['DISPATCHED','ACCEPTED','IN_PROGRESS'].includes(j.status)));
+      } else if (tab === 'history') {
+        const data = await api.jobs.list();
+        setJobs(data.filter(j => ['COMPLETED','CANCELLED'].includes(j.status)));
       } else {
         const data = await api.jobs.list({ status: 'DISPATCHED' });
         setJobs(data.filter(j => !j.workerId));
@@ -63,7 +66,7 @@ export default function WorkerJobsPage() {
       {/* Tabs */}
       <div className="px-5 mb-4">
         <div className="flex bg-slate-800 rounded-xl p-1 gap-1">
-          {(['my', 'available'] as Tab[]).map(tabKey => (
+          {(['my', 'available', 'history'] as Tab[]).map(tabKey => (
             <button
               key={tabKey}
               onClick={() => setTab(tabKey)}
@@ -71,7 +74,7 @@ export default function WorkerJobsPage() {
                 tab === tabKey ? 'bg-blue-600 text-white' : 'text-slate-400'
               }`}
             >
-              {tabKey === 'my' ? tr.myJobs : tr.available}
+              {tabKey === 'my' ? tr.myJobs : tabKey === 'available' ? tr.available : tr.history}
             </button>
           ))}
         </div>
@@ -96,11 +99,11 @@ export default function WorkerJobsPage() {
           </div>
         ) : jobs.length === 0 ? (
           <div className="text-center pt-16 space-y-2">
-            <div className="text-5xl">{tab === 'my' ? '✅' : '🎉'}</div>
+            <div className="text-5xl">{tab === 'my' ? '✅' : tab === 'history' ? '📋' : '🎉'}</div>
             <p className="text-white font-semibold text-lg">
-              {tab === 'my' ? tr.noActiveJobs : tr.noAvailableJobs}
+              {tab === 'my' ? tr.noActiveJobs : tab === 'history' ? tr.noHistory : tr.noAvailableJobs}
             </p>
-            <p className="text-slate-500 text-sm">{tr.tapRefresh}</p>
+            {tab !== 'history' && <p className="text-slate-500 text-sm">{tr.tapRefresh}</p>}
           </div>
         ) : (
           jobs.map(job => (
