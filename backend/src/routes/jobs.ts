@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { validate } from '../middleware/validate';
+import { sendPushNotification } from '../lib/pushNotifications';
 
 const router = Router();
 router.use(authenticate);
@@ -26,17 +27,30 @@ const issueSchema = z.object({
   severity: z.enum(['LOW', 'MEDIUM', 'HIGH']).default('LOW'),
 });
 
+function isHost(req: AuthRequest) { return req.user!.role === 'HOST'; }
+function isWorker(req: AuthRequest) { return req.user!.role === 'WORKER'; }
+
+// GET /api/jobs — hosts see their property jobs, workers see their own
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const { propertyId, status, type, workerId } = req.query;
 
+    let baseWhere: Record<string, unknown>;
+    if (isWorker(req)) {
+      const worker = await prisma.worker.findUnique({ where: { userId: req.user!.id } });
+      if (!worker) return res.json([]);
+      baseWhere = { workerId: worker.id };
+    } else {
+      baseWhere = { property: { host: { userId: req.user!.id } } };
+    }
+
     const jobs = await prisma.job.findMany({
       where: {
-        property: { host: { userId: req.user!.id } },
+        ...baseWhere,
         ...(propertyId ? { propertyId: propertyId as string } : {}),
-        ...(status ? { status: status as 'PENDING' } : {}),
-        ...(type ? { type: type as 'CLEANING' } : {}),
-        ...(workerId ? { workerId: workerId as string } : {}),
+        ...(status ? { status: status as string } : {}),
+        ...(type ? { type: type as string } : {}),
+        ...(isHost(req) && workerId ? { workerId: workerId as string } : {}),
       },
       include: {
         property: { select: { id: true, name: true, city: true } },
@@ -55,11 +69,11 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 
 router.post('/', validate(createJobSchema), async (req: AuthRequest, res: Response) => {
   try {
+    if (!isHost(req)) return res.status(403).json({ error: 'Hosts only' });
     const prop = await prisma.property.findFirst({
       where: { id: req.body.propertyId, host: { userId: req.user!.id } },
     });
     if (!prop) return res.status(403).json({ error: 'Property not found or access denied' });
-
     const job = await prisma.job.create({ data: req.body });
     return res.status(201).json(job);
   } catch (err) {
@@ -70,8 +84,12 @@ router.post('/', validate(createJobSchema), async (req: AuthRequest, res: Respon
 
 router.get('/:id', async (req: AuthRequest, res: Response) => {
   try {
+    const where = isWorker(req)
+      ? { id: req.params.id, worker: { userId: req.user!.id } }
+      : { id: req.params.id, property: { host: { userId: req.user!.id } } };
+
     const job = await prisma.job.findFirst({
-      where: { id: req.params.id, property: { host: { userId: req.user!.id } } },
+      where,
       include: {
         property: true,
         worker: { include: { user: { select: { name: true, email: true, phone: true } } } },
@@ -89,8 +107,10 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 
 router.post('/:id/dispatch', validate(dispatchSchema), async (req: AuthRequest, res: Response) => {
   try {
+    if (!isHost(req)) return res.status(403).json({ error: 'Hosts only' });
     const job = await prisma.job.findFirst({
       where: { id: req.params.id, property: { host: { userId: req.user!.id } } },
+      include: { property: { select: { name: true } } },
     });
     if (!job) return res.status(404).json({ error: 'Job not found' });
 
@@ -102,6 +122,20 @@ router.post('/:id/dispatch', validate(dispatchSchema), async (req: AuthRequest, 
       data: { workerId: req.body.workerId, status: 'DISPATCHED' },
       include: { worker: { include: { user: { select: { name: true } } } } },
     });
+
+    // Send push notification to worker
+    const workerWithToken = worker as typeof worker & { pushToken?: string | null };
+    if (workerWithToken.pushToken) {
+      await sendPushNotification(workerWithToken.pushToken, {
+        title: `New ${job.type} Job 🔔`,
+        body: `You've been assigned a job at ${job.property?.name}`,
+        data: { jobId: job.id },
+        sound: 'default',
+        priority: 'high',
+        channelId: 'jobs',
+      });
+    }
+
     return res.json(updated);
   } catch (err) {
     console.error(err);
@@ -111,10 +145,13 @@ router.post('/:id/dispatch', validate(dispatchSchema), async (req: AuthRequest, 
 
 router.post('/:id/accept', async (req: AuthRequest, res: Response) => {
   try {
-    const job = await prisma.job.update({
-      where: { id: req.params.id },
-      data: { status: 'ACCEPTED' },
-    });
+    if (isWorker(req)) {
+      const worker = await prisma.worker.findUnique({ where: { userId: req.user!.id } });
+      if (!worker) return res.status(403).json({ error: 'Worker not found' });
+      const job = await prisma.job.findFirst({ where: { id: req.params.id, workerId: worker.id } });
+      if (!job) return res.status(403).json({ error: 'Not your job' });
+    }
+    const job = await prisma.job.update({ where: { id: req.params.id }, data: { status: 'ACCEPTED' } });
     return res.json(job);
   } catch (err) {
     console.error(err);
@@ -124,10 +161,13 @@ router.post('/:id/accept', async (req: AuthRequest, res: Response) => {
 
 router.post('/:id/start', async (req: AuthRequest, res: Response) => {
   try {
-    const job = await prisma.job.update({
-      where: { id: req.params.id },
-      data: { status: 'IN_PROGRESS' },
-    });
+    if (isWorker(req)) {
+      const worker = await prisma.worker.findUnique({ where: { userId: req.user!.id } });
+      if (!worker) return res.status(403).json({ error: 'Worker not found' });
+      const job = await prisma.job.findFirst({ where: { id: req.params.id, workerId: worker.id } });
+      if (!job) return res.status(403).json({ error: 'Not your job' });
+    }
+    const job = await prisma.job.update({ where: { id: req.params.id }, data: { status: 'IN_PROGRESS' } });
     return res.json(job);
   } catch (err) {
     console.error(err);
@@ -137,25 +177,30 @@ router.post('/:id/start', async (req: AuthRequest, res: Response) => {
 
 router.post('/:id/complete', async (req: AuthRequest, res: Response) => {
   try {
-    const job = await prisma.job.findFirst({
-      where: { id: req.params.id, property: { host: { userId: req.user!.id } } },
-    });
-    if (!job) return res.status(404).json({ error: 'Job not found' });
+    let workerId: string | null = null;
 
-    const { checklist } = req.body;
+    if (isWorker(req)) {
+      const worker = await prisma.worker.findUnique({ where: { userId: req.user!.id } });
+      if (!worker) return res.status(403).json({ error: 'Worker not found' });
+      const job = await prisma.job.findFirst({ where: { id: req.params.id, workerId: worker.id } });
+      if (!job) return res.status(403).json({ error: 'Not your job' });
+      workerId = worker.id;
+    } else {
+      const job = await prisma.job.findFirst({
+        where: { id: req.params.id, property: { host: { userId: req.user!.id } } },
+      });
+      if (!job) return res.status(404).json({ error: 'Job not found' });
+      workerId = job.workerId ?? null;
+    }
 
     const updated = await prisma.job.update({
       where: { id: req.params.id },
-      data: {
-        status: 'COMPLETED',
-        completedAt: new Date(),
-        ...(checklist && { checklist }),
-      },
+      data: { status: 'COMPLETED', completedAt: new Date() },
     });
 
-    if (job.workerId) {
+    if (workerId) {
       await prisma.worker.update({
-        where: { id: job.workerId },
+        where: { id: workerId },
         data: { jobsCompleted: { increment: 1 } },
       });
     }
@@ -169,15 +214,12 @@ router.post('/:id/complete', async (req: AuthRequest, res: Response) => {
 
 router.post('/:id/cancel', async (req: AuthRequest, res: Response) => {
   try {
+    if (!isHost(req)) return res.status(403).json({ error: 'Hosts only' });
     const job = await prisma.job.findFirst({
       where: { id: req.params.id, property: { host: { userId: req.user!.id } } },
     });
     if (!job) return res.status(404).json({ error: 'Job not found' });
-
-    const updated = await prisma.job.update({
-      where: { id: req.params.id },
-      data: { status: 'CANCELLED' },
-    });
+    const updated = await prisma.job.update({ where: { id: req.params.id }, data: { status: 'CANCELLED' } });
     return res.json(updated);
   } catch (err) {
     console.error(err);
@@ -187,14 +229,18 @@ router.post('/:id/cancel', async (req: AuthRequest, res: Response) => {
 
 router.post('/:id/issues', validate(issueSchema), async (req: AuthRequest, res: Response) => {
   try {
-    const job = await prisma.job.findFirst({
-      where: { id: req.params.id, property: { host: { userId: req.user!.id } } },
-    });
+    let job;
+    if (isWorker(req)) {
+      const worker = await prisma.worker.findUnique({ where: { userId: req.user!.id } });
+      if (!worker) return res.status(403).json({ error: 'Worker not found' });
+      job = await prisma.job.findFirst({ where: { id: req.params.id, workerId: worker.id } });
+    } else {
+      job = await prisma.job.findFirst({
+        where: { id: req.params.id, property: { host: { userId: req.user!.id } } },
+      });
+    }
     if (!job) return res.status(404).json({ error: 'Job not found' });
-
-    const issue = await prisma.issue.create({
-      data: { jobId: req.params.id, ...req.body },
-    });
+    const issue = await prisma.issue.create({ data: { jobId: req.params.id, ...req.body } });
     return res.status(201).json(issue);
   } catch (err) {
     console.error(err);

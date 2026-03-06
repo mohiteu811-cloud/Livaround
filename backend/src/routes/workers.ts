@@ -24,6 +24,7 @@ const updateWorkerSchema = z.object({
   isAvailable: z.boolean().optional(),
   location: z.string().optional(),
   bio: z.string().optional(),
+  pushToken: z.string().optional(),
 });
 
 function parseSkills(raw: string | undefined): string[] {

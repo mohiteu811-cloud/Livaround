@@ -1,0 +1,1 @@
+ALTER TABLE "Worker" ADD COLUMN IF NOT EXISTS "pushToken" TEXT;
