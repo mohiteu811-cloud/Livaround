@@ -15,7 +15,8 @@ import analyticsRoutes from './routes/analytics';
 const app = express();
 
 app.use(helmet());
-app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:3000' }));
+const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000').split(',').map(o => o.trim());
+app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(json({ limit: '10mb' }));
 
 app.use('/api/auth', authRoutes);
