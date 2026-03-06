@@ -1,0 +1,14 @@
+{
+  "name": "livaround",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": ["backend", "dashboard"],
+  "scripts": {
+    "dev:backend": "npm run dev --workspace=backend",
+    "dev:dashboard": "npm run dev --workspace=dashboard",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:dashboard\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

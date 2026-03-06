@@ -1,0 +1,218 @@
+import { Router, Response } from 'express';
+import { z } from 'zod';
+import { prisma } from '../lib/prisma';
+import { authenticate, AuthRequest } from '../middleware/auth';
+import { validate } from '../middleware/validate';
+
+const router = Router();
+router.use(authenticate);
+
+const createJobSchema = z.object({
+  propertyId: z.string(),
+  bookingId: z.string().optional(),
+  type: z.enum(['CLEANING', 'COOKING', 'DRIVING', 'MAINTENANCE']),
+  scheduledAt: z.string().datetime(),
+  notes: z.string().optional(),
+  checklist: z.array(z.object({ item: z.string(), done: z.boolean().default(false) })).optional(),
+});
+
+const dispatchSchema = z.object({
+  workerId: z.string(),
+});
+
+const issueSchema = z.object({
+  description: z.string().min(5),
+  photoUrl: z.string().optional(),
+  severity: z.enum(['LOW', 'MEDIUM', 'HIGH']).default('LOW'),
+});
+
+router.get('/', async (req: AuthRequest, res: Response) => {
+  try {
+    const { propertyId, status, type, workerId } = req.query;
+
+    const jobs = await prisma.job.findMany({
+      where: {
+        property: { host: { userId: req.user!.id } },
+        ...(propertyId ? { propertyId: propertyId as string } : {}),
+        ...(status ? { status: status as 'PENDING' } : {}),
+        ...(type ? { type: type as 'CLEANING' } : {}),
+        ...(workerId ? { workerId: workerId as string } : {}),
+      },
+      include: {
+        property: { select: { id: true, name: true, city: true } },
+        worker: { include: { user: { select: { name: true, phone: true } } } },
+        booking: { select: { id: true, guestName: true, checkIn: true, checkOut: true } },
+        _count: { select: { issues: true } },
+      },
+      orderBy: { scheduledAt: 'asc' },
+    });
+    return res.json(jobs);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/', validate(createJobSchema), async (req: AuthRequest, res: Response) => {
+  try {
+    const prop = await prisma.property.findFirst({
+      where: { id: req.body.propertyId, host: { userId: req.user!.id } },
+    });
+    if (!prop) return res.status(403).json({ error: 'Property not found or access denied' });
+
+    const job = await prisma.job.create({ data: req.body });
+    return res.status(201).json(job);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    const job = await prisma.job.findFirst({
+      where: { id: req.params.id, property: { host: { userId: req.user!.id } } },
+      include: {
+        property: true,
+        worker: { include: { user: { select: { name: true, email: true, phone: true } } } },
+        booking: true,
+        issues: { orderBy: { createdAt: 'desc' } },
+      },
+    });
+    if (!job) return res.status(404).json({ error: 'Job not found' });
+    return res.json(job);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/:id/dispatch', validate(dispatchSchema), async (req: AuthRequest, res: Response) => {
+  try {
+    const job = await prisma.job.findFirst({
+      where: { id: req.params.id, property: { host: { userId: req.user!.id } } },
+    });
+    if (!job) return res.status(404).json({ error: 'Job not found' });
+
+    const worker = await prisma.worker.findUnique({ where: { id: req.body.workerId } });
+    if (!worker) return res.status(404).json({ error: 'Worker not found' });
+
+    const updated = await prisma.job.update({
+      where: { id: req.params.id },
+      data: { workerId: req.body.workerId, status: 'DISPATCHED' },
+      include: { worker: { include: { user: { select: { name: true } } } } },
+    });
+    return res.json(updated);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/:id/accept', async (req: AuthRequest, res: Response) => {
+  try {
+    const job = await prisma.job.update({
+      where: { id: req.params.id },
+      data: { status: 'ACCEPTED' },
+    });
+    return res.json(job);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/:id/start', async (req: AuthRequest, res: Response) => {
+  try {
+    const job = await prisma.job.update({
+      where: { id: req.params.id },
+      data: { status: 'IN_PROGRESS' },
+    });
+    return res.json(job);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/:id/complete', async (req: AuthRequest, res: Response) => {
+  try {
+    const job = await prisma.job.findFirst({
+      where: { id: req.params.id, property: { host: { userId: req.user!.id } } },
+    });
+    if (!job) return res.status(404).json({ error: 'Job not found' });
+
+    const { checklist } = req.body;
+
+    const updated = await prisma.job.update({
+      where: { id: req.params.id },
+      data: {
+        status: 'COMPLETED',
+        completedAt: new Date(),
+        ...(checklist && { checklist }),
+      },
+    });
+
+    if (job.workerId) {
+      await prisma.worker.update({
+        where: { id: job.workerId },
+        data: { jobsCompleted: { increment: 1 } },
+      });
+    }
+
+    return res.json(updated);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/:id/cancel', async (req: AuthRequest, res: Response) => {
+  try {
+    const job = await prisma.job.findFirst({
+      where: { id: req.params.id, property: { host: { userId: req.user!.id } } },
+    });
+    if (!job) return res.status(404).json({ error: 'Job not found' });
+
+    const updated = await prisma.job.update({
+      where: { id: req.params.id },
+      data: { status: 'CANCELLED' },
+    });
+    return res.json(updated);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/:id/issues', validate(issueSchema), async (req: AuthRequest, res: Response) => {
+  try {
+    const job = await prisma.job.findFirst({
+      where: { id: req.params.id, property: { host: { userId: req.user!.id } } },
+    });
+    if (!job) return res.status(404).json({ error: 'Job not found' });
+
+    const issue = await prisma.issue.create({
+      data: { jobId: req.params.id, ...req.body },
+    });
+    return res.status(201).json(issue);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/:id/issues', async (req: AuthRequest, res: Response) => {
+  try {
+    const issues = await prisma.issue.findMany({
+      where: { jobId: req.params.id },
+      orderBy: { createdAt: 'desc' },
+    });
+    return res.json(issues);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+export default router;
