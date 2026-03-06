@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import WorkerShell from '../../WorkerShell';
+import WorkerShell, { useLang } from '../../WorkerShell';
+import { t } from '../../i18n';
 import { api, Job } from '@/lib/api';
 
 const STATUS_COLOR: Record<string, string> = {
@@ -25,6 +26,8 @@ function fmt(iso: string) {
 export default function WorkerJobDetailPage() {
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
+  const [lang] = useLang();
+  const tr = t(lang);
   const [job, setJob] = useState<Job | null>(null);
   const [checklist, setChecklist] = useState<{ item: string; done: boolean }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,7 +36,10 @@ export default function WorkerJobDetailPage() {
 
   useEffect(() => {
     api.jobs.get(id)
-      .then(j => { setJob(j); setChecklist(j.checklist ?? []); })
+      .then((j: Job) => {
+        setJob(j);
+        setChecklist((j.checklist as { item: string; done: boolean }[]) ?? []);
+      })
       .catch(() => router.back())
       .finally(() => setLoading(false));
   }, [id, router]);
@@ -45,7 +51,7 @@ export default function WorkerJobDetailPage() {
   async function doAction(action: 'accept' | 'start' | 'complete') {
     if (action === 'complete') {
       const undone = checklist.filter(c => !c.done).length;
-      if (undone > 0 && !confirm(`${undone} checklist item(s) not done. Complete anyway?`)) return;
+      if (undone > 0 && !confirm(tr.incompleteItems(undone))) return;
     }
     setActionLoading(true);
     setError('');
@@ -53,7 +59,7 @@ export default function WorkerJobDetailPage() {
       const updated = await api.jobs[action](id);
       setJob(updated);
       if (action === 'complete') {
-        alert('✅ Job marked complete! Great work.');
+        alert('✅ ' + (lang === 'hi' ? 'काम पूरा हुआ! शाबाश।' : 'Job marked complete! Great work.'));
         router.push('/worker/jobs');
       }
     } catch (err) {
@@ -78,9 +84,8 @@ export default function WorkerJobDetailPage() {
 
   return (
     <WorkerShell>
-      {/* Header */}
       <div className="px-5 pt-12 pb-2 flex items-center justify-between">
-        <button onClick={() => router.back()} className="text-blue-400 font-semibold text-sm">← Back</button>
+        <button onClick={() => router.back()} className="text-blue-400 font-semibold text-sm">{tr.back}</button>
         <span className={`text-xs font-bold px-3 py-1 rounded-lg border ${STATUS_COLOR[job.status] ?? 'text-slate-400 border-slate-700'}`}>
           {job.status.replace('_', ' ')}
         </span>
@@ -99,29 +104,28 @@ export default function WorkerJobDetailPage() {
 
         {/* Details */}
         <div className="bg-slate-800 border border-slate-700 rounded-2xl p-4 space-y-3">
-          <h2 className="text-sm font-semibold text-white uppercase tracking-wider">Details</h2>
-          <InfoRow icon="📅" label="Scheduled" value={fmt(job.scheduledAt)} />
+          <h2 className="text-sm font-semibold text-white uppercase tracking-wider">{tr.details}</h2>
+          <InfoRow icon="📅" label={tr.scheduled} value={fmt(job.scheduledAt)} />
           {job.booking && <>
-            <InfoRow icon="👤" label="Guest" value={job.booking.guestName} />
-            <InfoRow icon="🛬" label="Check-in" value={fmt(job.booking.checkIn)} />
-            <InfoRow icon="🛫" label="Check-out" value={fmt(job.booking.checkOut)} />
+            <InfoRow icon="👤" label={tr.guest} value={job.booking.guestName} />
+            <InfoRow icon="🛬" label={tr.checkIn} value={fmt(job.booking.checkIn)} />
+            <InfoRow icon="🛫" label={tr.checkOut} value={fmt(job.booking.checkOut)} />
           </>}
-          {job.notes && <InfoRow icon="📝" label="Notes" value={job.notes} />}
+          {job.notes && <InfoRow icon="📝" label={tr.notes} value={job.notes} />}
         </div>
 
         {/* Checklist */}
         {checklist.length > 0 && (
           <div className="bg-slate-800 border border-slate-700 rounded-2xl p-4 space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-white uppercase tracking-wider">Checklist</h2>
+              <h2 className="text-sm font-semibold text-white uppercase tracking-wider">{tr.checklist}</h2>
               <span className="text-blue-400 text-sm font-semibold">{done}/{checklist.length}</span>
             </div>
-            {/* Progress bar */}
             <div className="h-1.5 bg-slate-700 rounded-full">
               <div className="h-1.5 bg-blue-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
             </div>
             <div className="space-y-2 pt-1">
-              {checklist.map((item, i) => (
+              {checklist.map((item: { item: string; done: boolean }, i: number) => (
                 <button
                   key={i}
                   onClick={() => job.status !== 'COMPLETED' && toggleCheck(i)}
@@ -151,20 +155,20 @@ export default function WorkerJobDetailPage() {
         {job.status !== 'COMPLETED' && job.status !== 'CANCELLED' && (
           <div className="space-y-3">
             {job.status === 'DISPATCHED' && (
-              <ActionBtn label="Accept Job" color="bg-blue-600 hover:bg-blue-500" loading={actionLoading} onClick={() => doAction('accept')} />
+              <ActionBtn label={tr.acceptJob} color="bg-blue-600 hover:bg-blue-500" loading={actionLoading} onClick={() => doAction('accept')} />
             )}
             {job.status === 'ACCEPTED' && (
-              <ActionBtn label="Start Job" color="bg-purple-600 hover:bg-purple-500" loading={actionLoading} onClick={() => doAction('start')} />
+              <ActionBtn label={tr.startJob} color="bg-purple-600 hover:bg-purple-500" loading={actionLoading} onClick={() => doAction('start')} />
             )}
             {job.status === 'IN_PROGRESS' && (
-              <ActionBtn label="Mark Complete ✅" color="bg-emerald-600 hover:bg-emerald-500" loading={actionLoading} onClick={() => doAction('complete')} />
+              <ActionBtn label={tr.markComplete} color="bg-emerald-600 hover:bg-emerald-500" loading={actionLoading} onClick={() => doAction('complete')} />
             )}
             {(job.status === 'ACCEPTED' || job.status === 'IN_PROGRESS') && (
               <button
                 onClick={() => router.push(`/worker/job/${id}/issue`)}
                 className="w-full py-4 rounded-2xl border border-red-500/40 text-red-400 font-semibold text-base"
               >
-                ⚠️ Report an Issue
+                {tr.reportIssue}
               </button>
             )}
           </div>
@@ -193,7 +197,7 @@ function ActionBtn({ label, color, loading, onClick }: { label: string; color: s
       disabled={loading}
       className={`w-full py-4 rounded-2xl text-white font-bold text-base transition-colors disabled:opacity-60 ${color}`}
     >
-      {loading ? 'Loading…' : label}
+      {loading ? '…' : label}
     </button>
   );
 }

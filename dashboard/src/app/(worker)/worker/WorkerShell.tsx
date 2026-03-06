@@ -4,18 +4,25 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { api, User } from '@/lib/api';
+import { Lang, getLang, setLang, t } from './i18n';
+
+export function useLang(): [Lang, (l: Lang) => void] {
+  const [lang, setLangState] = useState<Lang>('en');
+  useEffect(() => { setLangState(getLang()); }, []);
+  function toggle(l: Lang) { setLang(l); setLangState(l); }
+  return [lang, toggle];
+}
 
 export default function WorkerShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [user, setUser] = useState<User | null>(null);
   const [ready, setReady] = useState(false);
+  const [lang, setLangState] = useLang();
 
   useEffect(() => {
     api.auth.me()
       .then(u => {
         if (u.role !== 'WORKER') { router.replace('/worker/login'); return; }
-        setUser(u);
         setReady(true);
       })
       .catch(() => router.replace('/worker/login'));
@@ -29,13 +36,29 @@ export default function WorkerShell({ children }: { children: React.ReactNode })
     );
   }
 
+  const tr = t(lang);
   const tabs = [
-    { href: '/worker/jobs', label: 'Jobs', icon: '🔧' },
-    { href: '/worker/profile', label: 'Profile', icon: '👤' },
+    { href: '/worker/jobs', label: tr.jobs, icon: '🔧' },
+    { href: '/worker/profile', label: tr.profile, icon: '👤' },
   ];
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col max-w-lg mx-auto">
+      {/* Language toggle */}
+      <div className="fixed top-3 right-4 z-50 flex bg-slate-800 rounded-lg overflow-hidden border border-slate-700">
+        {(['en', 'hi'] as Lang[]).map(l => (
+          <button
+            key={l}
+            onClick={() => setLangState(l)}
+            className={`px-3 py-1.5 text-xs font-bold transition-colors ${
+              lang === l ? 'bg-blue-600 text-white' : 'text-slate-400'
+            }`}
+          >
+            {l === 'en' ? 'EN' : 'हिं'}
+          </button>
+        ))}
+      </div>
+
       <div className="flex-1 pb-20">{children}</div>
 
       {/* Bottom nav */}

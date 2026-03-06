@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import WorkerShell from '../WorkerShell';
+import WorkerShell, { useLang } from '../WorkerShell';
+import { t } from '../i18n';
 import { api, User } from '@/lib/api';
 
 const SKILL_ICON: Record<string, string> = {
@@ -11,6 +12,8 @@ const SKILL_ICON: Record<string, string> = {
 
 export default function WorkerProfilePage() {
   const router = useRouter();
+  const [lang] = useLang();
+  const tr = t(lang);
   const [user, setUser] = useState<User | null>(null);
   const [available, setAvailable] = useState(false);
   const [toggling, setToggling] = useState(false);
@@ -27,15 +30,14 @@ export default function WorkerProfilePage() {
     if (!user?.worker?.id) return;
     setToggling(true);
     try {
-      const next = !available;
-      await api.workers.updateAvailability(user.worker.id, next);
-      setAvailable(next);
+      await api.workers.updateAvailability(user.worker.id, !available);
+      setAvailable(a => !a);
     } catch { /* ignore */ }
     finally { setToggling(false); }
   }
 
   function handleLogout() {
-    if (!confirm('Sign out?')) return;
+    if (!confirm(tr.signOutConfirm)) return;
     localStorage.removeItem('livaround_token');
     router.push('/worker/login');
   }
@@ -57,7 +59,7 @@ export default function WorkerProfilePage() {
   return (
     <WorkerShell>
       <div className="px-5 pt-12 pb-8 space-y-5">
-        <h1 className="text-2xl font-bold text-white">Profile</h1>
+        <h1 className="text-2xl font-bold text-white">{tr.profile}</h1>
 
         {/* Avatar */}
         <div className="flex flex-col items-center py-6 gap-2">
@@ -73,11 +75,11 @@ export default function WorkerProfilePage() {
         <div className="grid grid-cols-2 gap-3">
           <div className="bg-slate-800 border border-slate-700 rounded-2xl p-4 text-center">
             <p className="text-2xl font-bold text-white">{jobsDone}</p>
-            <p className="text-slate-400 text-xs mt-1 font-semibold uppercase tracking-wide">Jobs Done</p>
+            <p className="text-slate-400 text-xs mt-1 font-semibold uppercase tracking-wide">{tr.jobsDone}</p>
           </div>
           <div className="bg-slate-800 border border-slate-700 rounded-2xl p-4 text-center">
             <p className="text-2xl font-bold text-white">{rating ? rating.toFixed(1) : '—'}</p>
-            <p className="text-slate-400 text-xs mt-1 font-semibold uppercase tracking-wide">Rating ⭐</p>
+            <p className="text-slate-400 text-xs mt-1 font-semibold uppercase tracking-wide">{tr.rating}</p>
           </div>
         </div>
 
@@ -85,10 +87,10 @@ export default function WorkerProfilePage() {
         <div className="bg-slate-800 border border-slate-700 rounded-2xl p-4 flex items-center justify-between">
           <div>
             <p className="text-white font-semibold">
-              {available ? '🟢 Available' : '🔴 Not available'}
+              {available ? tr.available2 : tr.notAvailable}
             </p>
             <p className="text-slate-500 text-xs mt-0.5">
-              {available ? 'You can receive new job assignments' : 'You won\'t receive new assignments'}
+              {available ? tr.availableDesc : tr.notAvailableDesc}
             </p>
           </div>
           <button
@@ -107,7 +109,7 @@ export default function WorkerProfilePage() {
         {/* Skills */}
         {skills.length > 0 && (
           <div className="bg-slate-800 border border-slate-700 rounded-2xl p-4 space-y-3">
-            <h3 className="text-sm font-semibold text-white uppercase tracking-wider">Skills</h3>
+            <h3 className="text-sm font-semibold text-white uppercase tracking-wider">{tr.skills}</h3>
             <div className="flex flex-wrap gap-2">
               {skills.map((skill: string) => (
                 <span key={skill} className="flex items-center gap-1.5 bg-slate-700 rounded-xl px-3 py-2 text-sm text-slate-300 font-medium">
@@ -119,12 +121,11 @@ export default function WorkerProfilePage() {
           </div>
         )}
 
-        {/* Sign out */}
         <button
           onClick={handleLogout}
           className="w-full py-4 border border-red-500/40 text-red-400 font-semibold rounded-2xl text-base"
         >
-          Sign Out
+          {tr.signOut}
         </button>
       </div>
     </WorkerShell>

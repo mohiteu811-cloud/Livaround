@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import WorkerShell, { useWorkerUser } from '../WorkerShell';
+import WorkerShell, { useWorkerUser, useLang } from '../WorkerShell';
+import { t } from '../i18n';
 import { api, Job } from '@/lib/api';
 
 const STATUS_COLOR: Record<string, string> = {
@@ -29,6 +30,8 @@ type Tab = 'my' | 'available';
 export default function WorkerJobsPage() {
   const router = useRouter();
   const user = useWorkerUser();
+  const [lang] = useLang();
+  const tr = t(lang);
   const [tab, setTab] = useState<Tab>('my');
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,35 +56,35 @@ export default function WorkerJobsPage() {
     <WorkerShell>
       {/* Header */}
       <div className="px-5 pt-12 pb-4 flex items-baseline justify-between">
-        <h1 className="text-2xl font-bold text-white">Jobs</h1>
-        {user && <span className="text-slate-400 text-sm">Hey, {user.name.split(' ')[0]} 👋</span>}
+        <h1 className="text-2xl font-bold text-white">{tr.jobs}</h1>
+        {user && <span className="text-slate-400 text-sm">{tr.hey}, {user.name.split(' ')[0]} 👋</span>}
       </div>
 
       {/* Tabs */}
       <div className="px-5 mb-4">
         <div className="flex bg-slate-800 rounded-xl p-1 gap-1">
-          {(['my', 'available'] as Tab[]).map(t => (
+          {(['my', 'available'] as Tab[]).map(tabKey => (
             <button
-              key={t}
-              onClick={() => setTab(t)}
+              key={tabKey}
+              onClick={() => setTab(tabKey)}
               className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-colors ${
-                tab === t ? 'bg-blue-600 text-white' : 'text-slate-400'
+                tab === tabKey ? 'bg-blue-600 text-white' : 'text-slate-400'
               }`}
             >
-              {t === 'my' ? 'My Jobs' : 'Available'}
+              {tabKey === 'my' ? tr.myJobs : tr.available}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Refresh button */}
+      {/* Refresh */}
       <div className="px-5 mb-3 flex justify-end">
         <button
           onClick={() => { setRefreshing(true); load(); }}
           disabled={refreshing}
           className="text-xs text-blue-400 font-semibold disabled:opacity-40"
         >
-          {refreshing ? 'Refreshing…' : '↻ Refresh'}
+          {refreshing ? tr.refreshing : tr.refresh}
         </button>
       </div>
 
@@ -95,9 +98,9 @@ export default function WorkerJobsPage() {
           <div className="text-center pt-16 space-y-2">
             <div className="text-5xl">{tab === 'my' ? '✅' : '🎉'}</div>
             <p className="text-white font-semibold text-lg">
-              {tab === 'my' ? 'No active jobs' : 'No available jobs'}
+              {tab === 'my' ? tr.noActiveJobs : tr.noAvailableJobs}
             </p>
-            <p className="text-slate-500 text-sm">Tap Refresh to check for updates</p>
+            <p className="text-slate-500 text-sm">{tr.tapRefresh}</p>
           </div>
         ) : (
           jobs.map(job => (
