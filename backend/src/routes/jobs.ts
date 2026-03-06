@@ -90,8 +90,14 @@ router.post('/', validate(createJobSchema), async (req: AuthRequest, res: Respon
       where: { id: req.body.propertyId, host: { userId: req.user!.id } },
     });
     if (!prop) return res.status(403).json({ error: 'Property not found or access denied' });
-    const job = await prisma.job.create({ data: req.body });
-    return res.status(201).json(job);
+    const { checklist, ...rest } = req.body;
+    const job = await prisma.job.create({
+      data: {
+        ...rest,
+        ...(checklist ? { checklist: JSON.stringify(checklist) } : {}),
+      },
+    });
+    return res.status(201).json(parseJob(job));
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Internal server error' });
