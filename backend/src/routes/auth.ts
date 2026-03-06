@@ -107,12 +107,23 @@ router.get('/me', authenticate, async (req: AuthRequest, res: Response) => {
         role: true,
         createdAt: true,
         host: { select: { id: true, name: true } },
-        worker: { select: { id: true, skills: true, rating: true } },
+        worker: { select: { id: true, skills: true, rating: true, isAvailable: true, jobsCompleted: true } },
       },
     });
 
     if (!user) return res.status(404).json({ error: 'User not found' });
-    return res.json(user);
+
+    const parsed = {
+      ...user,
+      worker: user.worker
+        ? {
+            ...user.worker,
+            skills: (() => { try { return JSON.parse(user.worker!.skills as unknown as string || '[]'); } catch { return []; } })(),
+          }
+        : null,
+    };
+
+    return res.json(parsed);
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Internal server error' });
