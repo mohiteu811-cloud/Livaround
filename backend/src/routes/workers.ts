@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '../lib/prisma';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { validate } from '../middleware/validate';
+import { sendWorkerWelcomeEmail } from '../lib/email';
 
 const router = Router();
 router.use(authenticate);
@@ -65,6 +66,11 @@ router.post('/', validate(createWorkerSchema), async (req: AuthRequest, res: Res
       },
       include: { worker: true },
     });
+
+    const workerAppUrl = process.env.WORKER_APP_URL || process.env.CORS_ORIGIN || 'http://localhost:3000';
+    sendWorkerWelcomeEmail({ name, email, tempPassword, workerAppUrl }).catch((err) =>
+      console.error('Failed to send welcome email:', err)
+    );
 
     return res.status(201).json({
       ...user.worker,
