@@ -16,7 +16,7 @@ const bookingSchema = z.object({
   checkOut: z.string().datetime(),
   guestCount: z.number().int().min(1).default(1),
   totalAmount: z.number().min(0),
-  currency: z.string().default('USD'),
+  currency: z.string().default('INR'),
   status: z.enum(['CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT', 'CANCELLED']).default('CONFIRMED'),
   source: z.enum(['DIRECT', 'AIRBNB', 'BOOKING_COM', 'VRBO', 'LIVAROUND']).default('DIRECT'),
   externalId: z.string().optional(),

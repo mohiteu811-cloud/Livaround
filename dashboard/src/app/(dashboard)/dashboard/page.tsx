@@ -105,7 +105,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatsCard
           title="Revenue (this month)"
-          value={`$${stats.monthlyRevenue.toLocaleString()}`}
+          value={`₹${stats.monthlyRevenue.toLocaleString('en-IN')}`}
           subtitle={`${stats.monthlyBookings} bookings`}
           icon={DollarSign}
           color="emerald"
@@ -150,11 +150,11 @@ export default function DashboardPage() {
                     </linearGradient>
                   </defs>
                   <XAxis dataKey="month" tick={{ fill: '#94a3b8', fontSize: 12 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: '#94a3b8', fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${v}`} />
+                  <YAxis tick={{ fill: '#94a3b8', fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${v.toLocaleString('en-IN')}`} />
                   <Tooltip
                     contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8 }}
                     labelStyle={{ color: '#e2e8f0' }}
-                    formatter={(v: number) => [`$${v.toLocaleString()}`, 'Revenue']}
+                    formatter={(v: number) => [`₹${v.toLocaleString('en-IN')}`, 'Revenue']}
                   />
                   <Area type="monotone" dataKey="revenue" stroke="#0ea5e9" fill="url(#colorRevenue)" strokeWidth={2} />
                 </AreaChart>
@@ -227,7 +227,7 @@ export default function DashboardPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-sm text-slate-300">${b.totalAmount.toLocaleString()}</span>
+                  <span className="text-sm text-slate-300">₹{b.totalAmount.toLocaleString('en-IN')}</span>
                   {statusBadge(b.status)}
                 </div>
               </div>

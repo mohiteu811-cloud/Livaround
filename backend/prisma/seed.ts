@@ -19,55 +19,55 @@ async function main() {
   const host = hostUser.host!;
 
   const villa = await prisma.property.upsert({
-    where: { id: 'prop-villa-bali' }, update: {},
+    where: { id: 'prop-villa-goa' }, update: {},
     create: {
-      id: 'prop-villa-bali', hostId: host.id, name: 'Villa Serenity',
-      address: 'Jl. Raya Ubud No. 12', city: 'Ubud', country: 'Indonesia',
-      description: 'A tranquil 4-bedroom villa with private pool, surrounded by rice fields.',
+      id: 'prop-villa-goa', hostId: host.id, name: 'Villa Sussegad',
+      address: '14 Gauravaddo, Calangute', city: 'Calangute', country: 'India',
+      description: 'A serene 4-bedroom villa with private pool, surrounded by tropical gardens, minutes from the beach.',
       type: 'VILLA', bedrooms: 4, bathrooms: 4, maxGuests: 8,
-      amenities: JSON.stringify(['Pool','WiFi','Air Conditioning','Kitchen','Rice Field View','Parking']),
+      amenities: JSON.stringify(['Pool','WiFi','Air Conditioning','Kitchen','Garden','Parking','BBQ']),
       images: JSON.stringify([]), isActive: true,
     },
   });
 
-  const apartment = await prisma.property.upsert({
-    where: { id: 'prop-apt-dubai' }, update: {},
+  const cottage = await prisma.property.upsert({
+    where: { id: 'prop-cottage-goa' }, update: {},
     create: {
-      id: 'prop-apt-dubai', hostId: host.id, name: 'Downtown Dubai Studio',
-      address: 'Mohammed Bin Rashid Blvd', city: 'Dubai', country: 'UAE',
-      description: 'Modern studio with Burj Khalifa views.',
-      type: 'APARTMENT', bedrooms: 1, bathrooms: 1, maxGuests: 2,
-      amenities: JSON.stringify(['WiFi','Air Conditioning','Gym','Pool','Concierge']),
+      id: 'prop-cottage-goa', hostId: host.id, name: 'Casa Anjuna',
+      address: '7 Mazal Waddo, Anjuna', city: 'Anjuna', country: 'India',
+      description: 'Charming 2-bedroom Portuguese-style cottage near Anjuna beach with a private courtyard.',
+      type: 'COTTAGE', bedrooms: 2, bathrooms: 2, maxGuests: 4,
+      amenities: JSON.stringify(['WiFi','Air Conditioning','Kitchen','Courtyard','Parking']),
       images: JSON.stringify([]), isActive: true,
     },
   });
 
   const cleanerUser = await prisma.user.upsert({
-    where: { email: 'wayan@livaround.com' }, update: {},
+    where: { email: 'preeti@livaround.com' }, update: {},
     create: {
-      name: 'Wayan Sukarta', email: 'wayan@livaround.com', password,
-      phone: '+62 812 3456 7890', role: 'WORKER',
-      worker: { create: { skills: JSON.stringify(['CLEANING']), isAvailable: true, location: 'Ubud, Bali', rating: 4.9, jobsCompleted: 47, bio: 'Professional villa cleaner with 5 years experience.' } },
+      name: 'Preeti Dessai', email: 'preeti@livaround.com', password,
+      phone: '+91 94220 11234', role: 'WORKER',
+      worker: { create: { skills: JSON.stringify(['CLEANING']), isAvailable: true, location: 'Calangute, Goa', rating: 4.9, jobsCompleted: 47, bio: 'Professional villa cleaner with 5 years experience in Goa.' } },
     },
     include: { worker: true },
   });
 
   const driverUser = await prisma.user.upsert({
-    where: { email: 'ketut@livaround.com' }, update: {},
+    where: { email: 'carlos@livaround.com' }, update: {},
     create: {
-      name: 'Ketut Darmawan', email: 'ketut@livaround.com', password,
-      phone: '+62 815 1122 3344', role: 'WORKER',
-      worker: { create: { skills: JSON.stringify(['DRIVING']), isAvailable: true, location: 'Ubud, Bali', rating: 5.0, jobsCompleted: 89, bio: 'Licensed driver, knows all of Bali.' } },
+      name: 'Carlos Fernandes', email: 'carlos@livaround.com', password,
+      phone: '+91 98221 55678', role: 'WORKER',
+      worker: { create: { skills: JSON.stringify(['DRIVING']), isAvailable: true, location: 'Panjim, Goa', rating: 5.0, jobsCompleted: 89, bio: 'Licensed driver, knows every corner of Goa.' } },
     },
     include: { worker: true },
   });
 
   await prisma.user.upsert({
-    where: { email: 'made@livaround.com' }, update: {},
+    where: { email: 'rohan@livaround.com' }, update: {},
     create: {
-      name: 'Made Wijaya', email: 'made@livaround.com', password,
-      phone: '+62 813 9876 5432', role: 'WORKER',
-      worker: { create: { skills: JSON.stringify(['COOKING','CLEANING']), isAvailable: true, location: 'Ubud, Bali', rating: 4.8, jobsCompleted: 32, bio: 'Balinese cuisine specialist.' } },
+      name: 'Rohan Naik', email: 'rohan@livaround.com', password,
+      phone: '+91 91300 77890', role: 'WORKER',
+      worker: { create: { skills: JSON.stringify(['COOKING','CLEANING']), isAvailable: true, location: 'Anjuna, Goa', rating: 4.8, jobsCompleted: 32, bio: 'Goan cuisine specialist — seafood curries, bebinca, and more.' } },
     },
   });
 
@@ -79,8 +79,8 @@ async function main() {
       id: 'booking-001', propertyId: villa.id, guestName: 'Priya & Rahul Mehta',
       guestEmail: 'priya.mehta@gmail.com', guestPhone: '+91 99887 76655',
       checkIn: new Date(now.getTime() + 3*86400000), checkOut: new Date(now.getTime() + 10*86400000),
-      guestCount: 4, totalAmount: 2100, currency: 'USD', status: 'CONFIRMED', source: 'AIRBNB',
-      notes: 'Celebrating anniversary.',
+      guestCount: 4, totalAmount: 175000, currency: 'INR', status: 'CONFIRMED', source: 'AIRBNB',
+      notes: 'Celebrating anniversary. Prefer early check-in if possible.',
     },
   });
 
@@ -90,17 +90,18 @@ async function main() {
       id: 'booking-002', propertyId: villa.id, guestName: 'James & Sarah Wilson',
       guestEmail: 'jwilson@outlook.com',
       checkIn: new Date(now.getTime() - 2*86400000), checkOut: new Date(now.getTime() + 5*86400000),
-      guestCount: 2, totalAmount: 1750, currency: 'USD', status: 'CHECKED_IN', source: 'DIRECT',
+      guestCount: 2, totalAmount: 140000, currency: 'INR', status: 'CHECKED_IN', source: 'DIRECT',
     },
   });
 
   await prisma.booking.upsert({
     where: { id: 'booking-003' }, update: {},
     create: {
-      id: 'booking-003', propertyId: apartment.id, guestName: 'Ahmed Al Rashid',
-      guestEmail: 'ahmed.r@hotmail.com', guestPhone: '+971 50 123 4567',
+      id: 'booking-003', propertyId: cottage.id, guestName: 'Sneha & Dev Kapoor',
+      guestEmail: 'sneha.kapoor@gmail.com', guestPhone: '+91 97300 12345',
       checkIn: new Date(now.getTime() + 7*86400000), checkOut: new Date(now.getTime() + 14*86400000),
-      guestCount: 2, totalAmount: 980, currency: 'USD', status: 'CONFIRMED', source: 'BOOKING_COM',
+      guestCount: 2, totalAmount: 84000, currency: 'INR', status: 'CONFIRMED', source: 'BOOKING_COM',
+      notes: 'First time in Goa — restaurant recommendations welcome.',
     },
   });
 
@@ -124,7 +125,7 @@ async function main() {
     create: {
       id: 'job-002', propertyId: villa.id, type: 'COOKING', status: 'PENDING',
       scheduledAt: new Date(now.getTime() + 86400000 + 18*3600000),
-      notes: 'Dinner for 2. Traditional Balinese cuisine.',
+      notes: 'Dinner for 2. Traditional Goan seafood — fish curry, prawn balchão.',
     },
   });
 
@@ -134,7 +135,7 @@ async function main() {
       id: 'job-003', propertyId: villa.id, workerId: driverUser.worker!.id,
       type: 'DRIVING', status: 'ACCEPTED',
       scheduledAt: new Date(now.getTime() + 2*3600000),
-      notes: 'Airport pickup — Ngurah Rai Airport at 14:00.',
+      notes: 'Airport pickup — Goa Mopa International Airport at 14:00.',
     },
   });
 
@@ -153,11 +154,11 @@ async function main() {
   }
 
   await prisma.supplyCabinet.upsert({
-    where: { qrCode: 'villa-serenity-main-cabinet' }, update: {},
+    where: { qrCode: 'villa-sussegad-main-cabinet' }, update: {},
     create: {
       propertyId: villa.id, name: 'Main Supply Cabinet',
       location: 'Ground floor hallway, next to laundry room',
-      qrCode: 'villa-serenity-main-cabinet',
+      qrCode: 'villa-sussegad-main-cabinet',
       description: 'Primary storage for cleaning supplies, toiletries and linens.',
     },
   });

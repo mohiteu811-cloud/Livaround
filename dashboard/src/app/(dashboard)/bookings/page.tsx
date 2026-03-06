@@ -38,7 +38,7 @@ function BookingForm({
     guestName: '', guestEmail: '', guestPhone: '',
     checkIn: tomorrow.toISOString().slice(0, 16),
     checkOut: checkout.toISOString().slice(0, 16),
-    guestCount: 2, totalAmount: 0, currency: 'USD',
+    guestCount: 2, totalAmount: 0, currency: 'INR',
     source: 'DIRECT', notes: '',
     ...initial,
   });
@@ -80,7 +80,7 @@ function BookingForm({
       </div>
       <div className="grid grid-cols-2 gap-4">
         <FormField label="Guest name">
-          <Input placeholder="Priya Mehta" value={form.guestName} onChange={(e) => set('guestName', e.target.value)} required />
+          <Input placeholder="Sneha Kapoor" value={form.guestName} onChange={(e) => set('guestName', e.target.value)} required />
         </FormField>
         <FormField label="Guest email">
           <Input type="email" placeholder="guest@example.com" value={form.guestEmail} onChange={(e) => set('guestEmail', e.target.value)} required />

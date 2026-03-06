@@ -65,18 +65,18 @@ function WorkerForm({ onSave, onClose }: { onSave: (d: unknown) => Promise<void>
       {error && <div className="px-4 py-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">{error}</div>}
       <div className="grid grid-cols-2 gap-4">
         <FormField label="Full name">
-          <Input placeholder="Wayan Sukarta" value={form.name} onChange={(e) => set('name', e.target.value)} required />
+          <Input placeholder="Preeti Dessai" value={form.name} onChange={(e) => set('name', e.target.value)} required />
         </FormField>
         <FormField label="Email">
-          <Input type="email" placeholder="wayan@example.com" value={form.email} onChange={(e) => set('email', e.target.value)} required />
+          <Input type="email" placeholder="preeti@example.com" value={form.email} onChange={(e) => set('email', e.target.value)} required />
         </FormField>
       </div>
       <div className="grid grid-cols-2 gap-4">
         <FormField label="Phone">
-          <Input placeholder="+62 812 3456 7890" value={form.phone} onChange={(e) => set('phone', e.target.value)} />
+          <Input placeholder="+91 94220 11234" value={form.phone} onChange={(e) => set('phone', e.target.value)} />
         </FormField>
         <FormField label="Location">
-          <Input placeholder="Ubud, Bali" value={form.location} onChange={(e) => set('location', e.target.value)} />
+          <Input placeholder="Calangute, Goa" value={form.location} onChange={(e) => set('location', e.target.value)} />
         </FormField>
       </div>
       <div>

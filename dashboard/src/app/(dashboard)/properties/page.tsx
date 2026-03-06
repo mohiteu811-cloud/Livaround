@@ -76,14 +76,14 @@ function PropertyForm({
         </FormField>
       </div>
       <FormField label="Address">
-        <Input placeholder="Jl. Raya Ubud No. 12" value={form.address} onChange={(e) => set('address', e.target.value)} required />
+        <Input placeholder="14 Gauravaddo, Calangute" value={form.address} onChange={(e) => set('address', e.target.value)} required />
       </FormField>
       <div className="grid grid-cols-2 gap-4">
         <FormField label="City">
-          <Input placeholder="Ubud" value={form.city} onChange={(e) => set('city', e.target.value)} required />
+          <Input placeholder="Calangute" value={form.city} onChange={(e) => set('city', e.target.value)} required />
         </FormField>
         <FormField label="Country">
-          <Input placeholder="Indonesia" value={form.country} onChange={(e) => set('country', e.target.value)} required />
+          <Input placeholder="India" value={form.country} onChange={(e) => set('country', e.target.value)} required />
         </FormField>
       </div>
       <div className="grid grid-cols-3 gap-4">
