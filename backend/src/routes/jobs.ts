@@ -8,6 +8,22 @@ import { sendPushNotification } from '../lib/pushNotifications';
 const router = Router();
 router.use(authenticate);
 
+const JOB_INCLUDE = {
+  property: { select: { id: true, name: true, city: true } },
+  worker: { include: { user: { select: { name: true, email: true, phone: true } } } },
+  booking: { select: { id: true, guestName: true, checkIn: true, checkOut: true } },
+  _count: { select: { issues: true } },
+} as const;
+
+function parseJob(job: any) {
+  return {
+    ...job,
+    checklist: typeof job.checklist === 'string'
+      ? (() => { try { return JSON.parse(job.checklist); } catch { return []; } })()
+      : (job.checklist ?? []),
+  };
+}
+
 const createJobSchema = z.object({
   propertyId: z.string(),
   bookingId: z.string().optional(),
@@ -60,7 +76,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       },
       orderBy: { scheduledAt: 'asc' },
     });
-    return res.json(jobs);
+    return res.json(jobs.map(parseJob));
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Internal server error' });
@@ -98,7 +114,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
       },
     });
     if (!job) return res.status(404).json({ error: 'Job not found' });
-    return res.json(job);
+    return res.json(parseJob(job));
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Internal server error' });
@@ -151,8 +167,8 @@ router.post('/:id/accept', async (req: AuthRequest, res: Response) => {
       const job = await prisma.job.findFirst({ where: { id: req.params.id, workerId: worker.id } });
       if (!job) return res.status(403).json({ error: 'Not your job' });
     }
-    const job = await prisma.job.update({ where: { id: req.params.id }, data: { status: 'ACCEPTED' } });
-    return res.json(job);
+    const job = await prisma.job.update({ where: { id: req.params.id }, data: { status: 'ACCEPTED' }, include: JOB_INCLUDE });
+    return res.json(parseJob(job));
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Internal server error' });
@@ -167,8 +183,8 @@ router.post('/:id/start', async (req: AuthRequest, res: Response) => {
       const job = await prisma.job.findFirst({ where: { id: req.params.id, workerId: worker.id } });
       if (!job) return res.status(403).json({ error: 'Not your job' });
     }
-    const job = await prisma.job.update({ where: { id: req.params.id }, data: { status: 'IN_PROGRESS' } });
-    return res.json(job);
+    const job = await prisma.job.update({ where: { id: req.params.id }, data: { status: 'IN_PROGRESS' }, include: JOB_INCLUDE });
+    return res.json(parseJob(job));
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Internal server error' });
@@ -196,6 +212,7 @@ router.post('/:id/complete', async (req: AuthRequest, res: Response) => {
     const updated = await prisma.job.update({
       where: { id: req.params.id },
       data: { status: 'COMPLETED', completedAt: new Date() },
+      include: JOB_INCLUDE,
     });
 
     if (workerId) {
@@ -205,7 +222,7 @@ router.post('/:id/complete', async (req: AuthRequest, res: Response) => {
       });
     }
 
-    return res.json(updated);
+    return res.json(parseJob(updated));
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Internal server error' });
