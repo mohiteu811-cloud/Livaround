@@ -18,7 +18,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (res.status === 401) {
     localStorage.removeItem('livaround_token');
-    window.location.href = '/login';
+    const isWorkerRoute = window.location.pathname.startsWith('/worker');
+    window.location.href = isWorkerRoute ? '/worker/login' : '/login';
     throw new Error('Unauthorized');
   }
 
@@ -85,6 +86,8 @@ export const api = {
       request<Worker>('/api/workers', { method: 'POST', body: JSON.stringify(data) }),
     update: (id: string, data: Partial<Worker>) =>
       request<Worker>(`/api/workers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    updateAvailability: (id: string, isAvailable: boolean) =>
+      request<Worker>(`/api/workers/${id}`, { method: 'PUT', body: JSON.stringify({ isAvailable }) }),
     delete: (id: string) => request<void>(`/api/workers/${id}`, { method: 'DELETE' }),
   },
 
@@ -98,10 +101,16 @@ export const api = {
       request<Job>('/api/jobs', { method: 'POST', body: JSON.stringify(data) }),
     dispatch: (id: string, workerId: string) =>
       request<Job>(`/api/jobs/${id}/dispatch`, { method: 'POST', body: JSON.stringify({ workerId }) }),
+    accept: (id: string) =>
+      request<Job>(`/api/jobs/${id}/accept`, { method: 'POST' }),
+    start: (id: string) =>
+      request<Job>(`/api/jobs/${id}/start`, { method: 'POST' }),
     complete: (id: string) =>
       request<Job>(`/api/jobs/${id}/complete`, { method: 'POST' }),
     cancel: (id: string) =>
       request<Job>(`/api/jobs/${id}/cancel`, { method: 'POST' }),
+    reportIssue: (id: string, data: { description: string; severity: 'LOW' | 'MEDIUM' | 'HIGH'; photoUrl?: string }) =>
+      request<{ id: string }>(`/api/jobs/${id}/issues`, { method: 'POST', body: JSON.stringify(data) }),
   },
 
   inventory: {
@@ -135,7 +144,7 @@ export interface User {
   phone?: string;
   role: string;
   host?: { id: string; name: string };
-  worker?: { id: string; skills: string[]; rating: number };
+  worker?: { id: string; skills: string[]; rating: number; isAvailable: boolean };
 }
 
 export interface Property {
