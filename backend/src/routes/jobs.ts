@@ -104,6 +104,65 @@ router.post('/', validate(createJobSchema), async (req: AuthRequest, res: Respon
   }
 });
 
+// GET /api/jobs/issues — all issues across the host's jobs (or worker's jobs)
+router.get('/issues', async (req: AuthRequest, res: Response) => {
+  try {
+    const { severity, status } = req.query;
+
+    let jobWhere: Record<string, unknown>;
+    if (isWorker(req)) {
+      const worker = await prisma.worker.findUnique({ where: { userId: req.user!.id } });
+      if (!worker) return res.json([]);
+      jobWhere = { workerId: worker.id };
+    } else {
+      jobWhere = { property: { host: { userId: req.user!.id } } };
+    }
+
+    const issues = await prisma.issue.findMany({
+      where: {
+        job: jobWhere,
+        ...(severity ? { severity: severity as string } : {}),
+        ...(status ? { status: status as string } : {}),
+      },
+      include: {
+        job: {
+          select: {
+            id: true,
+            type: true,
+            scheduledAt: true,
+            property: { select: { id: true, name: true } },
+            worker: { include: { user: { select: { name: true } } } },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    return res.json(issues);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /api/jobs/issues/:issueId — update issue status (host only)
+router.patch('/issues/:issueId', async (req: AuthRequest, res: Response) => {
+  try {
+    if (!isHost(req)) return res.status(403).json({ error: 'Hosts only' });
+    const { status } = req.body;
+    if (!['OPEN', 'IN_REVIEW', 'RESOLVED'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+    const issue = await prisma.issue.update({
+      where: { id: req.params.issueId },
+      data: { status },
+    });
+    return res.json(issue);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 router.get('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const where = isWorker(req)

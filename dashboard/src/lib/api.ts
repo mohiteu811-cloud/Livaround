@@ -111,6 +111,12 @@ export const api = {
       request<Job>(`/api/jobs/${id}/cancel`, { method: 'POST' }),
     reportIssue: (id: string, data: { description: string; severity: 'LOW' | 'MEDIUM' | 'HIGH'; photoUrl?: string }) =>
       request<{ id: string }>(`/api/jobs/${id}/issues`, { method: 'POST', body: JSON.stringify(data) }),
+    listIssues: (params?: { severity?: string; status?: string }) => {
+      const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
+      return request<JobIssue[]>(`/api/jobs/issues${qs}`);
+    },
+    resolveIssue: (issueId: string, status: 'OPEN' | 'IN_REVIEW' | 'RESOLVED') =>
+      request<JobIssue>(`/api/jobs/issues/${issueId}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
   },
 
   inventory: {
@@ -239,6 +245,24 @@ export interface SupplyCabinet {
   photoUrl?: string;
   qrCode: string;
   description?: string;
+}
+
+export interface JobIssue {
+  id: string;
+  jobId: string;
+  description: string;
+  photoUrl?: string;
+  severity: 'LOW' | 'MEDIUM' | 'HIGH';
+  status: 'OPEN' | 'IN_REVIEW' | 'RESOLVED';
+  createdAt: string;
+  updatedAt: string;
+  job?: {
+    id: string;
+    type: string;
+    scheduledAt: string;
+    property?: { id: string; name: string };
+    worker?: { user: { name: string } };
+  };
 }
 
 export interface DashboardStats {

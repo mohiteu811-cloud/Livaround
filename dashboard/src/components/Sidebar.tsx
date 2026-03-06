@@ -10,6 +10,7 @@ import {
   Briefcase,
   Users,
   Package,
+  AlertTriangle,
   LogOut,
 } from 'lucide-react';
 import { clearToken } from '@/lib/auth';
@@ -21,6 +22,7 @@ const nav = [
   { href: '/jobs', icon: Briefcase, label: 'Jobs' },
   { href: '/workers', icon: Users, label: 'Workers' },
   { href: '/inventory', icon: Package, label: 'Inventory' },
+  { href: '/issues', icon: AlertTriangle, label: 'Issues' },
 ];
 
 export function Sidebar() {
