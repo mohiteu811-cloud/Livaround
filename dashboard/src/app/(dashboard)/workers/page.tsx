@@ -199,9 +199,8 @@ export default function WorkersPage() {
       <Modal open={modal} onClose={() => setModal(false)} title="Add worker">
         <WorkerForm
           onSave={async (d) => {
-            const result = await api.workers.create(d as Parameters<typeof api.workers.create>[0]);
+            await api.workers.create(d as Parameters<typeof api.workers.create>[0]);
             await load();
-            return result;
           }}
           onClose={() => setModal(false)}
         />
