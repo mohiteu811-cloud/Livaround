@@ -15,7 +15,7 @@ import analyticsRoutes from './routes/analytics';
 const app = express();
 
 app.use(helmet());
-const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000').split(',').map(o => o.trim());
+const allowedOrigins = (process.env.CORS_ORIGIN || 'https://livarounddashboard-production.up.railway.app,http://localhost:3000').split(',').map(o => o.trim());
 app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(json({ limit: '10mb' }));
 
