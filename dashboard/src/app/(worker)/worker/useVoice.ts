@@ -5,14 +5,17 @@ import { Lang } from './i18n';
 
 declare global {
   interface Window {
-    SpeechRecognition: new () => SpeechRecognition;
-    webkitSpeechRecognition: new () => SpeechRecognition;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    SpeechRecognition: new () => any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    webkitSpeechRecognition: new () => any;
   }
 }
 
 export function useVoiceInput(lang: Lang, onTranscript: (text: string) => void) {
   const [listening, setListening] = useState(false);
-  const recRef = useRef<SpeechRecognition | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recRef = useRef<any>(null);
 
   const supported = typeof window !== 'undefined' &&
     ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
@@ -24,7 +27,7 @@ export function useVoiceInput(lang: Lang, onTranscript: (text: string) => void) 
     rec.lang = lang === 'hi' ? 'hi-IN' : 'en-IN';
     rec.interimResults = false;
     rec.maxAlternatives = 1;
-    rec.onresult = (e: SpeechRecognitionEvent) => {
+    rec.onresult = (e: any) => {
       const transcript = e.results[0][0].transcript;
       onTranscript(transcript);
     };
