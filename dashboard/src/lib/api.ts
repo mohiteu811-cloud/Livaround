@@ -96,6 +96,8 @@ export const api = {
       const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
       return request<Job[]>(`/api/jobs${qs}`);
     },
+    available: () => request<Job[]>('/api/jobs/available'),
+    claim: (id: string) => request<Job>(`/api/jobs/${id}/claim`, { method: 'POST' }),
     get: (id: string) => request<Job>(`/api/jobs/${id}`),
     create: (data: Partial<Job>) =>
       request<Job>('/api/jobs', { method: 'POST', body: JSON.stringify(data) }),

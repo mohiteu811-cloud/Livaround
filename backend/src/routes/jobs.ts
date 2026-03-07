@@ -46,6 +46,26 @@ const issueSchema = z.object({
 function isHost(req: AuthRequest) { return req.user!.role === 'HOST'; }
 function isWorker(req: AuthRequest) { return req.user!.role === 'WORKER'; }
 
+// GET /api/jobs/available — workers see unassigned PENDING jobs they can claim
+router.get('/available', async (req: AuthRequest, res: Response) => {
+  try {
+    if (!isWorker(req)) return res.status(403).json({ error: 'Workers only' });
+    const jobs = await prisma.job.findMany({
+      where: { workerId: null, status: 'PENDING' },
+      include: {
+        property: { select: { id: true, name: true, city: true } },
+        booking: { select: { id: true, guestName: true, checkIn: true, checkOut: true } },
+        _count: { select: { issues: true } },
+      },
+      orderBy: { scheduledAt: 'asc' },
+    });
+    return res.json(jobs.map(parseJob));
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // GET /api/jobs — hosts see their property jobs, workers see their own
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
@@ -157,6 +177,26 @@ router.patch('/issues/:issueId', async (req: AuthRequest, res: Response) => {
       data: { status },
     });
     return res.json(issue);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/jobs/:id/claim — worker self-assigns an available job
+router.post('/:id/claim', async (req: AuthRequest, res: Response) => {
+  try {
+    if (!isWorker(req)) return res.status(403).json({ error: 'Workers only' });
+    const worker = await prisma.worker.findUnique({ where: { userId: req.user!.id } });
+    if (!worker) return res.status(403).json({ error: 'Worker not found' });
+    const job = await prisma.job.findFirst({ where: { id: req.params.id, workerId: null, status: 'PENDING' } });
+    if (!job) return res.status(404).json({ error: 'Job not available' });
+    const updated = await prisma.job.update({
+      where: { id: req.params.id },
+      data: { workerId: worker.id, status: 'ACCEPTED' },
+      include: JOB_INCLUDE,
+    });
+    return res.json(parseJob(updated));
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Internal server error' });

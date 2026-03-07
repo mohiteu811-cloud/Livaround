@@ -46,8 +46,8 @@ export default function WorkerJobsPage() {
         const data = await api.jobs.list();
         setJobs(data.filter(j => ['COMPLETED','CANCELLED'].includes(j.status)));
       } else {
-        const data = await api.jobs.list({ status: 'DISPATCHED' });
-        setJobs(data.filter(j => !j.workerId));
+        const data = await api.jobs.available();
+        setJobs(data);
       }
     } catch { /* ignore */ }
     finally { setLoading(false); setRefreshing(false); }
@@ -107,29 +107,44 @@ export default function WorkerJobsPage() {
           </div>
         ) : (
           jobs.map(job => (
-            <button
+            <div
               key={job.id}
-              onClick={() => router.push(`/worker/job/${job.id}`)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-2xl p-4 text-left active:opacity-70 transition-opacity"
+              className="w-full bg-slate-800 border border-slate-700 rounded-2xl p-4 text-left"
             >
-              <div className="flex items-start gap-3">
-                <span className="text-3xl">{JOB_ICON[job.type] ?? '🔧'}</span>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2 mb-1">
-                    <span className="text-white font-bold">{job.type}</span>
-                    <span className={`text-xs font-bold px-2 py-0.5 rounded-md border ${STATUS_COLOR[job.status] ?? ''}`}>
-                      {job.status.replace('_', ' ')}
-                    </span>
+              <button
+                onClick={() => router.push(`/worker/job/${job.id}`)}
+                className="w-full text-left active:opacity-70 transition-opacity"
+              >
+                <div className="flex items-start gap-3">
+                  <span className="text-3xl">{JOB_ICON[job.type] ?? '🔧'}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <span className="text-white font-bold">{job.type}</span>
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-md border ${STATUS_COLOR[job.status] ?? ''}`}>
+                        {job.status.replace('_', ' ')}
+                      </span>
+                    </div>
+                    <p className="text-slate-400 text-sm truncate">{job.property?.name}</p>
+                    <p className="text-slate-500 text-xs mt-0.5">{job.property?.city}</p>
+                    <p className="text-slate-500 text-xs mt-2">📅 {formatDate(job.scheduledAt)}</p>
+                    {job.booking && (
+                      <p className="text-slate-500 text-xs">👤 {job.booking.guestName}</p>
+                    )}
                   </div>
-                  <p className="text-slate-400 text-sm truncate">{job.property?.name}</p>
-                  <p className="text-slate-500 text-xs mt-0.5">{job.property?.city}</p>
-                  <p className="text-slate-500 text-xs mt-2">📅 {formatDate(job.scheduledAt)}</p>
-                  {job.booking && (
-                    <p className="text-slate-500 text-xs">👤 {job.booking.guestName}</p>
-                  )}
                 </div>
-              </div>
-            </button>
+              </button>
+              {tab === 'available' && (
+                <button
+                  onClick={async () => {
+                    await api.jobs.claim(job.id);
+                    load();
+                  }}
+                  className="mt-3 w-full py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors"
+                >
+                  Claim Job
+                </button>
+              )}
+            </div>
           ))
         )}
       </div>

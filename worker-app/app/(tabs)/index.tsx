@@ -84,11 +84,10 @@ export default function JobsScreen() {
     try {
       let data: Job[];
       if (activeTab === 'My Jobs') {
-        data = await api.jobs.list({ workerId: user.worker.id });
+        data = await api.jobs.list();
         data = data.filter(j => ['DISPATCHED', 'ACCEPTED', 'IN_PROGRESS'].includes(j.status));
       } else {
-        data = await api.jobs.list({ status: 'DISPATCHED' });
-        data = data.filter(j => !j.workerId);
+        data = await api.jobs.available();
       }
       setJobs(data);
     } catch (err) {
@@ -104,8 +103,7 @@ export default function JobsScreen() {
     loadJobs();
   }
 
-  const myJobs = jobs.filter(j => j.workerId === user?.worker?.id);
-  const displayJobs = activeTab === 'My Jobs' ? myJobs : jobs;
+  const displayJobs = jobs;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -139,7 +137,25 @@ export default function JobsScreen() {
           contentContainerStyle={styles.list}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#3b82f6" />}
           renderItem={({ item }) => (
-            <JobCard job={item} onPress={() => router.push(`/job/${item.id}`)} />
+            <View>
+              <JobCard job={item} onPress={() => router.push(`/job/${item.id}`)} />
+              {activeTab === 'Available' && (
+                <TouchableOpacity
+                  style={styles.claimButton}
+                  activeOpacity={0.7}
+                  onPress={async () => {
+                    try {
+                      await api.jobs.claim(item.id);
+                      loadJobs();
+                    } catch (err) {
+                      console.error(err);
+                    }
+                  }}
+                >
+                  <Text style={styles.claimButtonText}>Claim Job</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           )}
           ListEmptyComponent={
             <View style={styles.empty}>
@@ -208,4 +224,15 @@ const styles = StyleSheet.create({
   emptyIcon: { fontSize: 48 },
   emptyText: { fontSize: 18, fontWeight: '600', color: '#f8fafc' },
   emptySubtext: { fontSize: 14, color: '#64748b' },
+  claimButton: {
+    marginHorizontal: 0,
+    marginTop: -4,
+    marginBottom: 8,
+    backgroundColor: '#2563eb',
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  claimButtonText: { color: '#fff', fontWeight: '700', fontSize: 14 },
 });
