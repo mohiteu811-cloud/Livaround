@@ -56,14 +56,14 @@ export default function DashboardPage() {
 
   if (!data) {
     return (
-      <div className="p-8 text-slate-400">Failed to load dashboard data.</div>
+      <div className="p-4 md:p-8 text-slate-400">Failed to load dashboard data.</div>
     );
   }
 
   const { stats, recentBookings, upcomingJobs, bookingsBySource, revenueByMonth, lowStockAlerts } = data;
 
   return (
-    <div className="p-8 space-y-8">
+    <div className="p-4 md:p-8 space-y-8">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-slate-100">Overview</h1>
@@ -71,7 +71,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatsCard
           title="Properties"
           value={stats.totalProperties}
@@ -102,7 +102,7 @@ export default function DashboardPage() {
         />
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatsCard
           title="Revenue (this month)"
           value={`₹${stats.monthlyRevenue.toLocaleString('en-IN')}`}

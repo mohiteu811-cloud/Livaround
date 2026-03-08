@@ -57,7 +57,7 @@ function ItemForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {error && <div className="px-4 py-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">{error}</div>}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <FormField label="Property">
           <Select value={form.propertyId} onChange={(e) => set('propertyId', e.target.value)} required>
             {properties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -72,7 +72,7 @@ function ItemForm({
       <FormField label="Item name">
         <Input placeholder="Toilet paper rolls" value={form.name} onChange={(e) => set('name', e.target.value)} required />
       </FormField>
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <FormField label="Current stock">
           <Input type="number" min={0} step="0.1" value={form.currentStock} onChange={(e) => set('currentStock', parseFloat(e.target.value))} required />
         </FormField>
@@ -112,7 +112,7 @@ function RestockModal({ item, onSave, onClose }: {
   return (
     <div className="space-y-4">
       <p className="text-sm text-slate-400">Updating stock for <strong className="text-slate-200">{item.name}</strong></p>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="bg-slate-800 rounded-lg p-3 text-center">
           <p className="text-xs text-slate-500 mb-1">Current</p>
           <p className="text-xl font-bold text-slate-200">{item.currentStock} <span className="text-sm text-slate-400">{item.unit}</span></p>
@@ -171,7 +171,7 @@ export default function InventoryPage() {
   }, {});
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-4 md:p-8 space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-100">Inventory</h1>

@@ -63,7 +63,7 @@ function WorkerForm({ onSave, onClose }: { onSave: (d: unknown) => Promise<void>
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {error && <div className="px-4 py-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">{error}</div>}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <FormField label="Full name">
           <Input placeholder="Preeti Dessai" value={form.name} onChange={(e) => set('name', e.target.value)} required />
         </FormField>
@@ -71,7 +71,7 @@ function WorkerForm({ onSave, onClose }: { onSave: (d: unknown) => Promise<void>
           <Input type="email" placeholder="preeti@example.com" value={form.email} onChange={(e) => set('email', e.target.value)} required />
         </FormField>
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <FormField label="Phone">
           <Input placeholder="+91 94220 11234" value={form.phone} onChange={(e) => set('phone', e.target.value)} />
         </FormField>
@@ -125,7 +125,7 @@ export default function WorkersPage() {
   }
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-4 md:p-8 space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-100">Workers</h1>

@@ -64,7 +64,7 @@ function BookingForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {error && <div className="px-4 py-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">{error}</div>}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <FormField label="Property">
           <Select value={form.propertyId} onChange={(e) => set('propertyId', e.target.value)} required>
             {properties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -78,7 +78,7 @@ function BookingForm({
           </Select>
         </FormField>
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <FormField label="Guest name">
           <Input placeholder="Sneha Kapoor" value={form.guestName} onChange={(e) => set('guestName', e.target.value)} required />
         </FormField>
@@ -86,7 +86,7 @@ function BookingForm({
           <Input type="email" placeholder="guest@example.com" value={form.guestEmail} onChange={(e) => set('guestEmail', e.target.value)} required />
         </FormField>
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <FormField label="Check-in">
           <Input type="datetime-local" value={form.checkIn as string} onChange={(e) => set('checkIn', e.target.value)} required />
         </FormField>
@@ -94,7 +94,7 @@ function BookingForm({
           <Input type="datetime-local" value={form.checkOut as string} onChange={(e) => set('checkOut', e.target.value)} required />
         </FormField>
       </div>
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <FormField label="Guests">
           <Input type="number" min={1} value={form.guestCount} onChange={(e) => set('guestCount', parseInt(e.target.value))} required />
         </FormField>
@@ -157,7 +157,7 @@ export default function BookingsPage() {
   });
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-4 md:p-8 space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-100">Bookings</h1>

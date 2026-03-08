@@ -63,7 +63,7 @@ function PropertyForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {error && <div className="px-4 py-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">{error}</div>}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <FormField label="Property name">
           <Input placeholder="Villa Serenity" value={form.name} onChange={(e) => set('name', e.target.value)} required />
         </FormField>
@@ -78,7 +78,7 @@ function PropertyForm({
       <FormField label="Address">
         <Input placeholder="14 Gauravaddo, Calangute" value={form.address} onChange={(e) => set('address', e.target.value)} required />
       </FormField>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <FormField label="City">
           <Input placeholder="Calangute" value={form.city} onChange={(e) => set('city', e.target.value)} required />
         </FormField>
@@ -86,7 +86,7 @@ function PropertyForm({
           <Input placeholder="India" value={form.country} onChange={(e) => set('country', e.target.value)} required />
         </FormField>
       </div>
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <FormField label="Bedrooms">
           <Input type="number" min={0} value={form.bedrooms} onChange={(e) => set('bedrooms', parseInt(e.target.value))} required />
         </FormField>
@@ -167,7 +167,7 @@ export default function PropertiesPage() {
   }
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-4 md:p-8 space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-100">Properties</h1>
