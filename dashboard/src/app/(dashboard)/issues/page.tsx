@@ -98,6 +98,19 @@ function IssueDetailModal({ issue, onClose, onStatusChange }: {
         </div>
       )}
 
+      {/* Video */}
+      {issue.videoUrl && (
+        <div>
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Video</p>
+          <video
+            src={issue.videoUrl}
+            controls
+            playsInline
+            className="w-full rounded-lg border border-slate-700 max-h-72 bg-black"
+          />
+        </div>
+      )}
+
       {/* Actions */}
       {issue.status !== 'RESOLVED' && (
         <div className="flex gap-3 pt-1">
@@ -215,7 +228,10 @@ export default function IssuesPage() {
                     {issue.job.worker && ` · ${issue.job.worker.user.name}`}
                   </p>
                 )}
-                {issue.photoUrl && <span className="text-xs text-slate-500">📷 Has photo</span>}
+                <div className="flex gap-2">
+                  {issue.photoUrl && <span className="text-xs text-slate-500">📷 Photo</span>}
+                  {issue.videoUrl && <span className="text-xs text-slate-500">🎥 Video</span>}
+                </div>
               </button>
             ))}
           </div>

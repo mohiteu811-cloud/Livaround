@@ -67,6 +67,7 @@ export interface Issue {
   severity: 'LOW' | 'MEDIUM' | 'HIGH';
   status: string;
   photoUrl?: string;
+  videoUrl?: string;
   createdAt: string;
 }
 
@@ -101,8 +102,24 @@ export const api = {
     accept: (id: string) => request<Job>(`/api/jobs/${id}/accept`, { method: 'POST' }),
     start: (id: string) => request<Job>(`/api/jobs/${id}/start`, { method: 'POST' }),
     complete: (id: string) => request<Job>(`/api/jobs/${id}/complete`, { method: 'POST' }),
-    reportIssue: (id: string, data: { description: string; severity: 'LOW' | 'MEDIUM' | 'HIGH'; photoUrl?: string }) =>
+    reportIssue: (id: string, data: { description: string; severity: 'LOW' | 'MEDIUM' | 'HIGH'; photoUrl?: string; videoUrl?: string }) =>
       request<Issue>(`/api/jobs/${id}/issues`, { method: 'POST', body: JSON.stringify(data) }),
+  },
+
+  upload: {
+    file: async (uri: string, mimeType: string): Promise<{ url: string; type: 'image' | 'video' }> => {
+      const token = await getToken();
+      const ext = uri.split('.').pop() ?? 'mp4';
+      const body = new FormData();
+      body.append('file', { uri, name: `upload.${ext}`, type: mimeType } as unknown as Blob);
+      const res = await fetch(`${API_URL}/api/upload`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body,
+      });
+      if (!res.ok) { const b = await res.json().catch(() => ({})); throw new Error(b.error || 'Upload failed'); }
+      return res.json();
+    },
   },
 
   workers: {

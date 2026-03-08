@@ -18,9 +18,13 @@ export default function ReportIssuePage() {
   const [severity, setSeverity] = useState<Severity>('MEDIUM');
   const [description, setDescription] = useState('');
   const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
 
   const appendTranscript = useCallback((text: string) => {
     setDescription(prev => prev ? `${prev} ${text}` : text);
@@ -36,20 +40,44 @@ export default function ReportIssuePage() {
     reader.readAsDataURL(file);
   }
 
+  function handleVideo(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setVideoFile(file);
+    setVideoPreviewUrl(URL.createObjectURL(file));
+  }
+
+  function clearVideo() {
+    setVideoFile(null);
+    if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl);
+    setVideoPreviewUrl(null);
+    if (videoInputRef.current) videoInputRef.current.value = '';
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (description.trim().length < 5) { setError(tr.descriptionRequired); return; }
     setLoading(true);
     setError('');
     try {
+      let uploadedVideoUrl: string | undefined;
+      if (videoFile) {
+        setUploading(true);
+        const result = await api.upload.file(videoFile);
+        uploadedVideoUrl = result.url;
+        setUploading(false);
+      }
+
       await api.jobs.reportIssue(id, {
         description: description.trim(),
         severity,
         photoUrl: photoDataUrl ?? undefined,
+        videoUrl: uploadedVideoUrl,
       });
       alert(tr.issueSubmitted);
       router.back();
     } catch (err) {
+      setUploading(false);
       setError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
       setLoading(false);
@@ -123,14 +151,7 @@ export default function ReportIssuePage() {
         {/* Photo */}
         <div>
           <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{tr.photo}</label>
-          <input
-            ref={photoInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={handlePhoto}
-            className="hidden"
-          />
+          <input ref={photoInputRef} type="file" accept="image/*" capture="environment" onChange={handlePhoto} className="hidden" />
           {photoDataUrl ? (
             <div className="relative">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -154,6 +175,56 @@ export default function ReportIssuePage() {
           )}
         </div>
 
+        {/* Video */}
+        <div>
+          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+            🎥 {lang === 'hi' ? 'वीडियो' : 'Video'}
+          </label>
+          <input
+            ref={videoInputRef}
+            type="file"
+            accept="video/*"
+            capture="environment"
+            onChange={handleVideo}
+            className="hidden"
+          />
+          {videoPreviewUrl ? (
+            <div className="relative">
+              <video
+                src={videoPreviewUrl}
+                controls
+                playsInline
+                className="w-full rounded-xl border border-slate-700 max-h-56 bg-black"
+              />
+              <button
+                type="button"
+                onClick={clearVideo}
+                className="absolute top-2 right-2 bg-slate-900/80 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold"
+              >
+                ✕
+              </button>
+              <p className="text-xs text-slate-500 mt-1">
+                {videoFile ? `${(videoFile.size / 1024 / 1024).toFixed(1)} MB` : ''}
+              </p>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => videoInputRef.current?.click()}
+              className="w-full py-4 bg-slate-800 border-2 border-dashed border-slate-600 rounded-xl text-slate-400 font-semibold text-sm flex items-center justify-center gap-2"
+            >
+              🎥 {lang === 'hi' ? 'वीडियो रिकॉर्ड करें' : 'Record / Upload Video'}
+            </button>
+          )}
+        </div>
+
+        {uploading && (
+          <div className="px-4 py-3 bg-blue-500/10 border border-blue-500/20 rounded-xl text-blue-400 text-sm flex items-center gap-2">
+            <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin shrink-0" />
+            {lang === 'hi' ? 'वीडियो अपलोड हो रहा है…' : 'Uploading video…'}
+          </div>
+        )}
+
         {error && (
           <div className="px-4 py-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">
             {error}
@@ -162,10 +233,10 @@ export default function ReportIssuePage() {
 
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || uploading}
           className="w-full py-4 bg-red-600 hover:bg-red-500 disabled:opacity-60 text-white font-bold rounded-2xl text-base transition-colors"
         >
-          {loading ? tr.submitting : tr.submitIssue}
+          {uploading ? (lang === 'hi' ? 'अपलोड हो रहा है…' : 'Uploading…') : loading ? tr.submitting : tr.submitIssue}
         </button>
       </form>
     </WorkerShell>

@@ -111,7 +111,7 @@ export const api = {
       request<Job>(`/api/jobs/${id}/complete`, { method: 'POST' }),
     cancel: (id: string) =>
       request<Job>(`/api/jobs/${id}/cancel`, { method: 'POST' }),
-    reportIssue: (id: string, data: { description: string; severity: 'LOW' | 'MEDIUM' | 'HIGH'; photoUrl?: string }) =>
+    reportIssue: (id: string, data: { description: string; severity: 'LOW' | 'MEDIUM' | 'HIGH'; photoUrl?: string; videoUrl?: string }) =>
       request<{ id: string }>(`/api/jobs/${id}/issues`, { method: 'POST', body: JSON.stringify(data) }),
     listIssues: (params?: { severity?: string; status?: string }) => {
       const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
@@ -119,6 +119,21 @@ export const api = {
     },
     resolveIssue: (issueId: string, status: 'OPEN' | 'IN_REVIEW' | 'RESOLVED') =>
       request<JobIssue>(`/api/jobs/issues/${issueId}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+  },
+
+  upload: {
+    file: async (file: File): Promise<{ url: string; type: 'image' | 'video' }> => {
+      const token = getToken();
+      const body = new FormData();
+      body.append('file', file);
+      const res = await fetch(`${API_URL}/api/upload`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body,
+      });
+      if (!res.ok) { const b = await res.json().catch(() => ({})); throw new Error(b.error || 'Upload failed'); }
+      return res.json();
+    },
   },
 
   inventory: {
@@ -254,6 +269,7 @@ export interface JobIssue {
   jobId: string;
   description: string;
   photoUrl?: string;
+  videoUrl?: string;
   severity: 'LOW' | 'MEDIUM' | 'HIGH';
   status: 'OPEN' | 'IN_REVIEW' | 'RESOLVED';
   createdAt: string;

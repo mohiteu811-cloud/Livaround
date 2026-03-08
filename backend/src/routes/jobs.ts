@@ -40,6 +40,7 @@ const dispatchSchema = z.object({
 const issueSchema = z.object({
   description: z.string().min(5),
   photoUrl: z.string().optional(),
+  videoUrl: z.string().optional(),
   severity: z.enum(['LOW', 'MEDIUM', 'HIGH']).default('LOW'),
 });
 
