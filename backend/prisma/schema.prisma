@@ -19,16 +19,18 @@ model User {
 
   host   Host?
   worker Worker?
+  owner  Owner?
 }
 
 model Host {
-  id         String     @id @default(cuid())
-  userId     String     @unique
-  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         String      @id @default(cuid())
+  userId     String      @unique
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   name       String
   properties Property[]
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
+  tradeRoles TradeRole[]
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
 }
 
 model Property {
@@ -51,10 +53,14 @@ model Property {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  bookings       Booking[]
-  jobs           Job[]
-  inventoryItems InventoryItem[]
-  supplyCabinets SupplyCabinet[]
+  bookings            Booking[]
+  jobs                Job[]
+  inventoryItems      InventoryItem[]
+  supplyCabinets      SupplyCabinet[]
+  staffAssignments    PropertyStaff[]
+  maintenanceSettings PropertyMaintenanceSettings?
+  maintenanceRequests MaintenanceRequest[]
+  ownerships          PropertyOwnership[]
 }
 
 model Booking {
@@ -80,40 +86,46 @@ model Booking {
 }
 
 model Worker {
-  id            String   @id @default(cuid())
-  userId        String   @unique
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  skills        String   @default("[]")
-  isAvailable   Boolean  @default(true)
+  id            String     @id @default(cuid())
+  userId        String     @unique
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skills        String     @default("[]")
+  isAvailable   Boolean    @default(true)
   location      String?
   rating        Float?
-  jobsCompleted Int      @default(0)
+  jobsCompleted Int        @default(0)
   bio           String?
   pushToken     String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  tradeRoleId   String?
+  tradeRole     TradeRole? @relation(fields: [tradeRoleId], references: [id], onDelete: SetNull)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
 
-  jobs Job[]
+  jobs                     Job[]
+  propertyStaff            PropertyStaff[]
+  reportedMaintenanceReqs  MaintenanceRequest[] @relation("ReportedBy")
+  assignedMaintenanceReqs  MaintenanceRequest[] @relation("AssignedTo")
 }
 
 model Job {
-  id          String    @id @default(cuid())
-  propertyId  String
-  property    Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  bookingId   String?
-  booking     Booking?  @relation(fields: [bookingId], references: [id])
-  workerId    String?
-  worker      Worker?   @relation(fields: [workerId], references: [id])
-  type        String
-  status      String    @default("PENDING")
-  scheduledAt DateTime
-  completedAt DateTime?
-  notes       String?
-  checklist   String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id                   String             @id @default(cuid())
+  propertyId           String
+  property             Property           @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  bookingId            String?
+  booking              Booking?           @relation(fields: [bookingId], references: [id])
+  workerId             String?
+  worker               Worker?            @relation(fields: [workerId], references: [id])
+  type                 String
+  status               String             @default("PENDING")
+  scheduledAt          DateTime
+  completedAt          DateTime?
+  notes                String?
+  checklist            String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
 
-  issues Issue[]
+  issues             Issue[]
+  maintenanceRequest MaintenanceRequest?
 }
 
 model Issue {
@@ -155,4 +167,100 @@ model SupplyCabinet {
   description String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+// ── Maintenance trade roles (host-defined) ──────────────────────────────────
+
+model TradeRole {
+  id          String   @id @default(cuid())
+  hostId      String
+  host        Host     @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  name        String   // e.g. "Plumber", "Carpenter", "Electrician"
+  description String?
+  color       String   @default("#6366f1") // display color
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workers             Worker[]
+  maintenanceRequests MaintenanceRequest[]
+}
+
+// ── Property staff assignments ───────────────────────────────────────────────
+
+model PropertyStaff {
+  id         String   @id @default(cuid())
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  workerId   String
+  worker     Worker   @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  role       String   @default("CLEANER") // CARETAKER, CLEANER
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([propertyId, workerId])
+}
+
+// ── Per-property maintenance approval settings ───────────────────────────────
+
+model PropertyMaintenanceSettings {
+  id                   String   @id @default(cuid())
+  propertyId           String   @unique
+  property             Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  requireApproval      Boolean  @default(true)
+  autoAssignTradeRoles String   @default("[]") // JSON array of tradeRoleIds
+  allowCaretakerAssign Boolean  @default(false) // caretaker can pick the tradesperson
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+// ── Maintenance requests (raised by caretakers / cleaners) ───────────────────
+
+model MaintenanceRequest {
+  id               String     @id @default(cuid())
+  propertyId       String
+  property         Property   @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  reportedById     String
+  reportedBy       Worker     @relation("ReportedBy", fields: [reportedById], references: [id])
+  tradeRoleId      String?
+  tradeRole        TradeRole? @relation(fields: [tradeRoleId], references: [id], onDelete: SetNull)
+  title            String
+  description      String
+  photoUrl         String?
+  videoUrl         String?
+  priority         String     @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  status           String     @default("PENDING") // PENDING, APPROVED, REJECTED, AUTO_ASSIGNED, ASSIGNED, IN_PROGRESS, COMPLETED
+  assignedWorkerId String?
+  assignedWorker   Worker?    @relation("AssignedTo", fields: [assignedWorkerId], references: [id])
+  jobId            String?    @unique
+  job              Job?       @relation(fields: [jobId], references: [id])
+  hostNotes        String?
+  scheduledAt      DateTime?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+}
+
+// ── Owner model ──────────────────────────────────────────────────────────────
+
+model Owner {
+  id        String             @id @default(cuid())
+  userId    String             @unique
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  properties PropertyOwnership[]
+}
+
+model PropertyOwnership {
+  id               String   @id @default(cuid())
+  ownerId          String
+  owner            Owner    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  propertyId       String
+  property         Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  involvementLevel String   @default("REPORTS_ONLY") // NONE, REPORTS_ONLY, FINANCIAL, FULL
+  ownershipPercent Float?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([ownerId, propertyId])
 }

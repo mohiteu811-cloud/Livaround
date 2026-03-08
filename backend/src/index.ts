@@ -13,6 +13,10 @@ import jobsRoutes from './routes/jobs';
 import inventoryRoutes from './routes/inventory';
 import analyticsRoutes from './routes/analytics';
 import uploadRoutes from './routes/upload';
+import tradeRolesRoutes from './routes/trade-roles';
+import propertyStaffRoutes from './routes/property-staff';
+import maintenanceRoutes from './routes/maintenance';
+import ownersRoutes from './routes/owners';
 
 const app = express();
 
@@ -32,6 +36,10 @@ app.use('/api/jobs', jobsRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/trade-roles', tradeRolesRoutes);
+app.use('/api/properties', propertyStaffRoutes);
+app.use('/api/maintenance', maintenanceRoutes);
+app.use('/api/owners', ownersRoutes);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 

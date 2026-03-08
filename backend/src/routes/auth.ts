@@ -70,7 +70,7 @@ router.post('/login', validate(loginSchema), async (req: Request, res: Response)
 
     const user = await prisma.user.findUnique({
       where: { email },
-      include: { host: true, worker: true },
+      include: { host: true, worker: true, owner: true },
     });
 
     if (!user || !(await bcrypt.compare(password, user.password))) {
@@ -83,6 +83,7 @@ router.post('/login', validate(loginSchema), async (req: Request, res: Response)
       role: user.role,
       hostId: user.host?.id,
       workerId: user.worker?.id,
+      ownerId: user.owner?.id,
     });
 
     return res.json({

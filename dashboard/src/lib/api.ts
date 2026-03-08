@@ -18,8 +18,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (res.status === 401) {
     localStorage.removeItem('livaround_token');
-    const isWorkerRoute = window.location.pathname.startsWith('/worker');
-    window.location.href = isWorkerRoute ? '/worker/login' : '/login';
+    const path = window.location.pathname;
+    if (path.startsWith('/worker')) window.location.href = '/worker/login';
+    else if (path.startsWith('/owner')) window.location.href = '/owner/login';
+    else window.location.href = '/login';
     throw new Error('Unauthorized');
   }
 
@@ -134,6 +136,56 @@ export const api = {
       if (!res.ok) { const b = await res.json().catch(() => ({})); throw new Error(b.error || 'Upload failed'); }
       return res.json();
     },
+  },
+
+  tradeRoles: {
+    list: () => request<TradeRole[]>('/api/trade-roles'),
+    create: (data: { name: string; description?: string; color?: string }) =>
+      request<TradeRole>('/api/trade-roles', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: Partial<TradeRole>) =>
+      request<TradeRole>(`/api/trade-roles/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: string) => request<void>(`/api/trade-roles/${id}`, { method: 'DELETE' }),
+  },
+
+  propertyStaff: {
+    list: (propertyId: string) => request<PropertyStaffAssignment[]>(`/api/properties/${propertyId}/staff`),
+    assign: (propertyId: string, data: { workerId: string; role: 'CARETAKER' | 'CLEANER' }) =>
+      request<PropertyStaffAssignment>(`/api/properties/${propertyId}/staff`, { method: 'POST', body: JSON.stringify(data) }),
+    remove: (propertyId: string, workerId: string) =>
+      request<void>(`/api/properties/${propertyId}/staff/${workerId}`, { method: 'DELETE' }),
+    getSettings: (propertyId: string) => request<MaintenanceSettings>(`/api/properties/${propertyId}/maintenance-settings`),
+    updateSettings: (propertyId: string, data: Partial<MaintenanceSettings>) =>
+      request<MaintenanceSettings>(`/api/properties/${propertyId}/maintenance-settings`, { method: 'PUT', body: JSON.stringify(data) }),
+  },
+
+  maintenance: {
+    list: (params?: { status?: string; propertyId?: string; priority?: string }) => {
+      const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
+      return request<MaintenanceRequest[]>(`/api/maintenance${qs}`);
+    },
+    get: (id: string) => request<MaintenanceRequest>(`/api/maintenance/${id}`),
+    create: (data: {
+      propertyId: string; title: string; description: string;
+      priority?: string; tradeRoleId?: string; photoUrl?: string; videoUrl?: string;
+    }) => request<MaintenanceRequest>('/api/maintenance', { method: 'POST', body: JSON.stringify(data) }),
+    review: (id: string, data: { action: 'APPROVE' | 'REJECT'; assignedWorkerId?: string; scheduledAt?: string; hostNotes?: string }) =>
+      request<MaintenanceRequest>(`/api/maintenance/${id}/review`, { method: 'POST', body: JSON.stringify(data) }),
+    assign: (id: string, data: { assignedWorkerId: string; scheduledAt?: string }) =>
+      request<MaintenanceRequest>(`/api/maintenance/${id}/assign`, { method: 'POST', body: JSON.stringify(data) }),
+  },
+
+  owners: {
+    list: () => request<OwnerEntry[]>('/api/owners'),
+    create: (data: { name: string; email: string; phone?: string }) =>
+      request<OwnerEntry & { tempPassword: string }>('/api/owners', { method: 'POST', body: JSON.stringify(data) }),
+    linkProperty: (ownerId: string, data: { propertyId: string; involvementLevel: string; ownershipPercent?: number }) =>
+      request<PropertyOwnership>(`/api/owners/${ownerId}/properties`, { method: 'POST', body: JSON.stringify(data) }),
+    updateLink: (ownerId: string, propertyId: string, data: { involvementLevel?: string; ownershipPercent?: number }) =>
+      request<PropertyOwnership>(`/api/owners/${ownerId}/properties/${propertyId}`, { method: 'PUT', body: JSON.stringify(data) }),
+    unlinkProperty: (ownerId: string, propertyId: string) =>
+      request<void>(`/api/owners/${ownerId}/properties/${propertyId}`, { method: 'DELETE' }),
+    delete: (id: string) => request<void>(`/api/owners/${id}`, { method: 'DELETE' }),
+    dashboard: () => request<OwnerDashboard>('/api/owners/dashboard'),
   },
 
   inventory: {
@@ -281,6 +333,88 @@ export interface JobIssue {
     property?: { id: string; name: string };
     worker?: { user: { name: string } };
   };
+}
+
+export interface TradeRole {
+  id: string;
+  hostId: string;
+  name: string;
+  description?: string;
+  color: string;
+  createdAt: string;
+  _count?: { workers: number; maintenanceRequests: number };
+}
+
+export interface PropertyStaffAssignment {
+  id: string;
+  propertyId: string;
+  workerId: string;
+  role: 'CARETAKER' | 'CLEANER';
+  createdAt: string;
+  worker: Worker & { tradeRole?: TradeRole };
+}
+
+export interface MaintenanceSettings {
+  propertyId: string;
+  requireApproval: boolean;
+  autoAssignTradeRoles: string[];
+  allowCaretakerAssign: boolean;
+}
+
+export interface MaintenanceRequest {
+  id: string;
+  propertyId: string;
+  property?: { id: string; name: string; city: string };
+  reportedById: string;
+  reportedBy?: { id: string; user: { id: string; name: string } };
+  tradeRoleId?: string;
+  tradeRole?: TradeRole;
+  title: string;
+  description: string;
+  photoUrl?: string;
+  videoUrl?: string;
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'AUTO_ASSIGNED' | 'ASSIGNED' | 'IN_PROGRESS' | 'COMPLETED';
+  assignedWorkerId?: string;
+  assignedWorker?: { id: string; user: { id: string; name: string } };
+  jobId?: string;
+  job?: { id: string; status: string };
+  hostNotes?: string;
+  scheduledAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PropertyOwnership {
+  id: string;
+  ownerId: string;
+  propertyId: string;
+  property?: { id: string; name: string; city: string };
+  involvementLevel: 'NONE' | 'REPORTS_ONLY' | 'FINANCIAL' | 'FULL';
+  ownershipPercent?: number;
+  createdAt: string;
+}
+
+export interface OwnerEntry {
+  id: string;
+  user: { id: string; name: string; email: string; phone?: string };
+  properties: PropertyOwnership[];
+}
+
+export interface OwnerDashboard {
+  owner: { id: string };
+  properties: {
+    propertyId: string;
+    involvementLevel: string;
+    ownershipPercent?: number;
+    property: {
+      id: string; name: string; city: string; type: string;
+      activeBookings?: Booking[];
+      recentRevenue?: number;
+      activeJobs?: Job[];
+      maintenanceRequests?: MaintenanceRequest[];
+    };
+  }[];
 }
 
 export interface DashboardStats {

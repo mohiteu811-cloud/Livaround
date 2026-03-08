@@ -15,6 +15,9 @@ import {
   LogOut,
   Menu,
   X,
+  Wrench,
+  ClipboardList,
+  UserCircle,
 } from 'lucide-react';
 import { clearToken } from '@/lib/auth';
 
@@ -26,13 +29,26 @@ const nav = [
   { href: '/workers', icon: Users, label: 'Workers' },
   { href: '/inventory', icon: Package, label: 'Inventory' },
   { href: '/issues', icon: AlertTriangle, label: 'Issues' },
+  { group: true, label: 'Maintenance' },
+  { href: '/trade-roles', icon: Wrench, label: 'Trade Roles' },
+  { href: '/maintenance', icon: ClipboardList, label: 'Requests' },
+  { group: true, label: 'Ownership' },
+  { href: '/owners', icon: UserCircle, label: 'Owners' },
 ];
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   return (
     <>
-      {nav.map(({ href, icon: Icon, label }) => {
+      {nav.map((item, i) => {
+        if ('group' in item) {
+          return (
+            <p key={i} className="px-3 pt-4 pb-1 text-xs font-semibold text-slate-600 uppercase tracking-wider">
+              {item.label}
+            </p>
+          );
+        }
+        const { href, icon: Icon, label } = item as { href: string; icon: React.ElementType; label: string };
         const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href));
         return (
           <Link
