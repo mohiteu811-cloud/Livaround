@@ -25,15 +25,16 @@ export function Modal({ open, onClose, title, children, size = 'md' }: Props) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div
         className={clsx(
-          'relative w-full bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl',
+          'relative w-full bg-slate-900 border border-slate-700 shadow-2xl flex flex-col max-h-[90dvh]',
+          'rounded-t-2xl sm:rounded-2xl',
           sizes[size]
         )}
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 shrink-0">
           <h2 className="text-lg font-semibold text-slate-100">{title}</h2>
           <button
             onClick={onClose}
@@ -42,7 +43,7 @@ export function Modal({ open, onClose, title, children, size = 'md' }: Props) {
             <X size={18} />
           </button>
         </div>
-        <div className="p-6">{children}</div>
+        <div className="p-6 overflow-y-auto">{children}</div>
       </div>
     </div>
   );

@@ -164,13 +164,13 @@ export default function IssuesPage() {
 
       {/* Filters */}
       <div className="flex gap-3">
-        <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-44">
+        <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="flex-1 sm:w-44 sm:flex-none">
           <option value="">All statuses</option>
           <option value="OPEN">Open</option>
           <option value="IN_REVIEW">In review</option>
           <option value="RESOLVED">Resolved</option>
         </Select>
-        <Select value={severityFilter} onChange={(e) => setSeverityFilter(e.target.value)} className="w-44">
+        <Select value={severityFilter} onChange={(e) => setSeverityFilter(e.target.value)} className="flex-1 sm:w-44 sm:flex-none">
           <option value="">All severities</option>
           <option value="HIGH">🔴 High</option>
           <option value="MEDIUM">🟡 Medium</option>
@@ -178,79 +178,112 @@ export default function IssuesPage() {
         </Select>
       </div>
 
-      {/* Table */}
+      {/* Content */}
       {loading ? (
         <div className="flex items-center justify-center h-64">
           <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
         </div>
-      ) : (
-        <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-800 text-xs text-slate-500 uppercase tracking-wider">
-                <th className="text-left px-6 py-3">Issue</th>
-                <th className="text-left px-6 py-3">Job / Property</th>
-                <th className="text-left px-6 py-3">Worker</th>
-                <th className="text-left px-6 py-3">Severity</th>
-                <th className="text-left px-6 py-3">Status</th>
-                <th className="text-left px-6 py-3">Reported</th>
-                <th className="px-6 py-3" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/60">
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-slate-500">No issues found</td>
-                </tr>
-              )}
-              {filtered.map((issue) => (
-                <tr key={issue.id} className="hover:bg-slate-800/30 transition-colors">
-                  <td className="px-6 py-4 max-w-xs">
-                    <p className="text-slate-200 truncate">{issue.description}</p>
-                    {issue.photoUrl && (
-                      <span className="text-xs text-slate-500 mt-0.5 block">📷 Has photo</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4">
-                    {issue.job ? (
-                      <div>
-                        <p className="text-slate-300 text-xs">
-                          {JOB_TYPE_ICONS[issue.job.type] ?? '📋'} {issue.job.type.charAt(0) + issue.job.type.slice(1).toLowerCase()}
-                        </p>
-                        <p className="text-slate-500 text-xs">{issue.job.property?.name}</p>
-                      </div>
-                    ) : '—'}
-                  </td>
-                  <td className="px-6 py-4 text-slate-400 text-xs">
-                    {issue.job?.worker?.user.name ?? <span className="text-slate-600 italic">Unknown</span>}
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${SEVERITY_STYLES[issue.severity]}`}>
-                      {issue.severity}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium w-fit ${STATUS_STYLES[issue.status]}`}>
-                      {STATUS_ICONS[issue.status]} {issue.status.replace('_', ' ')}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-slate-500 text-xs">
-                    {format(new Date(issue.createdAt), 'dd MMM, HH:mm')}
-                  </td>
-                  <td className="px-6 py-4">
-                    <button
-                      onClick={() => setSelected(issue)}
-                      className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-slate-200"
-                      title="View details"
-                    >
-                      <Eye size={14} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      ) : filtered.length === 0 ? (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl px-6 py-12 text-center text-slate-500">
+          No issues found
         </div>
+      ) : (
+        <>
+          {/* Mobile: card list */}
+          <div className="md:hidden space-y-3">
+            {filtered.map((issue) => (
+              <button
+                key={issue.id}
+                onClick={() => setSelected(issue)}
+                className="w-full text-left bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-2 active:bg-slate-800 transition-colors"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-slate-200 text-sm font-medium leading-snug line-clamp-2">{issue.description}</p>
+                  <Eye size={15} className="text-slate-500 shrink-0 mt-0.5" />
+                </div>
+                <div className="flex flex-wrap gap-1.5 text-xs">
+                  <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full font-medium ${SEVERITY_STYLES[issue.severity]}`}>
+                    {issue.severity}
+                  </span>
+                  <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full font-medium ${STATUS_STYLES[issue.status]}`}>
+                    {STATUS_ICONS[issue.status]} {issue.status.replace('_', ' ')}
+                  </span>
+                </div>
+                {issue.job && (
+                  <p className="text-slate-500 text-xs">
+                    {JOB_TYPE_ICONS[issue.job.type] ?? '📋'} {issue.job.type.charAt(0) + issue.job.type.slice(1).toLowerCase()} · {issue.job.property?.name}
+                    {issue.job.worker && ` · ${issue.job.worker.user.name}`}
+                  </p>
+                )}
+                {issue.photoUrl && <span className="text-xs text-slate-500">📷 Has photo</span>}
+              </button>
+            ))}
+          </div>
+
+          {/* Desktop: table */}
+          <div className="hidden md:block bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-800 text-xs text-slate-500 uppercase tracking-wider">
+                  <th className="text-left px-6 py-3">Issue</th>
+                  <th className="text-left px-6 py-3">Job / Property</th>
+                  <th className="text-left px-6 py-3">Worker</th>
+                  <th className="text-left px-6 py-3">Severity</th>
+                  <th className="text-left px-6 py-3">Status</th>
+                  <th className="text-left px-6 py-3">Reported</th>
+                  <th className="px-6 py-3" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60">
+                {filtered.map((issue) => (
+                  <tr key={issue.id} className="hover:bg-slate-800/30 transition-colors">
+                    <td className="px-6 py-4 max-w-xs">
+                      <p className="text-slate-200 truncate">{issue.description}</p>
+                      {issue.photoUrl && (
+                        <span className="text-xs text-slate-500 mt-0.5 block">📷 Has photo</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      {issue.job ? (
+                        <div>
+                          <p className="text-slate-300 text-xs">
+                            {JOB_TYPE_ICONS[issue.job.type] ?? '📋'} {issue.job.type.charAt(0) + issue.job.type.slice(1).toLowerCase()}
+                          </p>
+                          <p className="text-slate-500 text-xs">{issue.job.property?.name}</p>
+                        </div>
+                      ) : '—'}
+                    </td>
+                    <td className="px-6 py-4 text-slate-400 text-xs">
+                      {issue.job?.worker?.user.name ?? <span className="text-slate-600 italic">Unknown</span>}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${SEVERITY_STYLES[issue.severity]}`}>
+                        {issue.severity}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium w-fit ${STATUS_STYLES[issue.status]}`}>
+                        {STATUS_ICONS[issue.status]} {issue.status.replace('_', ' ')}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-slate-500 text-xs">
+                      {format(new Date(issue.createdAt), 'dd MMM, HH:mm')}
+                    </td>
+                    <td className="px-6 py-4">
+                      <button
+                        onClick={() => setSelected(issue)}
+                        className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-slate-200"
+                        title="View details"
+                      >
+                        <Eye size={14} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
 
       {selected && (
