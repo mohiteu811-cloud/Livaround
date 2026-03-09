@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
-import { Plus, Search, LogIn, LogOut, X } from 'lucide-react';
+import { Plus, Search, LogIn, LogOut, X, Link2, Check } from 'lucide-react';
 import { api, Booking, Property } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Input, Select, Textarea, FormField } from '@/components/ui/Input';
@@ -107,6 +107,9 @@ function BookingForm({
           </Select>
         </FormField>
       </div>
+      <FormField label="Lock code (optional — sent to guest)">
+        <Input placeholder="e.g. 1234#" value={(form as Booking).lockCode || ''} onChange={(e) => set('lockCode', e.target.value)} />
+      </FormField>
       <FormField label="Notes">
         <Textarea rows={2} placeholder="Any special requests or notes..." value={form.notes || ''} onChange={(e) => set('notes', e.target.value)} />
       </FormField>
@@ -117,6 +120,20 @@ function BookingForm({
         </Button>
       </div>
     </form>
+  );
+}
+
+function GuestLinkButton({ guestCode }: { guestCode?: string }) {
+  const [copied, setCopied] = useState(false);
+  if (!guestCode) return null;
+  const url = `${typeof window !== 'undefined' ? window.location.origin : ''}/stay/${guestCode}`;
+  function copy() {
+    navigator.clipboard.writeText(url).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
+  }
+  return (
+    <button onClick={copy} title="Copy guest stay link" className="p-1.5 rounded hover:bg-slate-800 text-slate-500 hover:text-brand-400 transition-colors">
+      {copied ? <Check size={14} className="text-emerald-400" /> : <Link2 size={14} />}
+    </button>
   );
 }
 
@@ -228,6 +245,7 @@ export default function BookingsPage() {
                   <td className="px-6 py-4">{statusBadge(b.status)}</td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-1 justify-end">
+                      <GuestLinkButton guestCode={b.guestCode} />
                       {b.status === 'CONFIRMED' && (
                         <button onClick={() => handleCheckIn(b.id)} className="p-1.5 rounded hover:bg-slate-800 text-emerald-400 hover:text-emerald-300" title="Check in">
                           <LogIn size={14} />

@@ -21,13 +21,23 @@ const propertySchema = z.object({
   images: z.array(z.string()).default([]),
   isActive: z.boolean().default(true),
   airbnbUrl: z.string().optional(),
+  wifiName: z.string().optional(),
+  wifiPassword: z.string().optional(),
+  mapUrl: z.string().optional(),
+  checkInInstructions: z.string().optional(),
+  houseRules: z.array(z.string()).optional(),
 });
 
 function parseJSON(s: string | null | undefined): string[] {
   try { return JSON.parse(s || '[]'); } catch { return []; }
 }
 function serializeProp(p: Record<string, unknown>) {
-  return { ...p, amenities: parseJSON(p.amenities as string), images: parseJSON(p.images as string) };
+  return {
+    ...p,
+    amenities: parseJSON(p.amenities as string),
+    images: parseJSON(p.images as string),
+    houseRules: parseJSON((p.houseRules as string) || '[]'),
+  };
 }
 
 router.get('/', async (req: AuthRequest, res: Response) => {
@@ -48,9 +58,15 @@ router.post('/', validate(propertySchema), async (req: AuthRequest, res: Respons
   try {
     const host = await prisma.host.findUnique({ where: { userId: req.user!.id } });
     if (!host) return res.status(403).json({ error: 'Host profile not found' });
-    const { amenities, images, ...rest } = req.body;
+    const { amenities, images, houseRules, ...rest } = req.body;
     const property = await prisma.property.create({
-      data: { ...rest, amenities: JSON.stringify(amenities), images: JSON.stringify(images), hostId: host.id },
+      data: {
+        ...rest,
+        amenities: JSON.stringify(amenities),
+        images: JSON.stringify(images),
+        houseRules: houseRules ? JSON.stringify(houseRules) : '[]',
+        hostId: host.id,
+      },
     });
     return res.status(201).json(serializeProp(property as Record<string, unknown>));
   } catch (err) {
@@ -82,13 +98,14 @@ router.put('/:id', validate(propertySchema.partial()), async (req: AuthRequest, 
   try {
     const existing = await prisma.property.findFirst({ where: { id: req.params.id, host: { userId: req.user!.id } } });
     if (!existing) return res.status(404).json({ error: 'Property not found' });
-    const { amenities, images, ...rest } = req.body;
+    const { amenities, images, houseRules, ...rest } = req.body;
     const property = await prisma.property.update({
       where: { id: req.params.id },
       data: {
         ...rest,
         ...(amenities && { amenities: JSON.stringify(amenities) }),
         ...(images && { images: JSON.stringify(images) }),
+        ...(houseRules !== undefined && { houseRules: JSON.stringify(houseRules) }),
       },
     });
     return res.json(serializeProp(property as Record<string, unknown>));

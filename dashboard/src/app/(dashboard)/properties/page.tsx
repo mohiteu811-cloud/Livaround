@@ -53,6 +53,7 @@ function PropertyForm({
   const [form, setForm] = useState<Partial<Property>>({
     name: '', address: '', city: '', country: '', type: 'VILLA',
     bedrooms: 1, bathrooms: 1, maxGuests: 2, amenities: [], description: '',
+    houseRules: [],
     ...initial,
   });
   const [loading, setLoading] = useState(false);
@@ -177,6 +178,33 @@ function PropertyForm({
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Guest experience */}
+      <div className="border-t border-slate-800 pt-4 space-y-3">
+        <p className="text-sm font-medium text-slate-300">Guest experience <span className="text-slate-600 font-normal">(shown on guest stay page)</span></p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <FormField label="WiFi network name">
+            <Input placeholder="e.g. Mohit" value={form.wifiName || ''} onChange={(e) => set('wifiName', e.target.value)} />
+          </FormField>
+          <FormField label="WiFi password">
+            <Input placeholder="e.g. 12345678" value={form.wifiPassword || ''} onChange={(e) => set('wifiPassword', e.target.value)} />
+          </FormField>
+        </div>
+        <FormField label="Google Maps link">
+          <Input placeholder="https://maps.app.goo.gl/..." value={form.mapUrl || ''} onChange={(e) => set('mapUrl', e.target.value)} />
+        </FormField>
+        <FormField label="Check-in instructions">
+          <Textarea rows={3} placeholder="How to find the property, parking, entry instructions..." value={form.checkInInstructions || ''} onChange={(e) => set('checkInInstructions', e.target.value)} />
+        </FormField>
+        <FormField label="House rules (one per line)">
+          <Textarea
+            rows={5}
+            placeholder={'No smoking inside the villa\nID required for all guests\nNo loud music after 10pm'}
+            value={(form.houseRules || []).join('\n')}
+            onChange={(e) => set('houseRules', e.target.value.split('\n'))}
+          />
+        </FormField>
       </div>
 
       {/* Owner assignment — only shown for new properties */}

@@ -50,10 +50,16 @@ model Property {
   maxGuests   Int      @default(2)
   amenities   String   @default("[]")
   images      String   @default("[]")
-  isActive    Boolean  @default(true)
-  airbnbUrl   String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isActive            Boolean  @default(true)
+  airbnbUrl           String?
+  // Guest experience
+  wifiName            String?
+  wifiPassword        String?
+  mapUrl              String?
+  checkInInstructions String?
+  houseRules          String?  // JSON array of rule strings
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   bookings            Booking[]
   jobs                Job[]
@@ -87,6 +93,8 @@ model Booking {
   source      String   @default("DIRECT")
   externalId  String?
   notes       String?
+  guestCode   String?  @unique  // short URL token for guest app
+  lockCode    String?           // door lock code
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

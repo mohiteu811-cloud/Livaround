@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import { z } from 'zod';
+import crypto from 'crypto';
 import { prisma } from '../lib/prisma';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { validate } from '../middleware/validate';
@@ -21,7 +22,12 @@ const bookingSchema = z.object({
   source: z.enum(['DIRECT', 'AIRBNB', 'BOOKING_COM', 'VRBO', 'LIVAROUND']).default('DIRECT'),
   externalId: z.string().optional(),
   notes: z.string().optional(),
+  lockCode: z.string().optional(),
 });
+
+function generateGuestCode(): string {
+  return crypto.randomBytes(4).toString('hex');
+}
 
 async function assertPropertyAccess(userId: string, propertyId: string) {
   const prop = await prisma.property.findFirst({
@@ -59,7 +65,13 @@ router.post('/', validate(bookingSchema), async (req: AuthRequest, res: Response
     const canAccess = await assertPropertyAccess(req.user!.id, req.body.propertyId);
     if (!canAccess) return res.status(403).json({ error: 'Property not found or access denied' });
 
-    const booking = await prisma.booking.create({ data: req.body });
+    // Generate unique guest code
+    let guestCode = generateGuestCode();
+    while (await prisma.booking.findUnique({ where: { guestCode } })) {
+      guestCode = generateGuestCode();
+    }
+
+    const booking = await prisma.booking.create({ data: { ...req.body, guestCode } });
     return res.status(201).json(booking);
   } catch (err) {
     console.error(err);

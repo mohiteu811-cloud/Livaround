@@ -317,6 +317,11 @@ export interface Property {
   images: string[];
   isActive: boolean;
   airbnbUrl?: string;
+  wifiName?: string;
+  wifiPassword?: string;
+  mapUrl?: string;
+  checkInInstructions?: string;
+  houseRules: string[];
   createdAt: string;
   _count?: { bookings: number; jobs: number };
 }
@@ -337,6 +342,8 @@ export interface Booking {
   source: string;
   externalId?: string;
   notes?: string;
+  guestCode?: string;
+  lockCode?: string;
   createdAt: string;
   _count?: { jobs: number };
 }
