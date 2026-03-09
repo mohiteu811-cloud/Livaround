@@ -18,10 +18,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (res.status === 401) {
     localStorage.removeItem('livaround_token');
-    const path = window.location.pathname;
-    if (path.startsWith('/worker')) window.location.href = '/worker/login';
-    else if (path.startsWith('/owner')) window.location.href = '/owner/login';
-    else window.location.href = '/login';
+    window.location.href = '/login';
     throw new Error('Unauthorized');
   }
 
