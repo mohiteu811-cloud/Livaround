@@ -252,6 +252,22 @@ export const api = {
     getAudit: (jobId: string) => request<JobAudit>(`/api/jobs/${jobId}/audit`),
   },
 
+  tradesmen: {
+    list: (params?: { trade?: string; propertyId?: string; area?: string }) => {
+      const qs = params ? '?' + new URLSearchParams(
+        Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== '') as [string, string][])
+      ).toString() : '';
+      return request<Tradesman[]>(`/api/tradesmen${qs}`);
+    },
+    create: (data: { name: string; trade: string; phones?: string[]; company?: string; notes?: string; area?: string; email?: string; propertyIds?: string[] }) =>
+      request<Tradesman>('/api/tradesmen', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: Partial<{ name: string; trade: string; phones: string[]; company: string; notes: string; area: string; email: string; propertyIds: string[] }>) =>
+      request<Tradesman>(`/api/tradesmen/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: string) => request<void>(`/api/tradesmen/${id}`, { method: 'DELETE' }),
+    importFromContacts: (propertyId: string) =>
+      request<{ created: number; skipped: number; total: number }>('/api/tradesmen/import', { method: 'POST', body: JSON.stringify({ propertyId }) }),
+  },
+
   inventory: {
     list: (params?: { propertyId?: string; lowStock?: string }) => {
       const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
@@ -456,6 +472,26 @@ export interface PropertyContact {
   notes?: string;
   order: number;
   createdAt: string;
+}
+
+export interface Tradesman {
+  id: string;
+  hostId: string;
+  name: string;
+  trade: string;
+  phones: string[];
+  company?: string;
+  notes?: string;
+  area?: string;
+  email?: string;
+  createdAt: string;
+  updatedAt: string;
+  properties: {
+    id: string;
+    tradesmanId: string;
+    propertyId: string;
+    property: { id: string; name: string; city: string };
+  }[];
 }
 
 export interface PropertyGuide {

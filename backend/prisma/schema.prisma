@@ -30,6 +30,7 @@ model Host {
   properties    Property[]
   tradeRoles    TradeRole[]
   ownersCreated Owner[]
+  tradesmen     Tradesman[]
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 }
@@ -67,6 +68,7 @@ model Property {
   areas               PropertyArea[]
   docs                PropertyDoc[]
   contacts            PropertyContact[]
+  tradesmen           TradesmanProperty[]
 }
 
 model Booking {
@@ -369,6 +371,35 @@ model PropertyContact {
   order      Int      @default(0)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+}
+
+// ── Tradesmen database ────────────────────────────────────────────────────────
+
+model Tradesman {
+  id        String   @id @default(cuid())
+  hostId    String
+  host      Host     @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  name      String
+  trade     String   // e.g. "Electrician", "Plumber"
+  phones    String   @default("[]") // JSON array
+  company   String?
+  notes     String?
+  area      String?  // location/area e.g. "Calangute, Goa"
+  email     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  properties TradesmanProperty[]
+}
+
+model TradesmanProperty {
+  id          String    @id @default(cuid())
+  tradesmanId String
+  tradesman   Tradesman @relation(fields: [tradesmanId], references: [id], onDelete: Cascade)
+  propertyId  String
+  property    Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@unique([tradesmanId, propertyId])
 }
 
 // ── Supervisor job audits ─────────────────────────────────────────────────────

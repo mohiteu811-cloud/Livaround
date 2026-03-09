@@ -19,6 +19,7 @@ import {
   ClipboardList,
   UserCircle,
   BarChart3,
+  HardHat,
 } from 'lucide-react';
 import { clearToken } from '@/lib/auth';
 
@@ -33,6 +34,7 @@ const nav = [
   { group: true, label: 'Maintenance' },
   { href: '/trade-roles', icon: Wrench, label: 'Trade Roles' },
   { href: '/maintenance', icon: ClipboardList, label: 'Requests' },
+  { href: '/tradesmen', icon: HardHat, label: 'Tradesmen' },
   { group: true, label: 'Ownership' },
   { href: '/owners', icon: UserCircle, label: 'Owners' },
   { href: '/revenue', icon: BarChart3, label: 'Revenue' },

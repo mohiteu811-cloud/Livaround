@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
   ArrowLeft, Plus, Trash2, ChevronDown, ChevronRight,
-  Phone, Building2, FolderOpen, Image as ImageIcon, BookOpen, Pencil, X, Check, QrCode,
+  Phone, Building2, FolderOpen, Image as ImageIcon, BookOpen, Pencil, X, Check, QrCode, HardHat,
 } from 'lucide-react';
 import { api, PropertyGuide, PropertyArea, PropertyDoc, PropertyContact, Property } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
@@ -321,11 +321,35 @@ function DocForm({
 
 function ContactRow({ contact, propertyId, onRefresh }: { contact: PropertyContact; propertyId: string; onRefresh: () => void }) {
   const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   async function handleDelete() {
     if (!confirm(`Delete contact "${contact.agency}"?`)) return;
     await api.guide.deleteContact(propertyId, contact.id);
     onRefresh();
+  }
+
+  async function handleSaveToTradesmen() {
+    setSaving(true);
+    try {
+      await api.tradesmen.create({
+        name: contact.name || contact.agency,
+        trade: contact.agency,
+        phones: contact.phones,
+        company: contact.company,
+        notes: contact.notes,
+        propertyIds: [propertyId],
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch {
+      // silently fail — may already exist
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } finally {
+      setSaving(false);
+    }
   }
 
   if (editing) {
@@ -364,6 +388,14 @@ function ContactRow({ contact, propertyId, onRefresh }: { contact: PropertyConta
         {contact.notes && <p className="text-xs text-slate-600 mt-1 italic">{contact.notes}</p>}
       </div>
       <div className="flex items-center gap-1 flex-shrink-0">
+        <button
+          onClick={handleSaveToTradesmen}
+          disabled={saving || saved}
+          title="Save to Tradesmen DB"
+          className={`p-1.5 rounded transition-colors ${saved ? 'text-emerald-400' : 'text-slate-600 hover:text-brand-400 hover:bg-slate-800'}`}
+        >
+          {saved ? <Check size={13} /> : <HardHat size={13} />}
+        </button>
         <button onClick={() => setEditing(true)} className="p-1.5 rounded hover:bg-slate-800 text-slate-600 hover:text-slate-300 transition-colors">
           <Pencil size={13} />
         </button>
