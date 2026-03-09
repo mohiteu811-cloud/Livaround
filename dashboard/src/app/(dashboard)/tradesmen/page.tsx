@@ -240,21 +240,24 @@ export default function TradesmenPage() {
   const [filterProperty, setFilterProperty] = useState('');
   const [filterArea, setFilterArea] = useState('');
 
+  useEffect(() => {
+    // Load properties once on mount, independently of tradesmen
+    api.properties.list().then(setProperties).catch(() => {});
+  }, []);
+
   useEffect(() => { load(); }, [filterTrade, filterProperty, filterArea]);
 
   async function load() {
     setLoading(true);
     try {
-      const [ts, props] = await Promise.all([
-        api.tradesmen.list({
-          ...(filterTrade && { trade: filterTrade }),
-          ...(filterProperty && { propertyId: filterProperty }),
-          ...(filterArea && { area: filterArea }),
-        }),
-        api.properties.list(),
-      ]);
+      const ts = await api.tradesmen.list({
+        ...(filterTrade && { trade: filterTrade }),
+        ...(filterProperty && { propertyId: filterProperty }),
+        ...(filterArea && { area: filterArea }),
+      });
       setTradesmen(ts);
-      setProperties(props);
+    } catch {
+      setTradesmen([]);
     } finally {
       setLoading(false);
     }
