@@ -16,19 +16,19 @@ function AssignStaffModal({
 }: {
   workers: Worker[];
   existing: PropertyStaffAssignment[];
-  onSave: (workerId: string, role: 'CARETAKER' | 'CLEANER') => Promise<void>;
+  onSave: (workerId: string, role: 'CARETAKER' | 'CLEANER' | 'SUPERVISOR') => Promise<void>;
   onClose: () => void;
 }) {
   const existingIds = existing.map((s) => s.workerId);
   const available = workers.filter((w) => !existingIds.includes(w.id));
   const [workerId, setWorkerId] = useState(available[0]?.id || '');
-  const [role, setRole] = useState<'CARETAKER' | 'CLEANER'>('CLEANER');
+  const [role, setRole] = useState<'CARETAKER' | 'CLEANER' | 'SUPERVISOR'>('CLEANER');
   const [loading, setLoading] = useState(false);
 
   async function handleSave() {
     if (!workerId) return;
     setLoading(true);
-    try { await onSave(workerId, role); onClose(); } finally { setLoading(false); }
+    try { await onSave(workerId, role as 'CARETAKER' | 'CLEANER'); onClose(); } finally { setLoading(false); }
   }
 
   if (available.length === 0) {
@@ -53,18 +53,22 @@ function AssignStaffModal({
       </FormField>
       <FormField label="Role at this property">
         <div className="flex gap-2">
-          {(['CLEANER', 'CARETAKER'] as const).map((r) => (
+          {(['CLEANER', 'CARETAKER', 'SUPERVISOR'] as const).map((r) => (
             <button
               key={r} type="button"
               onClick={() => setRole(r)}
               className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${role === r ? 'bg-brand-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
             >
-              {r === 'CARETAKER' ? '🏠 Caretaker' : '🧹 Cleaner'}
+              {r === 'CARETAKER' ? '🏠 Caretaker' : r === 'SUPERVISOR' ? '🔍 Supervisor' : '🧹 Cleaner'}
             </button>
           ))}
         </div>
         <p className="text-xs text-slate-600 mt-1">
-          {role === 'CARETAKER' ? 'Caretakers can raise maintenance requests and (if enabled) assign tradespeople.' : 'Cleaners can raise maintenance requests for issues they find.'}
+          {role === 'CARETAKER'
+            ? 'Caretakers can raise maintenance requests and (if enabled) assign tradespeople.'
+            : role === 'SUPERVISOR'
+            ? 'Supervisors visit to audit and inspect cleaner work. They can submit rated audit reports per job.'
+            : 'Cleaners can raise maintenance requests for issues they find.'}
         </p>
       </FormField>
       <div className="flex gap-3 pt-2">
@@ -263,8 +267,12 @@ export default function PropertyStaffPage() {
                   {s.worker.tradeRole && (
                     <span className="text-xs text-slate-500 bg-slate-700 px-2 py-0.5 rounded">{s.worker.tradeRole.name}</span>
                   )}
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${s.role === 'CARETAKER' ? 'text-brand-400 bg-brand-500/10' : 'text-slate-400 bg-slate-800'}`}>
-                    {s.role === 'CARETAKER' ? 'Caretaker' : 'Cleaner'}
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                    s.role === 'CARETAKER' ? 'text-brand-400 bg-brand-500/10'
+                    : s.role === 'SUPERVISOR' ? 'text-amber-400 bg-amber-500/10'
+                    : 'text-slate-400 bg-slate-800'
+                  }`}>
+                    {s.role === 'CARETAKER' ? 'Caretaker' : s.role === 'SUPERVISOR' ? 'Supervisor' : 'Cleaner'}
                   </span>
                   <button onClick={() => handleRemove(s.workerId)} className="p-1 rounded hover:bg-slate-700 text-slate-600 hover:text-red-400 transition-colors">
                     <Trash2 size={12} />
@@ -284,7 +292,7 @@ export default function PropertyStaffPage() {
           workers={workers}
           existing={staff}
           onSave={async (workerId, role) => {
-            await api.propertyStaff.assign(id, { workerId, role });
+            await api.propertyStaff.assign(id, { workerId, role: role as 'CARETAKER' | 'CLEANER' });
             await load();
           }}
           onClose={() => setModal(false)}

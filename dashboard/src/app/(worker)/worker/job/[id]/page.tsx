@@ -151,6 +151,16 @@ export default function WorkerJobDetailPage() {
           </div>
         )}
 
+        {/* Property Guide button */}
+        {job.propertyId && (
+          <button
+            onClick={() => router.push(`/worker/property/${job.propertyId}/guide?jobId=${id}`)}
+            className="w-full py-4 rounded-2xl border border-blue-500/30 text-blue-300 font-semibold text-base flex items-center justify-center gap-2"
+          >
+            📖 {lang === 'hi' ? 'प्रॉपर्टी गाइड देखें' : 'View Property Guide'}
+          </button>
+        )}
+
         {/* Action buttons */}
         {job.status !== 'COMPLETED' && job.status !== 'CANCELLED' && (
           <div className="space-y-3">

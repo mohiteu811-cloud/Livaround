@@ -62,6 +62,9 @@ model Property {
   maintenanceRequests MaintenanceRequest[]
   ownerships          PropertyOwnership[]
   revenueReports      RevenueReport[]
+  areas               PropertyArea[]
+  docs                PropertyDoc[]
+  contacts            PropertyContact[]
 }
 
 model Booking {
@@ -106,6 +109,7 @@ model Worker {
   propertyStaff            PropertyStaff[]
   reportedMaintenanceReqs  MaintenanceRequest[] @relation("ReportedBy")
   assignedMaintenanceReqs  MaintenanceRequest[] @relation("AssignedTo")
+  audits                   JobAudit[]
 }
 
 model Job {
@@ -127,6 +131,7 @@ model Job {
 
   issues             Issue[]
   maintenanceRequest MaintenanceRequest?
+  audit              JobAudit?
 }
 
 model Issue {
@@ -194,7 +199,7 @@ model PropertyStaff {
   property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   workerId   String
   worker     Worker   @relation(fields: [workerId], references: [id], onDelete: Cascade)
-  role       String   @default("CLEANER") // CARETAKER, CLEANER
+  role       String   @default("CLEANER") // CARETAKER, CLEANER, SUPERVISOR
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -309,4 +314,63 @@ model Expense {
   approverNotes    String?
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
+}
+
+// ── Property Operations Guide ─────────────────────────────────────────────────
+
+model PropertyArea {
+  id          String        @id @default(cuid())
+  propertyId  String
+  property    Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  name        String        // e.g. "1st Floor Laundry Room", "Ground Floor Kitchen"
+  floor       String?       // e.g. "Ground Floor", "1st Floor", "Outdoor"
+  description String?
+  order       Int           @default(0)
+  docs        PropertyDoc[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model PropertyDoc {
+  id          String        @id @default(cuid())
+  propertyId  String
+  property    Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  areaId      String?
+  area        PropertyArea? @relation(fields: [areaId], references: [id], onDelete: SetNull)
+  title       String        // e.g. "Cleaning Equipment Cabinet"
+  description String        // Detailed notes / instructions
+  category    String        @default("OTHER") // STORAGE, APPLIANCE, ELECTRICAL, UTILITY, ACCESS, SAFETY, PROCEDURE, OTHER
+  photos      String        @default("[]")   // JSON array of photo URLs
+  tags        String        @default("[]")   // JSON array of searchable tags
+  order       Int           @default(0)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model PropertyContact {
+  id         String   @id @default(cuid())
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  agency     String   // e.g. "Electrician", "Plumber", "HVAC"
+  name       String?  // Contact person name
+  phones     String   @default("[]") // JSON array of phone number strings
+  company    String?
+  notes      String?
+  order      Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+// ── Supervisor job audits ─────────────────────────────────────────────────────
+
+model JobAudit {
+  id           String   @id @default(cuid())
+  jobId        String   @unique
+  job          Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  supervisorId String
+  supervisor   Worker   @relation(fields: [supervisorId], references: [id])
+  rating       Int      // 1–5
+  notes        String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }

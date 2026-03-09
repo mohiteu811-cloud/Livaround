@@ -217,6 +217,31 @@ export const api = {
       request<Expense>(`/api/revenue-reports/${reportId}/expenses/${expenseId}/review`, { method: 'POST', body: JSON.stringify(data) }),
   },
 
+  guide: {
+    get: (propertyId: string) => request<PropertyGuide>(`/api/properties/${propertyId}/guide`),
+    createArea: (propertyId: string, data: { name: string; floor?: string; description?: string; order?: number }) =>
+      request<PropertyArea>(`/api/properties/${propertyId}/guide/areas`, { method: 'POST', body: JSON.stringify(data) }),
+    updateArea: (propertyId: string, areaId: string, data: Partial<{ name: string; floor: string; description: string; order: number }>) =>
+      request<PropertyArea>(`/api/properties/${propertyId}/guide/areas/${areaId}`, { method: 'PUT', body: JSON.stringify(data) }),
+    deleteArea: (propertyId: string, areaId: string) =>
+      request<void>(`/api/properties/${propertyId}/guide/areas/${areaId}`, { method: 'DELETE' }),
+    createDoc: (propertyId: string, data: { areaId?: string; title: string; description: string; category?: string; photos?: string[]; tags?: string[]; order?: number }) =>
+      request<PropertyDoc>(`/api/properties/${propertyId}/guide/docs`, { method: 'POST', body: JSON.stringify(data) }),
+    updateDoc: (propertyId: string, docId: string, data: Partial<PropertyDoc>) =>
+      request<PropertyDoc>(`/api/properties/${propertyId}/guide/docs/${docId}`, { method: 'PUT', body: JSON.stringify(data) }),
+    deleteDoc: (propertyId: string, docId: string) =>
+      request<void>(`/api/properties/${propertyId}/guide/docs/${docId}`, { method: 'DELETE' }),
+    createContact: (propertyId: string, data: { agency: string; name?: string; phones?: string[]; company?: string; notes?: string; order?: number }) =>
+      request<PropertyContact>(`/api/properties/${propertyId}/guide/contacts`, { method: 'POST', body: JSON.stringify(data) }),
+    updateContact: (propertyId: string, contactId: string, data: Partial<PropertyContact>) =>
+      request<PropertyContact>(`/api/properties/${propertyId}/guide/contacts/${contactId}`, { method: 'PUT', body: JSON.stringify(data) }),
+    deleteContact: (propertyId: string, contactId: string) =>
+      request<void>(`/api/properties/${propertyId}/guide/contacts/${contactId}`, { method: 'DELETE' }),
+    submitAudit: (jobId: string, data: { rating: number; notes: string }) =>
+      request<JobAudit>(`/api/jobs/${jobId}/audit`, { method: 'POST', body: JSON.stringify(data) }),
+    getAudit: (jobId: string) => request<JobAudit>(`/api/jobs/${jobId}/audit`),
+  },
+
   inventory: {
     list: (params?: { propertyId?: string; lowStock?: string }) => {
       const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
@@ -378,9 +403,61 @@ export interface PropertyStaffAssignment {
   id: string;
   propertyId: string;
   workerId: string;
-  role: 'CARETAKER' | 'CLEANER';
+  role: 'CARETAKER' | 'CLEANER' | 'SUPERVISOR';
   createdAt: string;
   worker: Worker & { tradeRole?: TradeRole };
+}
+
+export interface PropertyArea {
+  id: string;
+  propertyId: string;
+  name: string;
+  floor?: string;
+  description?: string;
+  order: number;
+  docs: PropertyDoc[];
+  createdAt: string;
+}
+
+export interface PropertyDoc {
+  id: string;
+  propertyId: string;
+  areaId?: string;
+  title: string;
+  description: string;
+  category: 'STORAGE' | 'APPLIANCE' | 'ELECTRICAL' | 'UTILITY' | 'ACCESS' | 'SAFETY' | 'PROCEDURE' | 'OTHER';
+  photos: string[];
+  tags: string[];
+  order: number;
+  createdAt: string;
+}
+
+export interface PropertyContact {
+  id: string;
+  propertyId: string;
+  agency: string;
+  name?: string;
+  phones: string[];
+  company?: string;
+  notes?: string;
+  order: number;
+  createdAt: string;
+}
+
+export interface PropertyGuide {
+  areas: PropertyArea[];
+  ungroupedDocs: PropertyDoc[];
+  contacts: PropertyContact[];
+}
+
+export interface JobAudit {
+  id: string;
+  jobId: string;
+  supervisorId: string;
+  supervisor?: { id: string; user: { name: string } };
+  rating: number;
+  notes: string;
+  createdAt: string;
 }
 
 export interface MaintenanceSettings {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Plus, MapPin, Bed, Bath, Users, MoreVertical, Wifi, UserCheck } from 'lucide-react';
+import { Plus, MapPin, Bed, Bath, Users, MoreVertical, Wifi, UserCheck, BookOpen } from 'lucide-react';
 import Link from 'next/link';
 import { api, Property } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
@@ -256,12 +256,20 @@ export default function PropertiesPage() {
 
                 <div className="mt-3 pt-3 border-t border-slate-800 flex justify-between items-center text-xs text-slate-500">
                   <span>{p._count?.bookings || 0} bookings · {p._count?.jobs || 0} jobs</span>
-                  <Link
-                    href={`/properties/${p.id}/staff`}
-                    className="flex items-center gap-1 text-slate-500 hover:text-slate-300 transition-colors"
-                  >
-                    <UserCheck size={11} /> Staff
-                  </Link>
+                  <div className="flex items-center gap-3">
+                    <Link
+                      href={`/properties/${p.id}/guide`}
+                      className="flex items-center gap-1 text-slate-500 hover:text-brand-400 transition-colors"
+                    >
+                      <BookOpen size={11} /> Guide
+                    </Link>
+                    <Link
+                      href={`/properties/${p.id}/staff`}
+                      className="flex items-center gap-1 text-slate-500 hover:text-slate-300 transition-colors"
+                    >
+                      <UserCheck size={11} /> Staff
+                    </Link>
+                  </div>
                 </div>
               </div>
             </div>

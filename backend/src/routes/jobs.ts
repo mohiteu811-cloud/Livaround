@@ -384,4 +384,58 @@ router.get('/:id/issues', async (req: AuthRequest, res: Response) => {
   }
 });
 
+// ── Supervisor audit ──────────────────────────────────────────────────────────
+
+const auditSchema = z.object({
+  rating: z.number().int().min(1).max(5),
+  notes: z.string().min(1),
+});
+
+// POST /api/jobs/:id/audit — supervisor submits or updates an audit
+router.post('/:id/audit', validate(auditSchema), async (req: AuthRequest, res: Response) => {
+  try {
+    if (!isWorker(req)) return res.status(403).json({ error: 'Workers only' });
+    const supervisor = await prisma.worker.findUnique({ where: { userId: req.user!.id } });
+    if (!supervisor) return res.status(403).json({ error: 'Worker not found' });
+
+    // Verify the job exists and the supervisor is assigned to the property as SUPERVISOR
+    const job = await prisma.job.findUnique({
+      where: { id: req.params.id },
+      include: { property: true },
+    });
+    if (!job) return res.status(404).json({ error: 'Job not found' });
+
+    const assignment = await prisma.propertyStaff.findFirst({
+      where: { propertyId: job.propertyId, workerId: supervisor.id, role: 'SUPERVISOR' },
+    });
+    if (!assignment) return res.status(403).json({ error: 'Only supervisors assigned to this property can audit jobs' });
+
+    const audit = await prisma.jobAudit.upsert({
+      where: { jobId: req.params.id },
+      create: { jobId: req.params.id, supervisorId: supervisor.id, rating: req.body.rating, notes: req.body.notes },
+      update: { supervisorId: supervisor.id, rating: req.body.rating, notes: req.body.notes },
+      include: { supervisor: { include: { user: { select: { name: true } } } } },
+    });
+    return res.json(audit);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/jobs/:id/audit — get audit for a job
+router.get('/:id/audit', async (req: AuthRequest, res: Response) => {
+  try {
+    const audit = await prisma.jobAudit.findUnique({
+      where: { jobId: req.params.id },
+      include: { supervisor: { include: { user: { select: { name: true } } } } },
+    });
+    if (!audit) return res.status(404).json({ error: 'No audit found' });
+    return res.json(audit);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export default router;
