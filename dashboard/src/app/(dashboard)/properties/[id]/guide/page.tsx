@@ -13,7 +13,9 @@ import { QRCodeModal } from '@/components/ui/QRCodeModal';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://livarounddashboard-production.up.railway.app';
 
-const CATEGORY_META: Record<string, { label: string; emoji: string; color: string }> = {
+type DocCategory = 'STORAGE' | 'APPLIANCE' | 'ELECTRICAL' | 'UTILITY' | 'ACCESS' | 'SAFETY' | 'PROCEDURE' | 'OTHER';
+
+const CATEGORY_META: Record<DocCategory, { label: string; emoji: string; color: string }> = {
   STORAGE:   { label: 'Storage',   emoji: '🗄️',  color: 'bg-amber-500/10 text-amber-400 border-amber-500/20' },
   APPLIANCE: { label: 'Appliance', emoji: '🔌',  color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
   ELECTRICAL:{ label: 'Electrical',emoji: '⚡',  color: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' },
@@ -243,7 +245,7 @@ function DocForm({
             <button
               key={key}
               type="button"
-              onClick={() => setCategory(key as keyof typeof CATEGORY_META)}
+              onClick={() => setCategory(key as DocCategory)}
               className={`py-1.5 px-1 rounded-lg text-xs font-medium transition-colors border ${category === key ? 'bg-brand-600 text-white border-brand-600' : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'}`}
             >
               {meta.emoji} {meta.label}
