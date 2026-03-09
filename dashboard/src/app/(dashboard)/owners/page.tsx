@@ -193,17 +193,20 @@ export default function OwnersPage() {
   const [loading, setLoading] = useState(true);
   const [createModal, setCreateModal] = useState(false);
   const [linkModal, setLinkModal] = useState<OwnerEntry | null>(null);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => { load(); }, []);
 
   async function load() {
     setLoading(true);
+    setLoadError('');
     try {
       const [o, p] = await Promise.all([api.owners.list(), api.properties.list()]);
       setOwners(o);
       setProperties(p);
     } catch (err) {
       console.error('Failed to load owners/properties:', err);
+      setLoadError(err instanceof Error ? err.message : 'Failed to load owners');
     } finally {
       setLoading(false);
     }
@@ -231,11 +234,17 @@ export default function OwnersPage() {
         <Button onClick={() => setCreateModal(true)}><Plus size={16} /> Add owner</Button>
       </div>
 
+      {loadError && (
+        <div className="px-4 py-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
+          {loadError} — <button className="underline" onClick={load}>Retry</button>
+        </div>
+      )}
+
       {loading ? (
         <div className="flex items-center justify-center h-64">
           <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
         </div>
-      ) : owners.length === 0 ? (
+      ) : owners.length === 0 && !loadError ? (
         <div className="bg-slate-900 border border-slate-800 rounded-xl flex flex-col items-center justify-center py-16 gap-3">
           <UserCircle size={40} className="text-slate-600" />
           <p className="text-slate-400">No owners yet</p>
@@ -310,7 +319,7 @@ export default function OwnersPage() {
         <CreateOwnerForm
           onSave={async (d) => {
             const result = await api.owners.create(d as Parameters<typeof api.owners.create>[0]);
-            await load();
+            setOwners((prev) => [...prev, { id: result.id, user: result.user, properties: [] }]);
             return result;
           }}
           onClose={() => setCreateModal(false)}
