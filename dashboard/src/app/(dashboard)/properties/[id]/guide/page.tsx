@@ -243,7 +243,7 @@ function DocForm({
             <button
               key={key}
               type="button"
-              onClick={() => setCategory(key)}
+              onClick={() => setCategory(key as keyof typeof CATEGORY_META)}
               className={`py-1.5 px-1 rounded-lg text-xs font-medium transition-colors border ${category === key ? 'bg-brand-600 text-white border-brand-600' : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'}`}
             >
               {meta.emoji} {meta.label}
