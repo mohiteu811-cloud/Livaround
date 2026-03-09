@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Plus, AlertTriangle, Package, RotateCcw } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Plus, AlertTriangle, Package, RotateCcw, X, ImageIcon } from 'lucide-react';
 import { api, InventoryItem, Property } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Input, Select, FormField } from '@/components/ui/Input';
@@ -24,6 +24,64 @@ function stockLevel(item: InventoryItem): { pct: number; color: string; label: s
   return { pct, color: 'bg-emerald-500', label: 'OK' };
 }
 
+function PhotoUploader({ photos, onChange }: { photos: string[]; onChange: (p: string[]) => void }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  async function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    if (!files.length) return;
+    setUploading(true);
+    try {
+      const urls: string[] = [];
+      for (const file of files) {
+        const result = await api.upload.file(file);
+        urls.push(result.url);
+      }
+      onChange([...photos, ...urls]);
+    } catch (err) {
+      console.error('Upload failed', err);
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  }
+
+  function remove(i: number) {
+    onChange(photos.filter((_, idx) => idx !== i));
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-2">
+        {photos.map((url, i) => (
+          <div key={i} className="relative group w-20 h-20 rounded-lg overflow-hidden border border-slate-700">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={url} alt="" className="w-full h-full object-cover" />
+            <button
+              type="button"
+              onClick={() => remove(i)}
+              className="absolute top-0.5 right-0.5 w-5 h-5 bg-red-500/90 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              <X size={10} className="text-white" />
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          disabled={uploading}
+          className="w-20 h-20 rounded-lg border-2 border-dashed border-slate-600 hover:border-slate-400 flex flex-col items-center justify-center gap-1 text-slate-500 hover:text-slate-300 transition-colors disabled:opacity-50"
+        >
+          <ImageIcon size={16} />
+          <span className="text-xs">{uploading ? '…' : 'Add'}</span>
+        </button>
+      </div>
+      <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFiles} />
+    </div>
+  );
+}
+
 function ItemForm({
   properties,
   initial,
@@ -37,7 +95,7 @@ function ItemForm({
 }) {
   const [form, setForm] = useState<Partial<InventoryItem>>({
     propertyId: properties[0]?.id || '', name: '', category: 'OTHER',
-    currentStock: 0, minStock: 1, unit: 'units', location: '',
+    currentStock: 0, minStock: 1, unit: 'units', location: '', photos: [],
     ...initial,
   });
   const [loading, setLoading] = useState(false);
@@ -85,6 +143,9 @@ function ItemForm({
       </div>
       <FormField label="Storage location">
         <Input placeholder="Main bathroom cabinet, under sink..." value={form.location || ''} onChange={(e) => set('location', e.target.value)} />
+      </FormField>
+      <FormField label="Photos">
+        <PhotoUploader photos={form.photos ?? []} onChange={(p) => set('photos', p)} />
       </FormField>
       <div className="flex gap-3 pt-2">
         <Button type="button" variant="secondary" onClick={onClose} className="flex-1 justify-center">Cancel</Button>
@@ -135,6 +196,38 @@ function RestockModal({ item, onSave, onClose }: {
   );
 }
 
+/** Lightbox for viewing item photos */
+function PhotoLightbox({ photos, startIndex, onClose }: { photos: string[]; startIndex: number; onClose: () => void }) {
+  const [idx, setIdx] = useState(startIndex);
+  return (
+    <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center" onClick={onClose}>
+      <button onClick={onClose} className="absolute top-4 right-4 text-white/70 hover:text-white">
+        <X size={24} />
+      </button>
+      <button
+        onClick={(e) => { e.stopPropagation(); setIdx((i) => (i - 1 + photos.length) % photos.length); }}
+        className="absolute left-4 text-white/70 hover:text-white text-3xl px-2"
+        hidden={photos.length <= 1}
+      >‹</button>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={photos[idx]}
+        alt=""
+        onClick={(e) => e.stopPropagation()}
+        className="max-h-[90vh] max-w-[90vw] rounded-lg object-contain"
+      />
+      <button
+        onClick={(e) => { e.stopPropagation(); setIdx((i) => (i + 1) % photos.length); }}
+        className="absolute right-4 text-white/70 hover:text-white text-3xl px-2"
+        hidden={photos.length <= 1}
+      >›</button>
+      {photos.length > 1 && (
+        <div className="absolute bottom-4 text-white/50 text-sm">{idx + 1} / {photos.length}</div>
+      )}
+    </div>
+  );
+}
+
 export default function InventoryPage() {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
@@ -145,6 +238,7 @@ export default function InventoryPage() {
   const [addModal, setAddModal] = useState(false);
   const [editModal, setEditModal] = useState<InventoryItem | null>(null);
   const [restockModal, setRestockModal] = useState<InventoryItem | null>(null);
+  const [lightbox, setLightbox] = useState<{ photos: string[]; index: number } | null>(null);
 
   useEffect(() => { load(); }, []);
 
@@ -223,6 +317,7 @@ export default function InventoryPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-slate-800 text-xs text-slate-600 uppercase tracking-wider">
+                      <th className="text-left px-5 py-2.5 w-10" />
                       <th className="text-left px-5 py-2.5">Item</th>
                       <th className="text-left px-5 py-2.5">Property</th>
                       <th className="text-left px-5 py-2.5">Location</th>
@@ -235,12 +330,32 @@ export default function InventoryPage() {
                     {grouped[cat].map((item) => {
                       const { pct, color, label } = stockLevel(item);
                       const isLow = item.currentStock <= item.minStock;
+                      const photos = item.photos ?? [];
                       return (
                         <tr key={item.id} className="hover:bg-slate-800/30 transition-colors">
+                          {/* Thumbnail */}
+                          <td className="px-3 py-2">
+                            {photos.length > 0 ? (
+                              <button
+                                onClick={() => setLightbox({ photos, index: 0 })}
+                                className="w-9 h-9 rounded overflow-hidden border border-slate-700 hover:border-slate-500 transition-colors block"
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={photos[0]} alt="" className="w-full h-full object-cover" />
+                              </button>
+                            ) : (
+                              <div className="w-9 h-9 rounded border border-slate-800 flex items-center justify-center text-slate-700">
+                                <ImageIcon size={14} />
+                              </div>
+                            )}
+                          </td>
                           <td className="px-5 py-3">
                             <div className="flex items-center gap-2">
                               {isLow && <AlertTriangle size={13} className="text-amber-400 shrink-0" />}
                               <span className={isLow ? 'text-amber-200' : 'text-slate-200'}>{item.name}</span>
+                              {photos.length > 1 && (
+                                <span className="text-xs text-slate-500">+{photos.length - 1}</span>
+                              )}
                             </div>
                           </td>
                           <td className="px-5 py-3 text-slate-400 text-xs">{item.property?.name}</td>
@@ -311,6 +426,14 @@ export default function InventoryPage() {
             onClose={() => setRestockModal(null)}
           />
         </Modal>
+      )}
+
+      {lightbox && (
+        <PhotoLightbox
+          photos={lightbox.photos}
+          startIndex={lightbox.index}
+          onClose={() => setLightbox(null)}
+        />
       )}
     </div>
   );

@@ -366,6 +366,7 @@ export interface InventoryItem {
   minStock: number;
   unit: string;
   location?: string;
+  photos: string[];
   lastRestocked?: string;
 }
 

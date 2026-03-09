@@ -164,6 +164,7 @@ model InventoryItem {
   minStock      Float     @default(1)
   unit          String    @default("units")
   location      String?
+  photos        String    @default("[]")  // JSON array of photo URLs
   lastRestocked DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt

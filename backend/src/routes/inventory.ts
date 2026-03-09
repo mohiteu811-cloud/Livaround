@@ -17,6 +17,7 @@ const inventorySchema = z.object({
   minStock: z.number().min(0).default(1),
   unit: z.string().default('units'),
   location: z.string().optional(),
+  photos: z.array(z.string()).optional(),
 });
 
 const cabinetSchema = z.object({
@@ -26,6 +27,15 @@ const cabinetSchema = z.object({
   photoUrl: z.string().optional(),
   description: z.string().optional(),
 });
+
+function parseItem(item: Record<string, unknown>) {
+  return {
+    ...item,
+    photos: (() => {
+      try { return JSON.parse(item.photos as string); } catch { return []; }
+    })(),
+  };
+}
 
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
@@ -40,7 +50,8 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       orderBy: [{ category: 'asc' }, { name: 'asc' }],
     });
 
-    const result = lowStock === 'true' ? items.filter((i) => i.currentStock <= i.minStock) : items;
+    const parsed = items.map(parseItem);
+    const result = lowStock === 'true' ? parsed.filter((i) => (i.currentStock as number) <= (i.minStock as number)) : parsed;
     return res.json(result);
   } catch (err) {
     console.error(err);
@@ -57,7 +68,8 @@ router.get('/low-stock', async (req: AuthRequest, res: Response) => {
       include: { property: { select: { id: true, name: true, city: true } } },
     });
 
-    const lowStock = items.filter((i) => i.currentStock <= i.minStock);
+    const parsed = items.map(parseItem);
+    const lowStock = parsed.filter((i) => (i.currentStock as number) <= (i.minStock as number));
     return res.json(lowStock);
   } catch (err) {
     console.error(err);
@@ -72,8 +84,11 @@ router.post('/', validate(inventorySchema), async (req: AuthRequest, res: Respon
     });
     if (!prop) return res.status(403).json({ error: 'Property not found or access denied' });
 
-    const item = await prisma.inventoryItem.create({ data: req.body });
-    return res.status(201).json(item);
+    const { photos, ...rest } = req.body;
+    const item = await prisma.inventoryItem.create({
+      data: { ...rest, photos: JSON.stringify(photos ?? []) },
+    });
+    return res.status(201).json(parseItem(item as unknown as Record<string, unknown>));
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Internal server error' });
@@ -87,13 +102,15 @@ router.put('/:id', validate(inventorySchema.partial()), async (req: AuthRequest,
     });
     if (!existing) return res.status(404).json({ error: 'Item not found' });
 
-    const data: Record<string, unknown> = { ...req.body };
+    const { photos, ...rest } = req.body;
+    const data: Record<string, unknown> = { ...rest };
+    if (photos !== undefined) data.photos = JSON.stringify(photos);
     if (req.body.currentStock !== undefined && req.body.currentStock > existing.currentStock) {
       data.lastRestocked = new Date();
     }
 
     const item = await prisma.inventoryItem.update({ where: { id: req.params.id }, data });
-    return res.json(item);
+    return res.json(parseItem(item as unknown as Record<string, unknown>));
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Internal server error' });
