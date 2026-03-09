@@ -61,6 +61,7 @@ model Property {
   staffAssignments    PropertyStaff[]
   maintenanceSettings PropertyMaintenanceSettings?
   maintenanceRequests MaintenanceRequest[]
+  issues              Issue[]
   ownerships          PropertyOwnership[]
   revenueReports      RevenueReport[]
   areas               PropertyArea[]
@@ -111,6 +112,7 @@ model Worker {
   reportedMaintenanceReqs  MaintenanceRequest[] @relation("ReportedBy")
   assignedMaintenanceReqs  MaintenanceRequest[] @relation("AssignedTo")
   audits                   JobAudit[]
+  reportedIssues           Issue[]              @relation("ReportedIssues")
 }
 
 model Job {
@@ -136,16 +138,20 @@ model Job {
 }
 
 model Issue {
-  id          String   @id @default(cuid())
-  jobId       String
-  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  description String
-  photoUrl    String?
-  videoUrl    String?
-  severity    String   @default("LOW")
-  status      String   @default("OPEN")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String    @id @default(cuid())
+  jobId        String?   // optional — supervisors can report without a job
+  job          Job?      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  propertyId   String?   // set on all new issues; nullable for backwards compat
+  property     Property? @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  reportedById String?   // worker who filed it; nullable for backwards compat
+  reportedBy   Worker?   @relation("ReportedIssues", fields: [reportedById], references: [id])
+  description  String
+  photoUrl     String?
+  videoUrl     String?
+  severity     String    @default("LOW")
+  status       String    @default("OPEN")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 }
 
 model InventoryItem {

@@ -17,15 +17,17 @@ export default function WorkerShell({ children }: { children: React.ReactNode })
   const router = useRouter();
   const pathname = usePathname();
   const [ready, setReady] = useState(false);
+  const [isSupervisor, setIsSupervisor] = useState(false);
   const [lang, setLangState] = useLang();
 
   useEffect(() => {
     api.auth.me()
       .then(u => {
-        if (u.role !== 'WORKER') { router.replace('/worker/login'); return; }
+        if (u.role !== 'WORKER') { router.replace('/login'); return; }
+        setIsSupervisor(u.worker?.isSupervisor ?? false);
         setReady(true);
       })
-      .catch(() => router.replace('/worker/login'));
+      .catch(() => router.replace('/login'));
   }, [router]);
 
   if (!ready) {
@@ -39,6 +41,7 @@ export default function WorkerShell({ children }: { children: React.ReactNode })
   const tr = t(lang);
   const tabs = [
     { href: '/worker/jobs', label: tr.jobs, icon: '🔧' },
+    ...(isSupervisor ? [{ href: '/worker/issues/new', label: 'Report Issue', icon: '⚠️' }] : []),
     { href: '/worker/profile', label: tr.profile, icon: '👤' },
   ];
 

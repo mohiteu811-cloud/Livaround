@@ -108,7 +108,12 @@ router.get('/me', authenticate, async (req: AuthRequest, res: Response) => {
         role: true,
         createdAt: true,
         host: { select: { id: true, name: true } },
-        worker: { select: { id: true, skills: true, rating: true, isAvailable: true, jobsCompleted: true } },
+        worker: {
+          select: {
+            id: true, skills: true, rating: true, isAvailable: true, jobsCompleted: true,
+            propertyStaff: { where: { role: 'SUPERVISOR' }, select: { id: true }, take: 1 },
+          },
+        },
       },
     });
 
@@ -120,6 +125,8 @@ router.get('/me', authenticate, async (req: AuthRequest, res: Response) => {
         ? {
             ...user.worker,
             skills: (() => { try { return JSON.parse(user.worker!.skills as unknown as string || '[]'); } catch { return []; } })(),
+            isSupervisor: user.worker.propertyStaff.length > 0,
+            propertyStaff: undefined,
           }
         : null,
     };

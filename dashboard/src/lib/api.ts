@@ -120,6 +120,19 @@ export const api = {
       request<JobIssue>(`/api/jobs/issues/${issueId}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
   },
 
+  issues: {
+    // Supervisor creates an issue without a mandatory job
+    create: (data: { propertyId: string; jobId?: string; description: string; severity: 'LOW' | 'MEDIUM' | 'HIGH'; photoUrl?: string; videoUrl?: string }) =>
+      request<JobIssue>('/api/issues', { method: 'POST', body: JSON.stringify(data) }),
+    // List issues for a property
+    list: (propertyId: string, params?: { severity?: string; status?: string }) => {
+      const qs = new URLSearchParams({ propertyId, ...params }).toString();
+      return request<JobIssue[]>(`/api/issues?${qs}`);
+    },
+    // Supervisor's supervised properties
+    myProperties: () => request<{ id: string; name: string; city: string; _count: { issues: number } }[]>('/api/issues/my-properties'),
+  },
+
   upload: {
     file: async (file: File): Promise<{ url: string; type: 'image' | 'video' }> => {
       const token = getToken();
@@ -270,7 +283,7 @@ export interface User {
   phone?: string;
   role: string;
   host?: { id: string; name: string };
-  worker?: { id: string; skills: string[]; rating: number; isAvailable: boolean };
+  worker?: { id: string; skills: string[]; rating: number; isAvailable: boolean; isSupervisor?: boolean };
 }
 
 export interface Property {
@@ -369,7 +382,10 @@ export interface SupplyCabinet {
 
 export interface JobIssue {
   id: string;
-  jobId: string;
+  jobId?: string;
+  propertyId?: string;
+  reportedById?: string;
+  reportedBy?: { id: string; user: { name: string } };
   description: string;
   photoUrl?: string;
   videoUrl?: string;

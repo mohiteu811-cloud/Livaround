@@ -352,18 +352,29 @@ router.post('/:id/cancel', async (req: AuthRequest, res: Response) => {
 
 router.post('/:id/issues', validate(issueSchema), async (req: AuthRequest, res: Response) => {
   try {
-    let job;
+    let job: { id: string; propertyId: string } | null = null;
+    let reportedById: string | null = null;
+
     if (isWorker(req)) {
       const worker = await prisma.worker.findUnique({ where: { userId: req.user!.id } });
       if (!worker) return res.status(403).json({ error: 'Worker not found' });
       job = await prisma.job.findFirst({ where: { id: req.params.id, workerId: worker.id } });
+      if (job) reportedById = worker.id;
     } else {
       job = await prisma.job.findFirst({
         where: { id: req.params.id, property: { host: { userId: req.user!.id } } },
       });
     }
     if (!job) return res.status(404).json({ error: 'Job not found' });
-    const issue = await prisma.issue.create({ data: { jobId: req.params.id, ...req.body } });
+
+    const issue = await prisma.issue.create({
+      data: {
+        jobId: req.params.id,
+        propertyId: job.propertyId,
+        reportedById: reportedById ?? undefined,
+        ...req.body,
+      },
+    });
     return res.status(201).json(issue);
   } catch (err) {
     console.error(err);
