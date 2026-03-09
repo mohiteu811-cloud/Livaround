@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Plus, MapPin, Bed, Bath, Users, Wifi, UserCheck, BookOpen } from 'lucide-react';
+import { Plus, MapPin, Bed, Bath, Users, Wifi, UserCheck, BookOpen, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
-import { api, Property } from '@/lib/api';
+import { api, Property, OwnerEntry } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { Input, Select, Textarea, FormField } from '@/components/ui/Input';
@@ -21,13 +21,33 @@ const COMMON_AMENITIES = [
   'Gym', 'Washer', 'Dryer', 'Beach Access', 'Garden',
 ];
 
+const INVOLVEMENT_LABELS: Record<string, string> = {
+  NONE: 'No involvement',
+  REPORTS_ONLY: 'Reports only',
+  FINANCIAL: 'Financial access',
+  FULL: 'Full access',
+};
+
+type OwnerAssignMode = 'none' | 'existing' | 'new';
+
+interface OwnerAssignment {
+  mode: OwnerAssignMode;
+  ownerId?: string;
+  name?: string;
+  email?: string;
+  phone?: string;
+  involvementLevel: string;
+  ownershipPercent?: number;
+  commissionPct?: number;
+}
+
 function PropertyForm({
   initial,
   onSave,
   onClose,
 }: {
   initial?: Partial<Property>;
-  onSave: (data: Partial<Property>) => Promise<void>;
+  onSave: (data: Partial<Property>, ownerAssignment?: OwnerAssignment) => Promise<void>;
   onClose: () => void;
 }) {
   const [form, setForm] = useState<Partial<Property>>({
@@ -38,6 +58,24 @@ function PropertyForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Owner assignment (creation mode only)
+  const isNew = !initial?.id;
+  const [owners, setOwners] = useState<OwnerEntry[]>([]);
+  const [ownerMode, setOwnerMode] = useState<OwnerAssignMode>('none');
+  const [ownerForm, setOwnerForm] = useState({
+    ownerId: '',
+    name: '', email: '', phone: '',
+    involvementLevel: 'REPORTS_ONLY',
+    ownershipPercent: '',
+    commissionPct: '',
+  });
+
+  useEffect(() => {
+    if (isNew) {
+      api.owners.list().then(setOwners).catch(() => {});
+    }
+  }, [isNew]);
+
   function set(key: string, value: unknown) {
     setForm((f) => ({ ...f, [key]: value }));
   }
@@ -47,12 +85,29 @@ function PropertyForm({
     set('amenities', cur.includes(a) ? cur.filter((x) => x !== a) : [...cur, a]);
   }
 
+  function setOwner(key: string, value: string) {
+    setOwnerForm((f) => ({ ...f, [key]: value }));
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError('');
     try {
-      await onSave(form);
+      let ownerAssignment: OwnerAssignment | undefined;
+      if (isNew && ownerMode !== 'none') {
+        ownerAssignment = {
+          mode: ownerMode,
+          ownerId: ownerMode === 'existing' ? ownerForm.ownerId : undefined,
+          name: ownerMode === 'new' ? ownerForm.name : undefined,
+          email: ownerMode === 'new' ? ownerForm.email : undefined,
+          phone: ownerMode === 'new' && ownerForm.phone ? ownerForm.phone : undefined,
+          involvementLevel: ownerForm.involvementLevel,
+          ownershipPercent: ownerForm.ownershipPercent ? parseFloat(ownerForm.ownershipPercent) : undefined,
+          commissionPct: ownerForm.commissionPct ? parseFloat(ownerForm.commissionPct) : undefined,
+        };
+      }
+      await onSave(form, ownerAssignment);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save');
@@ -123,6 +178,77 @@ function PropertyForm({
           ))}
         </div>
       </div>
+
+      {/* Owner assignment — only shown for new properties */}
+      {isNew && (
+        <div className="border-t border-slate-800 pt-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium text-slate-300">Assign owner <span className="text-slate-600 font-normal">(optional)</span></p>
+          </div>
+
+          {/* Mode selector */}
+          <div className="flex gap-2">
+            {(['none', 'existing', 'new'] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setOwnerMode(m)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
+                  ownerMode === m
+                    ? 'bg-brand-600 border-brand-500 text-white'
+                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
+                }`}
+              >
+                {m === 'none' ? 'Skip' : m === 'existing' ? 'Select existing' : 'Create new'}
+              </button>
+            ))}
+          </div>
+
+          {ownerMode === 'existing' && (
+            <div className="space-y-3">
+              {owners.length === 0 ? (
+                <p className="text-sm text-slate-500 italic">No owners yet — use &quot;Create new&quot; instead.</p>
+              ) : (
+                <FormField label="Owner">
+                  <div className="relative">
+                    <Select
+                      value={ownerForm.ownerId}
+                      onChange={(e) => setOwner('ownerId', e.target.value)}
+                      required={ownerMode === 'existing'}
+                    >
+                      <option value="">Select an owner…</option>
+                      {owners.map((o) => (
+                        <option key={o.id} value={o.id}>{o.user.name} ({o.user.email})</option>
+                      ))}
+                    </Select>
+                    <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                  </div>
+                </FormField>
+              )}
+              {owners.length > 0 && <OwnerLinkFields form={ownerForm} set={setOwner} />}
+            </div>
+          )}
+
+          {ownerMode === 'new' && (
+            <div className="space-y-3 p-3 bg-slate-800/50 rounded-lg border border-slate-700">
+              <p className="text-xs text-slate-500">A login will be created for the owner automatically.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <FormField label="Owner name">
+                  <Input placeholder="Rajesh Sharma" value={ownerForm.name} onChange={(e) => setOwner('name', e.target.value)} required={ownerMode === 'new'} />
+                </FormField>
+                <FormField label="Owner email">
+                  <Input type="email" placeholder="rajesh@example.com" value={ownerForm.email} onChange={(e) => setOwner('email', e.target.value)} required={ownerMode === 'new'} />
+                </FormField>
+              </div>
+              <FormField label="Phone (optional)">
+                <Input placeholder="+91 98765 43210" value={ownerForm.phone} onChange={(e) => setOwner('phone', e.target.value)} />
+              </FormField>
+              <OwnerLinkFields form={ownerForm} set={setOwner} />
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="flex gap-3 pt-2">
         <Button type="button" variant="secondary" onClick={onClose} className="flex-1 justify-center">Cancel</Button>
         <Button type="submit" loading={loading} className="flex-1 justify-center">
@@ -130,6 +256,31 @@ function PropertyForm({
         </Button>
       </div>
     </form>
+  );
+}
+
+function OwnerLinkFields({ form, set }: {
+  form: { involvementLevel: string; ownershipPercent: string; commissionPct: string };
+  set: (k: string, v: string) => void;
+}) {
+  return (
+    <>
+      <FormField label="Involvement level">
+        <Select value={form.involvementLevel} onChange={(e) => set('involvementLevel', e.target.value)}>
+          {Object.entries(INVOLVEMENT_LABELS).map(([k, v]) => (
+            <option key={k} value={k}>{v}</option>
+          ))}
+        </Select>
+      </FormField>
+      <div className="grid grid-cols-2 gap-3">
+        <FormField label="Ownership % (optional)">
+          <Input type="number" min="0" max="100" placeholder="e.g. 100" value={form.ownershipPercent} onChange={(e) => set('ownershipPercent', e.target.value)} />
+        </FormField>
+        <FormField label="Commission % (optional)">
+          <Input type="number" min="0" max="100" placeholder="e.g. 20" value={form.commissionPct} onChange={(e) => set('commissionPct', e.target.value)} />
+        </FormField>
+      </div>
+    </>
   );
 }
 
@@ -152,12 +303,36 @@ export default function PropertiesPage() {
     }
   }
 
-  async function handleSave(data: Partial<Property>) {
+  async function handleSave(data: Partial<Property>, ownerAssignment?: OwnerAssignment) {
+    let propertyId: string;
     if (modal.property?.id) {
       await api.properties.update(modal.property.id, data);
+      propertyId = modal.property.id;
     } else {
-      await api.properties.create(data);
+      const created = await api.properties.create(data);
+      propertyId = created.id;
     }
+
+    if (ownerAssignment && ownerAssignment.mode !== 'none' && propertyId) {
+      let ownerId = ownerAssignment.ownerId;
+      if (ownerAssignment.mode === 'new') {
+        const newOwner = await api.owners.create({
+          name: ownerAssignment.name!,
+          email: ownerAssignment.email!,
+          phone: ownerAssignment.phone,
+        });
+        ownerId = newOwner.id;
+      }
+      if (ownerId) {
+        await api.owners.linkProperty(ownerId, {
+          propertyId,
+          involvementLevel: ownerAssignment.involvementLevel,
+          ownershipPercent: ownerAssignment.ownershipPercent,
+          commissionPct: ownerAssignment.commissionPct,
+        });
+      }
+    }
+
     await load();
   }
 
