@@ -89,8 +89,20 @@ router.post('/', validate(createOwnerSchema), async (req: AuthRequest, res: Resp
     if (!hostId) return;
     const { name, email, phone } = req.body;
 
-    const existing = await prisma.user.findUnique({ where: { email } });
-    if (existing) return res.status(409).json({ error: 'Email already registered' });
+    const existing = await prisma.user.findUnique({ where: { email }, include: { owner: true } });
+    if (existing) {
+      // If this is an unclaimed owner (created before createdByHostId was tracked), claim them now
+      if (existing.role === 'OWNER' && existing.owner && !existing.owner.createdByHostId) {
+        const updated = await prisma.owner.update({
+          where: { id: existing.owner.id },
+          data: { createdByHostId: hostId },
+          include: { user: { select: { id: true, name: true, email: true, phone: true } } },
+        });
+        const ownedProps = await prisma.propertyOwnership.findMany({ where: { ownerId: updated.id } });
+        return res.status(200).json({ id: updated.id, user: updated.user, properties: ownedProps });
+      }
+      return res.status(409).json({ error: 'Email already registered' });
+    }
 
     const tempPassword = Math.random().toString(36).slice(-10);
     const hashed = await bcrypt.hash(tempPassword, 12);
