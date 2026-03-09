@@ -28,7 +28,7 @@ const cabinetSchema = z.object({
   description: z.string().optional(),
 });
 
-function parseItem(item: Record<string, unknown>) {
+function parseItem(item: Record<string, unknown>): Record<string, unknown> {
   return {
     ...item,
     photos: (() => {
