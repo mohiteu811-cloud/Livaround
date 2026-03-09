@@ -19,6 +19,7 @@ import maintenanceRoutes from './routes/maintenance';
 import ownersRoutes from './routes/owners';
 import revenueRoutes from './routes/revenue';
 import guideRoutes from './routes/guide';
+import publicRoutes from './routes/public';
 
 const app = express();
 
@@ -44,6 +45,7 @@ app.use('/api/maintenance', maintenanceRoutes);
 app.use('/api/owners', ownersRoutes);
 app.use('/api/revenue-reports', revenueRoutes);
 app.use('/api/properties/:id/guide', guideRoutes);
+app.use('/api/guide', publicRoutes);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 

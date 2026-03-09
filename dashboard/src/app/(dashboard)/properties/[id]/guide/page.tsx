@@ -4,11 +4,14 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
   ArrowLeft, Plus, Trash2, ChevronDown, ChevronRight,
-  Phone, Building2, FolderOpen, Image as ImageIcon, BookOpen, Pencil, X, Check,
+  Phone, Building2, FolderOpen, Image as ImageIcon, BookOpen, Pencil, X, Check, QrCode,
 } from 'lucide-react';
 import { api, PropertyGuide, PropertyArea, PropertyDoc, PropertyContact, Property } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
+import { QRCodeModal } from '@/components/ui/QRCodeModal';
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://livarounddashboard-production.up.railway.app';
 
 const CATEGORY_META: Record<string, { label: string; emoji: string; color: string }> = {
   STORAGE:   { label: 'Storage',   emoji: '🗄️',  color: 'bg-amber-500/10 text-amber-400 border-amber-500/20' },
@@ -28,9 +31,18 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://livaroundbackend-pro
 function DocCard({ doc, onEdit, onDelete }: { doc: PropertyDoc; onEdit: () => void; onDelete: () => void }) {
   const meta = CATEGORY_META[doc.category] ?? CATEGORY_META.OTHER;
   const [lightbox, setLightbox] = useState<string | null>(null);
+  const [qrOpen, setQrOpen] = useState(false);
 
   return (
     <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-4 space-y-3">
+      <QRCodeModal
+        open={qrOpen}
+        onClose={() => setQrOpen(false)}
+        url={`${APP_URL}/guide/doc/${doc.id}`}
+        title={doc.title}
+        subtitle={`${meta.emoji} ${meta.label}`}
+        instructions="Scan to see contents, photos & instructions"
+      />
       {lightbox && (
         <div
           className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center"
@@ -50,6 +62,9 @@ function DocCard({ doc, onEdit, onDelete }: { doc: PropertyDoc; onEdit: () => vo
           </div>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
+          <button onClick={() => setQrOpen(true)} title="Print label QR" className="p-1.5 rounded hover:bg-slate-700 text-slate-500 hover:text-brand-400 transition-colors">
+            <QrCode size={13} />
+          </button>
           <button onClick={onEdit} className="p-1.5 rounded hover:bg-slate-700 text-slate-500 hover:text-slate-300 transition-colors">
             <Pencil size={13} />
           </button>
@@ -467,6 +482,7 @@ export default function PropertyGuidePage() {
   const [tab, setTab] = useState<'areas' | 'contacts'>('areas');
   const [areaModal, setAreaModal] = useState(false);
   const [contactModal, setContactModal] = useState(false);
+  const [entryQrOpen, setEntryQrOpen] = useState(false);
 
   // Area form state
   const [areaName, setAreaName] = useState('');
@@ -510,6 +526,16 @@ export default function PropertyGuidePage() {
 
   return (
     <div className="p-4 md:p-8 space-y-6">
+      {/* Entry QR modal */}
+      <QRCodeModal
+        open={entryQrOpen}
+        onClose={() => setEntryQrOpen(false)}
+        url={`${APP_URL}/worker/checkin/${id}`}
+        title={property?.name ?? 'Property Check-in'}
+        subtitle={property?.city}
+        instructions="Workers: scan on arrival to view your job and mark check-in"
+      />
+
       {/* Header */}
       <div className="flex items-center gap-3">
         <button onClick={() => router.back()} className="p-1.5 rounded hover:bg-slate-800 text-slate-500 hover:text-slate-300 transition-colors">
@@ -519,6 +545,9 @@ export default function PropertyGuidePage() {
           <h1 className="text-2xl font-bold text-slate-100">{property?.name} — Operations Guide</h1>
           <p className="text-slate-400 text-sm mt-0.5">Documented areas, equipment locations, procedures, and vendor contacts for staff reference</p>
         </div>
+        <Button variant="secondary" onClick={() => setEntryQrOpen(true)} className="flex-shrink-0 text-xs py-1.5 px-3 h-auto">
+          <QrCode size={13} /> Entry QR
+        </Button>
       </div>
 
       {/* Tabs */}

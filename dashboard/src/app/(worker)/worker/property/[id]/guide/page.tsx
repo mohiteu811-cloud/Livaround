@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import WorkerShell from '../../../../WorkerShell';
+import WorkerShell from '../../../WorkerShell';
 import { api, PropertyGuide, PropertyArea, PropertyDoc, PropertyContact } from '@/lib/api';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://livaroundbackend-production.up.railway.app';
