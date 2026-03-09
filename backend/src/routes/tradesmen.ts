@@ -1,12 +1,9 @@
-import { Router, Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { Router, Response } from 'express';
+import { prisma } from '../lib/prisma';
+import { authenticate, AuthRequest } from '../middleware/auth';
 
 const router = Router();
-const prisma = new PrismaClient();
-
-interface AuthRequest extends Request {
-  user?: { id: string };
-}
+router.use(authenticate);
 
 async function getHostId(userId: string): Promise<string | null> {
   const host = await prisma.host.findUnique({ where: { userId } });
