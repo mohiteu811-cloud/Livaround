@@ -33,7 +33,7 @@ async function getHostId(req: AuthRequest, res: Response): Promise<string | null
   return host.id;
 }
 
-// List all owners created by this host (via their properties)
+// List all owners created by this host (via their properties or directly created)
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const hostId = await getHostId(req, res);
@@ -63,6 +63,18 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       }
       ownerMap.get(key)!.properties.push(o);
     }
+
+    // Also include owners created by this host who have no properties linked yet
+    const directOwners = await prisma.owner.findMany({
+      where: { createdByHostId: hostId },
+      include: { user: { select: { id: true, name: true, email: true, phone: true } } },
+    });
+    for (const o of directOwners) {
+      if (!ownerMap.has(o.id)) {
+        ownerMap.set(o.id, { id: o.id, user: o.user as { id: string; name: string; email: string; phone?: string }, properties: [] });
+      }
+    }
+
     return res.json(Array.from(ownerMap.values()));
   } catch (err) {
     console.error(err);
@@ -73,7 +85,8 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 // Create owner account
 router.post('/', validate(createOwnerSchema), async (req: AuthRequest, res: Response) => {
   try {
-    await getHostId(req, res); // verify caller is host
+    const hostId = await getHostId(req, res); // verify caller is host
+    if (!hostId) return;
     const { name, email, phone } = req.body;
 
     const existing = await prisma.user.findUnique({ where: { email } });
@@ -85,7 +98,7 @@ router.post('/', validate(createOwnerSchema), async (req: AuthRequest, res: Resp
     const user = await prisma.user.create({
       data: {
         name, email, password: hashed, phone, role: 'OWNER',
-        owner: { create: {} },
+        owner: { create: { createdByHostId: hostId } },
       },
       include: { owner: true },
     });

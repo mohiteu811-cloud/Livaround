@@ -23,14 +23,15 @@ model User {
 }
 
 model Host {
-  id         String      @id @default(cuid())
-  userId     String      @unique
-  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name       String
-  properties Property[]
-  tradeRoles TradeRole[]
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
+  id            String      @id @default(cuid())
+  userId        String      @unique
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name          String
+  properties    Property[]
+  tradeRoles    TradeRole[]
+  ownersCreated Owner[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 }
 
 model Property {
@@ -248,11 +249,13 @@ model MaintenanceRequest {
 // ── Owner model ──────────────────────────────────────────────────────────────
 
 model Owner {
-  id        String             @id @default(cuid())
-  userId    String             @unique
-  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
+  id               String             @id @default(cuid())
+  userId           String             @unique
+  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdByHostId  String?
+  createdByHost    Host?              @relation(fields: [createdByHostId], references: [id], onDelete: SetNull)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
 
   properties PropertyOwnership[]
 }
