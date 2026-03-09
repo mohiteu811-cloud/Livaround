@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { authenticate } from '../middleware/auth';
-import prisma from '../lib/prisma';
+import { prisma } from '../lib/prisma';
 
 const router = Router({ mergeParams: true });
 
@@ -38,21 +38,21 @@ router.get('/', async (req: Request, res: Response) => {
       }),
     ]);
 
-    const parsedAreas = areas.map((a) => ({
+    const parsedAreas = areas.map((a: any) => ({
       ...a,
-      docs: a.docs.map((d) => ({
+      docs: a.docs.map((d: any) => ({
         ...d,
         photos: JSON.parse(d.photos),
         tags: JSON.parse(d.tags),
       })),
     }));
 
-    const parsedContacts = contacts.map((c) => ({
+    const parsedContacts = contacts.map((c: any) => ({
       ...c,
       phones: JSON.parse(c.phones),
     }));
 
-    const parsedUngrouped = ungroupedDocs.map((d) => ({
+    const parsedUngrouped = ungroupedDocs.map((d: any) => ({
       ...d,
       photos: JSON.parse(d.photos),
       tags: JSON.parse(d.tags),
