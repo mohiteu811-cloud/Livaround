@@ -31,14 +31,17 @@ const MO_CONTACTS = [
 ];
 
 async function main() {
-  const villaMo = await prisma.property.findFirst({
-    where: { name: { contains: 'Villa Mo', mode: 'insensitive' } },
-  });
+  // List all properties so we can diagnose name-matching issues
+  const allProps = await prisma.property.findMany({ select: { id: true, name: true } });
+  console.log('seed-contacts: properties in DB:', allProps.map(p => `"${p.name}" (${p.id})`).join(', '));
+
+  const villaMo = allProps.find(p => p.name.toLowerCase().includes('villa mo'));
 
   if (!villaMo) {
-    console.log('seed-contacts: Villa Mo not found, skipping');
+    console.log('seed-contacts: no property matching "villa mo" found — skipping');
     return;
   }
+  console.log(`seed-contacts: matched "${villaMo.name}" (${villaMo.id})`);
 
   let seeded = 0;
   for (const c of MO_CONTACTS) {
@@ -57,7 +60,9 @@ async function main() {
     });
     seeded++;
   }
-  console.log(`seed-contacts: seeded ${seeded} Villa Mo contacts`);
+  console.log(`seed-contacts: seeded ${seeded} contacts for "${villaMo.name}"`);
 }
 
-main().catch(console.error).finally(() => prisma.$disconnect());
+main()
+  .catch(err => console.error('seed-contacts ERROR:', err))
+  .finally(() => prisma.$disconnect());
