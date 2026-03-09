@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Plus, MapPin, Bed, Bath, Users, MoreVertical, Wifi, UserCheck, BookOpen } from 'lucide-react';
+import { Plus, MapPin, Bed, Bath, Users, Wifi, UserCheck, BookOpen } from 'lucide-react';
 import Link from 'next/link';
 import { api, Property } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
@@ -211,25 +211,18 @@ export default function PropertiesPage() {
                     <Badge variant={p.isActive ? 'success' : 'default'}>
                       {p.isActive ? 'Active' : 'Inactive'}
                     </Badge>
-                    <div className="relative group">
-                      <button className="p-1 rounded hover:bg-slate-800 text-slate-400">
-                        <MoreVertical size={15} />
-                      </button>
-                      <div className="absolute right-0 top-7 z-10 hidden group-hover:flex flex-col bg-slate-800 border border-slate-700 rounded-lg py-1 min-w-32 shadow-xl">
-                        <button
-                          onClick={() => setModal({ open: true, property: p })}
-                          className="px-3 py-1.5 text-sm text-left text-slate-300 hover:bg-slate-700"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDelete(p.id)}
-                          className="px-3 py-1.5 text-sm text-left text-red-400 hover:bg-slate-700"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </div>
+                    <button
+                      onClick={() => setModal({ open: true, property: p })}
+                      className="px-2.5 py-1 rounded text-xs font-medium text-slate-300 bg-slate-800 border border-slate-700 hover:bg-slate-700 transition-colors"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDelete(p.id)}
+                      className="px-2.5 py-1 rounded text-xs font-medium text-red-400 bg-slate-800 border border-slate-700 hover:bg-slate-700 transition-colors"
+                    >
+                      Delete
+                    </button>
                   </div>
                 </div>
 
