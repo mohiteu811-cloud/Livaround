@@ -206,7 +206,8 @@ async function main() {
   });
 
   // ── Villa Mo vendor contacts ────────────────────────────────────────────────
-  const villaMo = await prisma.property.findFirst({ where: { name: { contains: 'Villa Mo', mode: 'insensitive' } } });
+  // Use hardcoded ID to avoid matching the duplicate "Villa Mo" test property
+  const villaMo = await prisma.property.findUnique({ where: { id: 'cmmiyun9s001d7485xp9ysdve' } });
   if (villaMo) {
     const moContacts = [
       { id: 'cnt-mo-01', agency: 'Electrician',                                  name: 'Eknath Baragundi',                phones: '["+91 76767 35006"]',                      company: 'TAG Engineers & Contractors',                order: 1  },
@@ -234,7 +235,7 @@ async function main() {
     for (const c of moContacts) {
       await prisma.propertyContact.upsert({
         where: { id: c.id },
-        update: {},
+        update: { propertyId: villaMo.id },
         create: { id: c.id, propertyId: villaMo.id, agency: c.agency, name: c.name, phones: c.phones, company: c.company, order: c.order },
       });
     }

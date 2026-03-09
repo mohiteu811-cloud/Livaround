@@ -30,24 +30,25 @@ const MO_CONTACTS = [
   { id: 'cnt-mo-21', agency: 'MVR Homes Builder CRM',                        name: 'Devidas Shetkar',                 phones: '["+91 92090 04343"]',                    company: 'Casa Aurea',                                  order: 21 },
 ];
 
-async function main() {
-  // List all properties so we can diagnose name-matching issues
-  const allProps = await prisma.property.findMany({ select: { id: true, name: true } });
-  console.log('seed-contacts: properties in DB:', allProps.map(p => `"${p.name}" (${p.id})`).join(', '));
+// Hardcoded production ID for the real Villa Mo property.
+// There are two "Villa Mo" properties; this is the one the host actually uses.
+const VILLA_MO_ID = 'cmmiyun9s001d7485xp9ysdve';
 
-  const villaMo = allProps.find(p => p.name.toLowerCase().includes('villa mo'));
+async function main() {
+  const villaMo = await prisma.property.findUnique({ where: { id: VILLA_MO_ID } });
 
   if (!villaMo) {
-    console.log('seed-contacts: no property matching "villa mo" found — skipping');
+    console.log('seed-contacts: Villa Mo property not found — skipping');
     return;
   }
-  console.log(`seed-contacts: matched "${villaMo.name}" (${villaMo.id})`);
+  console.log(`seed-contacts: targeting "${villaMo.name}" (${villaMo.id})`);
 
   let seeded = 0;
   for (const c of MO_CONTACTS) {
     await prisma.propertyContact.upsert({
       where: { id: c.id },
-      update: {},
+      // Also update propertyId so contacts previously on the wrong Villa Mo get moved
+      update: { propertyId: villaMo.id },
       create: {
         id: c.id,
         propertyId: villaMo.id,
@@ -60,7 +61,7 @@ async function main() {
     });
     seeded++;
   }
-  console.log(`seed-contacts: seeded ${seeded} contacts for "${villaMo.name}"`);
+  console.log(`seed-contacts: seeded/moved ${seeded} contacts to "${villaMo.name}"`);
 }
 
 main()
