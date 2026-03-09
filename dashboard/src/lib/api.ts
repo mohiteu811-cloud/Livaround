@@ -178,14 +178,43 @@ export const api = {
     list: () => request<OwnerEntry[]>('/api/owners'),
     create: (data: { name: string; email: string; phone?: string }) =>
       request<OwnerEntry & { tempPassword: string }>('/api/owners', { method: 'POST', body: JSON.stringify(data) }),
-    linkProperty: (ownerId: string, data: { propertyId: string; involvementLevel: string; ownershipPercent?: number }) =>
+    linkProperty: (ownerId: string, data: { propertyId: string; involvementLevel: string; ownershipPercent?: number; commissionPct?: number }) =>
       request<PropertyOwnership>(`/api/owners/${ownerId}/properties`, { method: 'POST', body: JSON.stringify(data) }),
-    updateLink: (ownerId: string, propertyId: string, data: { involvementLevel?: string; ownershipPercent?: number }) =>
+    updateLink: (ownerId: string, propertyId: string, data: { involvementLevel?: string; ownershipPercent?: number; commissionPct?: number }) =>
       request<PropertyOwnership>(`/api/owners/${ownerId}/properties/${propertyId}`, { method: 'PUT', body: JSON.stringify(data) }),
     unlinkProperty: (ownerId: string, propertyId: string) =>
       request<void>(`/api/owners/${ownerId}/properties/${propertyId}`, { method: 'DELETE' }),
     delete: (id: string) => request<void>(`/api/owners/${id}`, { method: 'DELETE' }),
     dashboard: () => request<OwnerDashboard>('/api/owners/dashboard'),
+  },
+
+  revenueReports: {
+    list: (params?: { propertyId?: string; month?: number; year?: number }) => {
+      const qs = params ? '?' + new URLSearchParams(
+        Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)]))
+      ).toString() : '';
+      return request<RevenueReport[]>(`/api/revenue-reports${qs}`);
+    },
+    get: (id: string) => request<RevenueReport>(`/api/revenue-reports/${id}`),
+    create: (data: {
+      propertyId: string; month: number; year: number;
+      grossRevenue: number; airbnbServiceFees: number; netRevenue: number;
+      commissionPct: number; airbnbReportUrl?: string; notes?: string;
+    }) => request<RevenueReport>('/api/revenue-reports', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: Partial<RevenueReport>) =>
+      request<RevenueReport>(`/api/revenue-reports/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: string) => request<void>(`/api/revenue-reports/${id}`, { method: 'DELETE' }),
+    addExpense: (reportId: string, data: {
+      category: string; description: string; amount: number;
+      expenseType: string; receiptUrl?: string; requiresApproval?: boolean;
+    }) => request<Expense>(`/api/revenue-reports/${reportId}/expenses`, { method: 'POST', body: JSON.stringify(data) }),
+    updateExpense: (reportId: string, expenseId: string, data: Partial<Expense>) =>
+      request<Expense>(`/api/revenue-reports/${reportId}/expenses/${expenseId}`, { method: 'PUT', body: JSON.stringify(data) }),
+    deleteExpense: (reportId: string, expenseId: string) =>
+      request<void>(`/api/revenue-reports/${reportId}/expenses/${expenseId}`, { method: 'DELETE' }),
+    ownerReports: () => request<RevenueReport[]>('/api/revenue-reports/owner/reports'),
+    reviewExpense: (reportId: string, expenseId: string, data: { action: 'APPROVE' | 'REJECT'; notes?: string }) =>
+      request<Expense>(`/api/revenue-reports/${reportId}/expenses/${expenseId}/review`, { method: 'POST', body: JSON.stringify(data) }),
   },
 
   inventory: {
@@ -392,7 +421,46 @@ export interface PropertyOwnership {
   property?: { id: string; name: string; city: string };
   involvementLevel: 'NONE' | 'REPORTS_ONLY' | 'FINANCIAL' | 'FULL';
   ownershipPercent?: number;
+  commissionPct?: number;
   createdAt: string;
+}
+
+export interface Expense {
+  id: string;
+  reportId: string;
+  propertyId: string;
+  category: 'HOUSEKEEPING' | 'CONSUMABLES' | 'REPAIRS' | 'UTILITIES' | 'MISCELLANEOUS';
+  description: string;
+  amount: number;
+  expenseType: 'SHARED' | 'OWNER_ONLY';
+  receiptUrl?: string;
+  requiresApproval: boolean;
+  approvalStatus: 'PENDING' | 'APPROVED' | 'REJECTED';
+  approvedByUserId?: string;
+  approvedAt?: string;
+  approverNotes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RevenueReport {
+  id: string;
+  propertyId: string;
+  property?: { id: string; name: string; city: string };
+  hostId: string;
+  month: number;
+  year: number;
+  grossRevenue: number;
+  airbnbServiceFees: number;
+  netRevenue: number;
+  commissionPct: number;
+  commissionAmount: number;
+  airbnbReportUrl?: string;
+  status: 'DRAFT' | 'PUBLISHED';
+  notes?: string;
+  expenses: Expense[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface OwnerEntry {

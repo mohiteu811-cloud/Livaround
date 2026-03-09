@@ -18,11 +18,13 @@ const linkPropertySchema = z.object({
   propertyId: z.string(),
   involvementLevel: z.enum(['NONE', 'REPORTS_ONLY', 'FINANCIAL', 'FULL']).default('REPORTS_ONLY'),
   ownershipPercent: z.number().min(0).max(100).optional(),
+  commissionPct: z.number().min(0).max(100).optional(),
 });
 
 const updateLinkSchema = z.object({
   involvementLevel: z.enum(['NONE', 'REPORTS_ONLY', 'FINANCIAL', 'FULL']).optional(),
   ownershipPercent: z.number().min(0).max(100).optional(),
+  commissionPct: z.number().min(0).max(100).optional(),
 });
 
 async function getHostId(req: AuthRequest, res: Response): Promise<string | null> {

@@ -19,7 +19,7 @@ const upload = multer({
   storage,
   limits: { fileSize: 200 * 1024 * 1024 }, // 200 MB
   fileFilter: (_req, file, cb) => {
-    const allowed = /image\/(jpeg|jpg|png|webp|gif)|video\/(mp4|quicktime|webm|3gpp)/;
+    const allowed = /image\/(jpeg|jpg|png|webp|gif)|video\/(mp4|quicktime|webm|3gpp)|application\/(pdf)|text\/(csv|plain)/;
     cb(null, allowed.test(file.mimetype));
   },
 });
@@ -33,7 +33,11 @@ router.post('/', upload.single('file'), (req: AuthRequest, res: Response) => {
   const host = process.env.PUBLIC_URL ||
     `${req.protocol}://${req.get('host')}`;
   const url = `${host}/uploads/${req.file.filename}`;
-  return res.json({ url, type: req.file.mimetype.startsWith('video/') ? 'video' : 'image' });
+  const type = req.file.mimetype.startsWith('video/') ? 'video'
+    : req.file.mimetype === 'application/pdf' ? 'pdf'
+    : req.file.mimetype.startsWith('text/') ? 'document'
+    : 'image';
+  return res.json({ url, type });
 });
 
 export default router;

@@ -98,6 +98,7 @@ function LinkPropertyModal({
     propertyId: available[0]?.id || '',
     involvementLevel: 'REPORTS_ONLY',
     ownershipPercent: '',
+    commissionPct: '',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -111,6 +112,7 @@ function LinkPropertyModal({
         propertyId: form.propertyId,
         involvementLevel: form.involvementLevel,
         ownershipPercent: form.ownershipPercent ? parseFloat(form.ownershipPercent) : undefined,
+        commissionPct: form.commissionPct ? parseFloat(form.commissionPct) : undefined,
       });
       onSave();
       onClose();
@@ -161,13 +163,22 @@ function LinkPropertyModal({
           ))}
         </div>
       </FormField>
-      <FormField label="Ownership % (optional)">
-        <Input
-          type="number" min="0" max="100" placeholder="e.g. 50"
-          value={form.ownershipPercent}
-          onChange={(e) => setForm((f) => ({ ...f, ownershipPercent: e.target.value }))}
-        />
-      </FormField>
+      <div className="grid grid-cols-2 gap-4">
+        <FormField label="Ownership % (optional)">
+          <Input
+            type="number" min="0" max="100" placeholder="e.g. 50"
+            value={form.ownershipPercent}
+            onChange={(e) => setForm((f) => ({ ...f, ownershipPercent: e.target.value }))}
+          />
+        </FormField>
+        <FormField label="Commission % (optional)">
+          <Input
+            type="number" min="0" max="100" placeholder="e.g. 20"
+            value={form.commissionPct}
+            onChange={(e) => setForm((f) => ({ ...f, commissionPct: e.target.value }))}
+          />
+        </FormField>
+      </div>
       <div className="flex gap-3 pt-2">
         <Button type="button" variant="secondary" onClick={onClose} className="flex-1 justify-center">Cancel</Button>
         <Button type="submit" loading={loading} className="flex-1 justify-center">Link property</Button>
@@ -273,7 +284,8 @@ export default function OwnersPage() {
                           <span className="text-xs text-slate-600">— {op.property?.city || prop?.city}</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          {op.ownershipPercent && <span className="text-xs text-slate-500">{op.ownershipPercent}%</span>}
+                          {op.ownershipPercent && <span className="text-xs text-slate-500">{op.ownershipPercent}% owned</span>}
+                          {op.commissionPct !== undefined && op.commissionPct !== null && <span className="text-xs text-amber-500">{op.commissionPct}% commission</span>}
                           <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${inv.color}`}>{inv.label}</span>
                           <button
                             onClick={() => handleUnlink(owner.id, op.propertyId, op.property?.name || prop?.name || '')}

@@ -18,6 +18,7 @@ import {
   Wrench,
   ClipboardList,
   UserCircle,
+  BarChart3,
 } from 'lucide-react';
 import { clearToken } from '@/lib/auth';
 
@@ -34,6 +35,7 @@ const nav = [
   { href: '/maintenance', icon: ClipboardList, label: 'Requests' },
   { group: true, label: 'Ownership' },
   { href: '/owners', icon: UserCircle, label: 'Owners' },
+  { href: '/revenue', icon: BarChart3, label: 'Revenue' },
 ];
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {

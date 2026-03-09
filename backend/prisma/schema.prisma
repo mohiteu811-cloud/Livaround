@@ -61,6 +61,7 @@ model Property {
   maintenanceSettings PropertyMaintenanceSettings?
   maintenanceRequests MaintenanceRequest[]
   ownerships          PropertyOwnership[]
+  revenueReports      RevenueReport[]
 }
 
 model Booking {
@@ -259,8 +260,53 @@ model PropertyOwnership {
   property         Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   involvementLevel String   @default("REPORTS_ONLY") // NONE, REPORTS_ONLY, FINANCIAL, FULL
   ownershipPercent Float?
+  commissionPct    Float?   // Management commission % taken from gross revenue
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
   @@unique([ownerId, propertyId])
+}
+
+// ── Revenue reports ───────────────────────────────────────────────────────────
+
+model RevenueReport {
+  id                String    @id @default(cuid())
+  propertyId        String
+  property          Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  hostId            String
+  month             Int       // 1-12
+  year              Int
+  grossRevenue      Float     // Airbnb gross earnings (before Airbnb service fee)
+  airbnbServiceFees Float     @default(0) // Airbnb's own service fees deducted
+  netRevenue        Float     // grossRevenue - airbnbServiceFees (credited to host account)
+  commissionPct     Float     @default(20) // Management commission %
+  commissionAmount  Float     // Calculated commission amount
+  airbnbReportUrl   String?   // Uploaded Airbnb report file URL
+  status            String    @default("DRAFT") // DRAFT, PUBLISHED
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  expenses          Expense[]
+
+  @@unique([propertyId, month, year])
+}
+
+model Expense {
+  id               String        @id @default(cuid())
+  reportId         String
+  report           RevenueReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  propertyId       String
+  category         String        // HOUSEKEEPING, CONSUMABLES, REPAIRS, UTILITIES, MISCELLANEOUS
+  description      String
+  amount           Float
+  expenseType      String        @default("SHARED") // SHARED, OWNER_ONLY
+  receiptUrl       String?
+  requiresApproval Boolean       @default(false)
+  approvalStatus   String        @default("PENDING") // PENDING, APPROVED, REJECTED
+  approvedByUserId String?
+  approvedAt       DateTime?
+  approverNotes    String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
 }

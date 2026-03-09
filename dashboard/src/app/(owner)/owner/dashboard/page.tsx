@@ -4,11 +4,10 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Building2, CalendarCheck, DollarSign, Wrench, LogOut,
-  TrendingUp, AlertCircle, Clock,
+  TrendingUp, AlertCircle, Clock, BarChart3,
 } from 'lucide-react';
-import { api, OwnerDashboard, MaintenanceRequest, Booking } from '@/lib/api';
+import { api, OwnerDashboard, RevenueReport } from '@/lib/api';
 import { getToken, clearToken } from '@/lib/auth';
-import { Badge } from '@/components/ui/Badge';
 
 const PRIORITY_COLORS: Record<string, string> = {
   LOW: 'text-slate-400',
@@ -44,6 +43,7 @@ function StatCard({ icon: Icon, label, value, sub, color = 'text-brand-400' }: {
 export default function OwnerDashboardPage() {
   const router = useRouter();
   const [data, setData] = useState<OwnerDashboard | null>(null);
+  const [revenueReports, setRevenueReports] = useState<RevenueReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -55,8 +55,12 @@ export default function OwnerDashboardPage() {
   async function load() {
     setLoading(true);
     try {
-      const d = await api.owners.dashboard();
+      const [d, r] = await Promise.all([
+        api.owners.dashboard(),
+        api.revenueReports.ownerReports().catch(() => [] as RevenueReport[]),
+      ]);
       setData(d);
+      setRevenueReports(r);
     } catch (err) {
       if (err instanceof Error && err.message === 'Unauthorized') return;
       setError('Failed to load dashboard');
@@ -84,6 +88,9 @@ export default function OwnerDashboardPage() {
   const pendingMaintenance = data?.properties.reduce((sum, p) => sum + (p.property.maintenanceRequests?.filter((m) => m.status === 'PENDING').length || 0), 0) || 0;
   const hasFinancial = data?.properties.some((p) => ['FINANCIAL', 'FULL'].includes(p.involvementLevel));
   const hasMaintenance = data?.properties.some((p) => p.involvementLevel === 'FULL');
+  const pendingExpenseApprovals = revenueReports.reduce((s, r) =>
+    s + r.expenses.filter((e) => e.requiresApproval && e.approvalStatus === 'PENDING').length, 0);
+  const latestReport = revenueReports[0];
 
   return (
     <div className="min-h-screen bg-slate-950">
@@ -116,12 +123,48 @@ export default function OwnerDashboardPage() {
           <StatCard icon={Building2} label="Properties" value={totalProperties} color="text-violet-400" />
           <StatCard icon={CalendarCheck} label="Active bookings" value={totalActiveBookings} color="text-blue-400" />
           {hasFinancial && (
-            <StatCard icon={DollarSign} label="Revenue (active)" value={`$${totalRevenue.toLocaleString()}`} color="text-emerald-400" />
+            <StatCard icon={DollarSign} label="Revenue (active)" value={`₹${totalRevenue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`} color="text-emerald-400" />
           )}
           {hasMaintenance && pendingMaintenance > 0 && (
             <StatCard icon={Wrench} label="Pending maintenance" value={pendingMaintenance} color="text-amber-400" />
           )}
         </div>
+
+        {/* Revenue reports banner */}
+        {(revenueReports.length > 0 || pendingExpenseApprovals > 0) && (
+          <div
+            className={`rounded-xl border p-5 cursor-pointer hover:border-brand-500/50 transition-colors ${
+              pendingExpenseApprovals > 0
+                ? 'bg-amber-500/5 border-amber-500/20'
+                : 'bg-slate-900 border-slate-800'
+            }`}
+            onClick={() => router.push('/owner/revenue')}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${pendingExpenseApprovals > 0 ? 'bg-amber-500/20' : 'bg-slate-800'}`}>
+                  <BarChart3 size={16} className={pendingExpenseApprovals > 0 ? 'text-amber-400' : 'text-brand-400'} />
+                </div>
+                <div>
+                  <p className="font-medium text-slate-200">Revenue Reports</p>
+                  {pendingExpenseApprovals > 0 ? (
+                    <p className="text-xs text-amber-400">{pendingExpenseApprovals} expense{pendingExpenseApprovals > 1 ? 's' : ''} awaiting your approval</p>
+                  ) : (
+                    <p className="text-xs text-slate-500">{revenueReports.length} published report{revenueReports.length !== 1 ? 's' : ''} from your manager</p>
+                  )}
+                </div>
+              </div>
+              {latestReport && (
+                <div className="text-right">
+                  <p className="text-xs text-slate-500">Latest ({['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][latestReport.month - 1]} {latestReport.year})</p>
+                  <p className="text-sm font-bold text-emerald-400">
+                    ₹{(latestReport.netRevenue - latestReport.commissionAmount - latestReport.expenses.reduce((s, e) => s + e.amount, 0)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Per-property breakdown */}
         <div className="space-y-6">
