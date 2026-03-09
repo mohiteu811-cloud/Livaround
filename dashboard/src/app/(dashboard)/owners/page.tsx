@@ -48,7 +48,7 @@ function CreateOwnerForm({ onSave, onClose }: { onSave: (d: unknown) => Promise<
         <p className="text-slate-400 text-sm">Share these credentials with <strong>{form.name}</strong>:</p>
         <div className="bg-slate-800 rounded-lg p-4 text-left">
           <p className="text-xs text-slate-500 mb-1">Login URL</p>
-          <p className="text-slate-200 font-mono text-sm">/owner/login</p>
+          <p className="text-slate-200 font-mono text-sm">/login → Owner tab</p>
           <p className="text-xs text-slate-500 mb-1 mt-3">Email</p>
           <p className="text-slate-200 font-mono text-sm">{created.email}</p>
           <p className="text-xs text-slate-500 mb-1 mt-3">Temporary password</p>
@@ -202,6 +202,8 @@ export default function OwnersPage() {
       const [o, p] = await Promise.all([api.owners.list(), api.properties.list()]);
       setOwners(o);
       setProperties(p);
+    } catch (err) {
+      console.error('Failed to load owners/properties:', err);
     } finally {
       setLoading(false);
     }

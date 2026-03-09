@@ -121,19 +121,20 @@ router.post('/:ownerId/properties', validate(linkPropertySchema), async (req: Au
     const hostId = await getHostId(req, res);
     if (!hostId) return;
 
-    const { propertyId, involvementLevel, ownershipPercent } = req.body;
+    const { propertyId, involvementLevel, ownershipPercent, commissionPct } = req.body;
 
     // Verify property belongs to this host
     const property = await prisma.property.findFirst({ where: { id: propertyId, hostId } });
-    if (!property) return res.status(403).json({ error: 'Property not found' });
+    if (!property) return res.status(403).json({ error: 'Property not found or not owned by your account' });
 
     const owner = await prisma.owner.findUnique({ where: { id: req.params.ownerId } });
     if (!owner) return res.status(404).json({ error: 'Owner not found' });
 
+    const linkData = { involvementLevel, ownershipPercent, commissionPct };
     const link = await prisma.propertyOwnership.upsert({
       where: { ownerId_propertyId: { ownerId: req.params.ownerId, propertyId } },
-      create: { ownerId: req.params.ownerId, propertyId, involvementLevel, ownershipPercent },
-      update: { involvementLevel, ownershipPercent },
+      create: { ownerId: req.params.ownerId, propertyId, ...linkData },
+      update: linkData,
       include: { property: { select: { id: true, name: true, city: true } } },
     });
     return res.status(201).json(link);
