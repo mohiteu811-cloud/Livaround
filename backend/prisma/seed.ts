@@ -163,7 +163,53 @@ async function main() {
     },
   });
 
-  console.log('\nSeed complete! Login: host@livaround.com / password123');
+  // ── Dummy owners ────────────────────────────────────────────────────────────
+
+  const ownerPassword = await bcrypt.hash('owner123', 12);
+
+  // Owner 1: Mohit Lalvani — Villa Sussegad
+  const mohitUser = await prisma.user.upsert({
+    where: { email: 'mohit@livaround.com' }, update: {},
+    create: {
+      name: 'Mohit Lalvani', email: 'mohit@livaround.com',
+      password: ownerPassword, phone: '+91 98201 55678', role: 'OWNER',
+      owner: { create: {} },
+    },
+    include: { owner: true },
+  });
+  await prisma.propertyOwnership.upsert({
+    where: { ownerId_propertyId: { ownerId: mohitUser.owner!.id, propertyId: villa.id } },
+    update: {},
+    create: {
+      ownerId: mohitUser.owner!.id, propertyId: villa.id,
+      involvementLevel: 'FINANCIAL', ownershipPercent: 100, commissionPct: 20,
+    },
+  });
+
+  // Owner 2: Priya Desai — Casa Anjuna
+  const priyaUser = await prisma.user.upsert({
+    where: { email: 'priya.desai@livaround.com' }, update: {},
+    create: {
+      name: 'Priya Desai', email: 'priya.desai@livaround.com',
+      password: ownerPassword, phone: '+91 97301 22345', role: 'OWNER',
+      owner: { create: {} },
+    },
+    include: { owner: true },
+  });
+  await prisma.propertyOwnership.upsert({
+    where: { ownerId_propertyId: { ownerId: priyaUser.owner!.id, propertyId: cottage.id } },
+    update: {},
+    create: {
+      ownerId: priyaUser.owner!.id, propertyId: cottage.id,
+      involvementLevel: 'FINANCIAL', ownershipPercent: 100, commissionPct: 20,
+    },
+  });
+
+  console.log('\nSeed complete!');
+  console.log('  Host:    host@livaround.com / password123');
+  console.log('  Owner 1: mohit@livaround.com / owner123  → Villa Sussegad');
+  console.log('  Owner 2: priya.desai@livaround.com / owner123  → Casa Anjuna');
+  console.log('  Login URL: /owner/login');
 }
 
 main().catch(console.error).finally(() => prisma.$disconnect());
