@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import {
   Wifi, Lock, MapPin, Phone, Home, BookOpen, HelpCircle, Key,
@@ -527,7 +527,7 @@ function ServicesTab({ data, guestCode, onRequestsUpdate }: {
                 type="time"
                 value={arrivalTime}
                 onChange={(e) => setArrivalTime(e.target.value)}
-                className="flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-indigo-400"
+                className="flex-1 text-sm text-slate-800 border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-indigo-400"
               />
               <button
                 disabled={!arrivalTime || submitting === 'ARRIVAL_TIME'}
@@ -552,7 +552,7 @@ function ServicesTab({ data, guestCode, onRequestsUpdate }: {
                 type="time"
                 value={departureTime}
                 onChange={(e) => setDepartureTime(e.target.value)}
-                className="flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-indigo-400"
+                className="flex-1 text-sm text-slate-800 border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-indigo-400"
               />
               <button
                 disabled={!departureTime || submitting === 'DEPARTURE_TIME'}
@@ -595,7 +595,7 @@ function ServicesTab({ data, guestCode, onRequestsUpdate }: {
               <select
                 value={hkDate}
                 onChange={(e) => setHkDate(e.target.value)}
-                className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-indigo-400"
+                className="w-full text-sm text-slate-800 border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-indigo-400"
               >
                 <option value="">Select date</option>
                 {stayDates.map((d) => (
@@ -612,7 +612,7 @@ function ServicesTab({ data, guestCode, onRequestsUpdate }: {
                 <select
                   value={hkTime}
                   onChange={(e) => setHkTime(e.target.value)}
-                  className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-indigo-400"
+                  className="w-full text-sm text-slate-800 border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-indigo-400"
                 >
                   {timeSlots.map((s) => (
                     <option key={s.value} value={s.value}>{s.label}</option>
@@ -660,7 +660,7 @@ function ServicesTab({ data, guestCode, onRequestsUpdate }: {
               <select
                 value={serviceDate}
                 onChange={(e) => setServiceDate(e.target.value)}
-                className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-indigo-400"
+                className="w-full text-sm text-slate-800 border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-indigo-400"
               >
                 <option value="">Select date</option>
                 {stayDates.map((d) => (
@@ -719,29 +719,106 @@ function ServicesTab({ data, guestCode, onRequestsUpdate }: {
   );
 }
 
+// ── Voice input hook (inline for guest page) ─────────────────────────────────
+
+function useVoiceInput(onTranscript: (t: string) => void) {
+  const [listening, setListening] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recRef = useRef<any>(null);
+  const supported = typeof window !== 'undefined' &&
+    ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
+
+  const start = useCallback(() => {
+    if (!supported) { alert('Voice input not supported in this browser. Try Chrome.'); return; }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const SR = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rec = new SR() as any;
+    rec.lang = 'en-IN';
+    rec.interimResults = false;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    rec.onresult = (e: any) => onTranscript(e.results[0][0].transcript);
+    rec.onerror = () => setListening(false);
+    rec.onend = () => setListening(false);
+    recRef.current = rec;
+    rec.start();
+    setListening(true);
+  }, [supported, onTranscript]);
+
+  const stop = useCallback(() => { recRef.current?.stop(); setListening(false); }, []);
+  return { listening, supported, start, stop };
+}
+
 // ── Tab: Help ─────────────────────────────────────────────────────────────────
 
 function HelpTab({ data, guestCode }: { data: StayData; guestCode: string }) {
   const { property, guide } = data;
   const [showIssueForm, setShowIssueForm] = useState(false);
   const [issueDesc, setIssueDesc] = useState('');
+  const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+
+  const photoRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLInputElement>(null);
+
+  const appendTranscript = useCallback((t: string) => setIssueDesc((p) => p ? `${p} ${t}` : t), []);
+  const { listening, supported: voiceOk, start: startVoice, stop: stopVoice } = useVoiceInput(appendTranscript);
+
+  function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setPhotoDataUrl(reader.result as string);
+    reader.readAsDataURL(file);
+  }
+
+  function handleVideo(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setVideoFile(file);
+    setVideoPreviewUrl(URL.createObjectURL(file));
+  }
+
+  function clearVideo() {
+    setVideoFile(null);
+    if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl);
+    setVideoPreviewUrl(null);
+    if (videoRef.current) videoRef.current.value = '';
+  }
 
   async function submitIssue() {
     if (!issueDesc.trim()) return;
     setSubmitting(true);
+    setSubmitError('');
     try {
-      await fetch(`${API_URL}/api/stay/${guestCode}/issue`, {
+      let videoUrl: string | undefined;
+      if (videoFile) {
+        setUploading(true);
+        const body = new FormData();
+        body.append('file', videoFile);
+        const r = await fetch(`${API_URL}/api/stay/${guestCode}/upload`, { method: 'POST', body });
+        if (r.ok) { const j = await r.json(); videoUrl = j.url; }
+        setUploading(false);
+      }
+      const res = await fetch(`${API_URL}/api/stay/${guestCode}/issue`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ description: issueDesc }),
+        body: JSON.stringify({ description: issueDesc, photoUrl: photoDataUrl ?? undefined, videoUrl }),
       });
+      if (!res.ok) { setSubmitError('Failed to submit. Please try again.'); return; }
       setSubmitted(true);
       setShowIssueForm(false);
       setIssueDesc('');
+      setPhotoDataUrl(null);
+      clearVideo();
     } finally {
       setSubmitting(false);
+      setUploading(false);
     }
   }
 
@@ -806,11 +883,18 @@ function HelpTab({ data, guestCode }: { data: StayData; guestCode: string }) {
       {/* Report issue */}
       <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
         <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Something wrong?</p>
+
         {submitted && (
           <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 rounded-xl px-3 py-2 mb-3">
             <Check size={14} /> Issue reported — your host will be notified.
           </div>
         )}
+        {submitError && (
+          <div className="flex items-center gap-2 text-sm text-red-700 bg-red-50 rounded-xl px-3 py-2 mb-3">
+            <AlertTriangle size={14} /> {submitError}
+          </div>
+        )}
+
         {!showIssueForm ? (
           <button onClick={() => setShowIssueForm(true)}
             className="flex items-center gap-2 w-full py-3 px-4 bg-red-50 hover:bg-red-100 border border-red-200 rounded-xl text-red-700 text-sm font-medium transition-colors">
@@ -818,19 +902,79 @@ function HelpTab({ data, guestCode }: { data: StayData; guestCode: string }) {
           </button>
         ) : (
           <div className="space-y-3">
-            <textarea
-              value={issueDesc}
-              onChange={(e) => setIssueDesc(e.target.value)}
-              placeholder="Describe the issue (e.g. AC not working, tap leaking...)"
-              rows={3}
-              className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 text-slate-700 placeholder-slate-400 focus:outline-none focus:border-indigo-400 resize-none"
-            />
-            <div className="flex gap-2">
-              <button onClick={() => setShowIssueForm(false)}
+            {/* Description + voice */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-medium text-slate-600">Describe the issue</label>
+                {voiceOk && (
+                  <button
+                    type="button"
+                    onClick={listening ? stopVoice : startVoice}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                      listening
+                        ? 'bg-red-100 text-red-600 animate-pulse'
+                        : 'bg-slate-100 text-slate-600'
+                    }`}
+                  >
+                    🎤 {listening ? 'Listening…' : 'Speak'}
+                  </button>
+                )}
+              </div>
+              <textarea
+                value={issueDesc}
+                onChange={(e) => setIssueDesc(e.target.value)}
+                placeholder="e.g. AC not working, tap leaking..."
+                rows={3}
+                className="w-full text-sm text-slate-800 border border-slate-200 rounded-xl px-3 py-2.5 placeholder-slate-400 focus:outline-none focus:border-red-300 resize-none"
+              />
+            </div>
+
+            {/* Photo */}
+            <input ref={photoRef} type="file" accept="image/*" capture="environment" onChange={handlePhoto} className="hidden" />
+            {photoDataUrl ? (
+              <div className="relative">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={photoDataUrl} alt="Issue photo" className="w-full rounded-xl border border-slate-200 object-cover max-h-48" />
+                <button type="button"
+                  onClick={() => { setPhotoDataUrl(null); if (photoRef.current) photoRef.current.value = ''; }}
+                  className="absolute top-2 right-2 bg-white/90 text-slate-700 rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold shadow">✕</button>
+              </div>
+            ) : (
+              <button type="button" onClick={() => photoRef.current?.click()}
+                className="w-full py-3 bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl text-slate-500 text-sm font-medium flex items-center justify-center gap-2">
+                📷 Take / upload photo
+              </button>
+            )}
+
+            {/* Video */}
+            <input ref={videoRef} type="file" accept="video/*" capture="environment" onChange={handleVideo} className="hidden" />
+            {videoPreviewUrl ? (
+              <div className="relative">
+                <video src={videoPreviewUrl} controls playsInline className="w-full rounded-xl border border-slate-200 max-h-48 bg-black" />
+                <button type="button" onClick={clearVideo}
+                  className="absolute top-2 right-2 bg-white/90 text-slate-700 rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold shadow">✕</button>
+                {videoFile && <p className="text-xs text-slate-400 mt-1">{(videoFile.size / 1024 / 1024).toFixed(1)} MB</p>}
+              </div>
+            ) : (
+              <button type="button" onClick={() => videoRef.current?.click()}
+                className="w-full py-3 bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl text-slate-500 text-sm font-medium flex items-center justify-center gap-2">
+                🎥 Record / upload video
+              </button>
+            )}
+
+            {uploading && (
+              <div className="flex items-center gap-2 text-sm text-indigo-600 bg-indigo-50 rounded-xl px-3 py-2">
+                <div className="w-3.5 h-3.5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+                Uploading video…
+              </div>
+            )}
+
+            <div className="flex gap-2 pt-1">
+              <button onClick={() => { setShowIssueForm(false); setIssueDesc(''); setPhotoDataUrl(null); clearVideo(); }}
                 className="flex-1 py-2.5 text-sm text-slate-500 border border-slate-200 rounded-xl hover:bg-slate-50">Cancel</button>
-              <button onClick={submitIssue} disabled={submitting || !issueDesc.trim()}
+              <button onClick={submitIssue} disabled={submitting || uploading || !issueDesc.trim()}
                 className="flex-1 py-2.5 text-sm font-medium text-white bg-red-600 rounded-xl hover:bg-red-700 disabled:opacity-50">
-                {submitting ? 'Sending...' : 'Send report'}
+                {uploading ? 'Uploading…' : submitting ? 'Sending…' : 'Send report'}
               </button>
             </div>
           </div>

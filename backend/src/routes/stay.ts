@@ -1,8 +1,29 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
 import { prisma } from '../lib/prisma';
 
 const router = Router();
+
+const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
+if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
+    },
+  }),
+  limits: { fileSize: 200 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const ok = /image\/(jpeg|jpg|png|webp)|video\/(mp4|quicktime|webm|3gpp)/.test(file.mimetype);
+    cb(null, ok);
+  },
+});
 
 function parseJSON(s: string | null | undefined): string[] {
   try { return JSON.parse(s || '[]'); } catch { return []; }
@@ -242,6 +263,28 @@ router.post('/:code/service-request', async (req: Request, res: Response) => {
     }
 
     return res.status(201).json({ id: request.id, status: request.status });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ── POST /api/stay/:code/upload ───────────────────────────────────────────────
+// Public file upload for guest issue reports (photo / video)
+
+router.post('/:code/upload', upload.single('file'), async (req: Request, res: Response) => {
+  try {
+    const booking = await prisma.booking.findUnique({
+      where: { guestCode: req.params.code },
+      select: { id: true },
+    });
+    if (!booking) return res.status(404).json({ error: 'Stay not found' });
+    if (!req.file) return res.status(400).json({ error: 'No file or unsupported type' });
+
+    const host = process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`;
+    const url = `${host}/uploads/${req.file.filename}`;
+    const type = req.file.mimetype.startsWith('video/') ? 'video' : 'image';
+    return res.json({ url, type });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Internal server error' });
