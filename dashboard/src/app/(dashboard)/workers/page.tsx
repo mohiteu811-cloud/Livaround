@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Plus, Star, MapPin, Trash2, Building2, X } from 'lucide-react';
+import { Plus, Star, MapPin, Trash2, Building2, X, KeyRound } from 'lucide-react';
 import { api, Worker, Property } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Input, Textarea, FormField } from '@/components/ui/Input';
@@ -187,12 +187,62 @@ function ManagePropertiesModal({
   );
 }
 
+function ResetPasswordModal({ worker, onClose }: { worker: Worker; onClose: () => void }) {
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<{ tempPassword: string } | null>(null);
+  const [error, setError] = useState('');
+
+  async function handleReset() {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await api.workers.resetPassword(worker.id);
+      setResult(res);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to reset password');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (result) {
+    return (
+      <div className="space-y-4 text-center">
+        <div className="text-4xl">🔑</div>
+        <p className="text-slate-100 font-semibold">Password reset!</p>
+        <p className="text-slate-400 text-sm">A new temporary password has been emailed to <strong>{worker.user.email}</strong>. You can also share it directly:</p>
+        <div className="bg-slate-800 rounded-lg p-4 text-left">
+          <p className="text-xs text-slate-500 mb-1">Email</p>
+          <p className="text-slate-200 font-mono text-sm">{worker.user.email}</p>
+          <p className="text-xs text-slate-500 mb-1 mt-3">New temporary password</p>
+          <p className="text-slate-200 font-mono text-sm font-bold">{result.tempPassword}</p>
+        </div>
+        <Button onClick={onClose} className="w-full justify-center">Done</Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {error && <div className="px-4 py-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">{error}</div>}
+      <p className="text-slate-400 text-sm">
+        This will generate a new temporary password for <strong className="text-slate-200">{worker.user.name}</strong> and send it to <strong className="text-slate-200">{worker.user.email}</strong>.
+      </p>
+      <div className="flex gap-3 pt-2">
+        <Button type="button" variant="secondary" onClick={onClose} className="flex-1 justify-center">Cancel</Button>
+        <Button loading={loading} onClick={handleReset} className="flex-1 justify-center">Reset password</Button>
+      </div>
+    </div>
+  );
+}
+
 export default function WorkersPage() {
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [addModal, setAddModal] = useState(false);
   const [manageWorker, setManageWorker] = useState<Worker | null>(null);
+  const [resetWorker, setResetWorker] = useState<Worker | null>(null);
 
   useEffect(() => { load(); }, []);
 
@@ -260,6 +310,9 @@ export default function WorkersPage() {
                       className={`px-2 py-1 rounded-full text-xs font-medium transition-colors ${w.isAvailable ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}
                     >
                       {w.isAvailable ? 'Available' : 'Unavailable'}
+                    </button>
+                    <button onClick={() => setResetWorker(w)} title="Reset password" className="p-1 rounded hover:bg-slate-800 text-slate-500 hover:text-brand-400 transition-colors">
+                      <KeyRound size={13} />
                     </button>
                     <button onClick={() => handleDelete(w.id)} className="p-1 rounded hover:bg-slate-800 text-slate-500 hover:text-red-400 transition-colors">
                       <Trash2 size={13} />
@@ -339,6 +392,12 @@ export default function WorkersPage() {
           onClose={() => setAddModal(false)}
         />
       </Modal>
+
+      {resetWorker && (
+        <Modal open={!!resetWorker} onClose={() => setResetWorker(null)} title="Reset worker password">
+          <ResetPasswordModal worker={resetWorker} onClose={() => setResetWorker(null)} />
+        </Modal>
+      )}
 
       {manageWorker && (
         <Modal

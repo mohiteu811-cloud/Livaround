@@ -136,6 +136,7 @@ export const api = {
     updateAvailability: (id: string, isAvailable: boolean) =>
       request<Worker>(`/api/workers/${id}`, { method: 'PUT', body: JSON.stringify({ isAvailable }) }),
     delete: (id: string) => request<void>(`/api/workers/${id}`, { method: 'DELETE' }),
+    resetPassword: (id: string) => request<{ tempPassword: string }>(`/api/workers/${id}/reset-password`, { method: 'POST' }),
   },
 
   jobs: {

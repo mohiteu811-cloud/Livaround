@@ -130,6 +130,31 @@ router.put('/:id', validate(updateWorkerSchema), async (req: AuthRequest, res: R
   }
 });
 
+router.post('/:id/reset-password', async (req: AuthRequest, res: Response) => {
+  try {
+    const worker = await prisma.worker.findUnique({
+      where: { id: req.params.id },
+      include: { user: { select: { name: true, email: true } } },
+    });
+    if (!worker) return res.status(404).json({ error: 'Worker not found' });
+
+    const tempPassword = Math.random().toString(36).slice(-10);
+    const hashed = await bcrypt.hash(tempPassword, 12);
+
+    await prisma.user.update({ where: { id: worker.userId }, data: { password: hashed } });
+
+    const workerAppUrl = process.env.WORKER_APP_URL || process.env.CORS_ORIGIN || 'http://localhost:3000';
+    sendWorkerWelcomeEmail({ name: worker.user.name, email: worker.user.email, tempPassword, workerAppUrl }).catch((err) =>
+      console.error('Failed to send password reset email:', err)
+    );
+
+    return res.json({ tempPassword });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const worker = await prisma.worker.findUnique({ where: { id: req.params.id } });
