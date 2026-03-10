@@ -82,17 +82,25 @@ export default function ReportIssueScreen() {
     }
     setLoading(true);
     try {
+      let photoUrl: string | undefined;
       let videoUrl: string | undefined;
+
+      if (photo) {
+        setUploading(true);
+        const result = await api.upload.file(photo.uri, photo.type);
+        photoUrl = result.url;
+      }
       if (video) {
         setUploading(true);
         const result = await api.upload.file(video.uri, video.type);
         videoUrl = result.url;
-        setUploading(false);
       }
+      setUploading(false);
 
       await api.jobs.reportIssue(id, {
         description: description.trim(),
         severity,
+        photoUrl,
         videoUrl,
       });
 
