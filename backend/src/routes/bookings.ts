@@ -141,18 +141,39 @@ router.post('/', validate(bookingSchema), async (req: AuthRequest, res: Response
 
     const booking = await prisma.booking.create({ data: { ...req.body, guestCode } });
 
-    // Auto-create and claim pre-checkin cleaning job
     const property = await prisma.property.findUnique({
       where: { id: booking.propertyId },
       select: { name: true },
     });
-    await autoCreateCleaningJob({
-      propertyId: booking.propertyId,
-      propertyName: property?.name ?? 'the property',
-      bookingId: booking.id,
-      scheduledAt: new Date(booking.checkIn),
-      notes: PRE_CHECKIN_NOTES,
+
+    // Skip pre-checkin cleaning job if the previous booking's post-checkout
+    // cleaning was already completed (the place is already clean).
+    const prevBooking = await prisma.booking.findFirst({
+      where: {
+        propertyId: booking.propertyId,
+        checkOut: { lte: new Date(booking.checkIn) },
+        id: { not: booking.id },
+        status: { not: 'CANCELLED' },
+      },
+      orderBy: { checkOut: 'desc' },
+      include: {
+        jobs: {
+          where: { type: 'CLEANING', notes: POST_CHECKOUT_NOTES, status: 'COMPLETED' },
+        },
+      },
     });
+
+    const prevCheckoutCleanDone = (prevBooking?.jobs?.length ?? 0) > 0;
+
+    if (!prevCheckoutCleanDone) {
+      await autoCreateCleaningJob({
+        propertyId: booking.propertyId,
+        propertyName: property?.name ?? 'the property',
+        bookingId: booking.id,
+        scheduledAt: new Date(booking.checkIn),
+        notes: PRE_CHECKIN_NOTES,
+      });
+    }
 
     return res.status(201).json(booking);
   } catch (err) {

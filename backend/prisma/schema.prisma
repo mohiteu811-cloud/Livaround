@@ -102,6 +102,31 @@ model Booking {
 
   jobs            Job[]
   serviceRequests GuestServiceRequest[]
+  guestIds        GuestID[]
+  visitors        GuestVisitor[]
+}
+
+model GuestID {
+  id           String   @id @default(cuid())
+  bookingId    String
+  booking      Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  guestName    String
+  documentType String   @default("PASSPORT") // PASSPORT | NATIONAL_ID | DRIVERS_LICENSE | OTHER
+  documentUrl  String
+  createdAt    DateTime @default(now())
+}
+
+model GuestVisitor {
+  id           String   @id @default(cuid())
+  bookingId    String
+  booking      Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  visitorName  String
+  purpose      String?
+  expectedDate String?  // "YYYY-MM-DD"
+  expectedTime String?  // "HH:MM"
+  idUrl        String?
+  notes        String?
+  createdAt    DateTime @default(now())
 }
 
 model GuestServiceRequest {

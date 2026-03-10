@@ -6,6 +6,7 @@ import {
   Wifi, Lock, MapPin, Phone, Home, BookOpen, HelpCircle, Key,
   ChevronDown, ChevronRight, Copy, Check, ExternalLink, Bed, Bath, Users,
   AlertTriangle, X, ConciergeBell, Sparkles, ChefHat, Car, ShoppingBag,
+  Shield, Upload, UserPlus,
 } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://livaroundbackend-production.up.railway.app';
@@ -22,12 +23,29 @@ interface ServiceRequest {
   createdAt: string;
 }
 
+interface GuestIDRecord {
+  id: string;
+  guestName: string;
+  documentType: string;
+  createdAt: string;
+}
+
+interface GuestVisitorRecord {
+  id: string;
+  visitorName: string;
+  purpose?: string;
+  expectedDate?: string;
+  expectedTime?: string;
+  createdAt: string;
+}
+
 interface StayData {
   booking: {
     guestName: string;
     checkIn: string;
     checkOut: string;
     guestCount: number;
+    idsUploaded: number;
     lockCode: string | null;
     status: string;
   };
@@ -60,6 +78,8 @@ interface StayData {
     emergencyServices: { name: string; number: string; icon: string }[];
   };
   serviceRequests: ServiceRequest[];
+  guestIds: GuestIDRecord[];
+  visitors: GuestVisitorRecord[];
 }
 
 type Tab = 'stay' | 'access' | 'guide' | 'services' | 'help';
@@ -197,14 +217,21 @@ function StayTab({ data }: { data: StayData }) {
             <div><p className="text-sm font-medium text-slate-800">Call host</p><p className="text-xs text-slate-400">{property.host.name}</p></div>
           </a>
         )}
-        {booking.lockCode && (
+        {booking.lockCode ? (
           <div className="flex items-center gap-2.5 p-3.5 bg-white rounded-xl border border-slate-200 shadow-sm">
             <div className="w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
               <Lock size={16} className="text-amber-600" />
             </div>
             <div className="min-w-0"><p className="text-sm font-medium text-slate-800">Lock code</p><p className="text-xs font-mono text-slate-600 truncate">{booking.lockCode}</p></div>
           </div>
-        )}
+        ) : booking.idsUploaded < booking.guestCount ? (
+          <div className="flex items-center gap-2.5 p-3.5 bg-white rounded-xl border border-dashed border-slate-200">
+            <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
+              <Lock size={16} className="text-slate-400" />
+            </div>
+            <div className="min-w-0"><p className="text-sm font-medium text-slate-500">Lock code</p><p className="text-xs text-slate-400">Upload IDs to unlock</p></div>
+          </div>
+        ) : null}
         {property.wifiName && (
           <div className="flex items-center gap-2.5 p-3.5 bg-white rounded-xl border border-slate-200 shadow-sm">
             <div className="w-9 h-9 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0">
@@ -260,14 +287,177 @@ function StayTab({ data }: { data: StayData }) {
 
 // ── Tab: Access ───────────────────────────────────────────────────────────────
 
-function AccessTab({ data }: { data: StayData }) {
+const DOC_TYPE_LABELS: Record<string, string> = {
+  PASSPORT: 'Passport',
+  NATIONAL_ID: 'National ID',
+  DRIVERS_LICENSE: "Driver's License",
+  OTHER: 'Other',
+};
+
+function AccessTab({ data, guestCode, onRefresh }: { data: StayData; guestCode: string; onRefresh: () => void }) {
   const { booking, property } = data;
+  const allIdsUploaded = booking.idsUploaded >= booking.guestCount;
+
+  // ID upload state
+  const [idName, setIdName] = useState('');
+  const [idDocType, setIdDocType] = useState('PASSPORT');
+  const [idFile, setIdFile] = useState<File | null>(null);
+  const [idPreview, setIdPreview] = useState<string | null>(null);
+  const [idUploading, setIdUploading] = useState(false);
+  const [idError, setIdError] = useState('');
+  const idFileRef = useRef<HTMLInputElement>(null);
+
+  function handleIdFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIdFile(file);
+    const reader = new FileReader();
+    reader.onload = () => setIdPreview(reader.result as string);
+    reader.readAsDataURL(file);
+  }
+
+  async function uploadId() {
+    if (!idName.trim() || !idFile) return;
+    setIdUploading(true);
+    setIdError('');
+    try {
+      // Step 1: upload the image file
+      const formData = new FormData();
+      formData.append('file', idFile);
+      const uploadRes = await fetch(`${API_URL}/api/stay/${guestCode}/upload`, { method: 'POST', body: formData });
+      if (!uploadRes.ok) { setIdError('Photo upload failed. Please try again.'); return; }
+      const { url: documentUrl } = await uploadRes.json();
+
+      // Step 2: register the ID
+      const idRes = await fetch(`${API_URL}/api/stay/${guestCode}/guest-ids`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ guestName: idName.trim(), documentType: idDocType, documentUrl }),
+      });
+      if (!idRes.ok) { setIdError('Failed to submit ID. Please try again.'); return; }
+
+      // Reset form and refresh data
+      setIdName('');
+      setIdFile(null);
+      setIdPreview(null);
+      if (idFileRef.current) idFileRef.current.value = '';
+      onRefresh();
+    } catch {
+      setIdError('Something went wrong. Please try again.');
+    } finally {
+      setIdUploading(false);
+    }
+  }
 
   return (
     <div className="space-y-4 px-5 pt-5 pb-24">
       <h2 className="text-lg font-bold text-slate-900">Check-in & Access</h2>
 
-      {booking.lockCode && (
+      {/* ── ID Verification ─────────────────────────────────────────── */}
+      <div className={`rounded-2xl p-4 shadow-sm border ${allIdsUploaded ? 'bg-green-50 border-green-200' : 'bg-white border-slate-200'}`}>
+        <div className="flex items-center gap-2 mb-3">
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${allIdsUploaded ? 'bg-green-100' : 'bg-indigo-100'}`}>
+            <Shield size={15} className={allIdsUploaded ? 'text-green-600' : 'text-indigo-600'} />
+          </div>
+          <div className="flex-1">
+            <p className="font-semibold text-slate-800">Identity Verification</p>
+            <p className="text-xs text-slate-400">{booking.idsUploaded} of {booking.guestCount} {booking.guestCount === 1 ? 'guest' : 'guests'} verified</p>
+          </div>
+          {allIdsUploaded && <Check size={16} className="text-green-600" />}
+        </div>
+
+        {/* Progress dots */}
+        <div className="flex gap-1.5 mb-3">
+          {Array.from({ length: booking.guestCount }).map((_, i) => (
+            <div key={i} className={`h-1.5 flex-1 rounded-full ${i < booking.idsUploaded ? 'bg-green-500' : 'bg-slate-200'}`} />
+          ))}
+        </div>
+
+        {/* Uploaded IDs list */}
+        {data.guestIds.length > 0 && (
+          <div className="space-y-1.5 mb-3">
+            {data.guestIds.map((g) => (
+              <div key={g.id} className="flex items-center gap-2 text-sm bg-white rounded-xl px-3 py-2 border border-slate-100">
+                <Check size={13} className="text-green-500 flex-shrink-0" />
+                <span className="font-medium text-slate-700">{g.guestName}</span>
+                <span className="text-xs text-slate-400">· {DOC_TYPE_LABELS[g.documentType] ?? g.documentType}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {!allIdsUploaded && (
+          <>
+            <p className="text-xs text-indigo-700 bg-indigo-50 rounded-lg px-3 py-2 mb-3">
+              Upload a government-issued ID for each guest to reveal your lock code.
+            </p>
+
+            {idError && (
+              <div className="flex items-center gap-2 text-xs text-red-700 bg-red-50 rounded-lg px-3 py-2 mb-2">
+                <AlertTriangle size={12} /> {idError}
+              </div>
+            )}
+
+            <div className="space-y-2.5">
+              <input
+                type="text"
+                value={idName}
+                onChange={(e) => setIdName(e.target.value)}
+                placeholder="Guest full name"
+                className="w-full text-sm text-slate-800 border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-indigo-400"
+              />
+
+              <select
+                value={idDocType}
+                onChange={(e) => setIdDocType(e.target.value)}
+                className="w-full text-sm text-slate-800 border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-indigo-400"
+              >
+                <option value="PASSPORT">Passport</option>
+                <option value="NATIONAL_ID">National ID</option>
+                <option value="DRIVERS_LICENSE">Driver&apos;s License</option>
+                <option value="OTHER">Other</option>
+              </select>
+
+              <input ref={idFileRef} type="file" accept="image/*" capture="environment" onChange={handleIdFile} className="hidden" />
+              {idPreview ? (
+                <div className="relative">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={idPreview} alt="ID preview" className="w-full rounded-xl border border-slate-200 object-cover max-h-36" />
+                  <button type="button"
+                    onClick={() => { setIdFile(null); setIdPreview(null); if (idFileRef.current) idFileRef.current.value = ''; }}
+                    className="absolute top-2 right-2 bg-white/90 text-slate-700 rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold shadow">✕</button>
+                </div>
+              ) : (
+                <button type="button" onClick={() => idFileRef.current?.click()}
+                  className="w-full py-3 bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl text-slate-500 text-sm font-medium flex items-center justify-center gap-2 hover:bg-slate-100 transition-colors">
+                  <Upload size={15} /> Take / upload photo of ID
+                </button>
+              )}
+
+              <button
+                disabled={!idName.trim() || !idFile || idUploading}
+                onClick={uploadId}
+                className="w-full py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 disabled:opacity-40 flex items-center justify-center gap-2"
+              >
+                {idUploading ? (
+                  <><div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Uploading…</>
+                ) : (
+                  <><Shield size={14} /> Submit ID</>
+                )}
+              </button>
+            </div>
+          </>
+        )}
+
+        {allIdsUploaded && (
+          <p className="text-sm text-green-700 font-medium">
+            ✓ All guest IDs verified — your lock code is now available below.
+          </p>
+        )}
+      </div>
+
+      {/* ── Lock Code ────────────────────────────────────────────────── */}
+      {booking.lockCode ? (
         <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
           <div className="flex items-center gap-2 mb-3">
             <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center">
@@ -281,7 +471,19 @@ function AccessTab({ data }: { data: StayData }) {
           </div>
           <p className="text-xs text-slate-400 mt-2">Use this code to unlock the main door.</p>
         </div>
-      )}
+      ) : !allIdsUploaded ? (
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center">
+              <Lock size={15} className="text-slate-400" />
+            </div>
+            <p className="font-semibold text-slate-500">Lock Code</p>
+          </div>
+          <div className="flex items-center justify-center bg-slate-50 rounded-xl px-4 py-4 border border-dashed border-slate-200">
+            <p className="text-sm text-slate-400 text-center">Upload IDs for all guests above to reveal the lock code</p>
+          </div>
+        </div>
+      ) : null}
 
       {(property.wifiName || property.wifiPassword) && (
         <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
@@ -439,10 +641,11 @@ function DocItem({ doc, open, onToggle }: {
 
 // ── Tab: Services ─────────────────────────────────────────────────────────────
 
-function ServicesTab({ data, guestCode, onRequestsUpdate }: {
+function ServicesTab({ data, guestCode, onRequestsUpdate, onRefresh }: {
   data: StayData;
   guestCode: string;
   onRequestsUpdate: (reqs: ServiceRequest[]) => void;
+  onRefresh: () => void;
 }) {
   const { booking, property } = data;
   const [requests, setRequests] = useState<ServiceRequest[]>(data.serviceRequests);
@@ -465,6 +668,70 @@ function ServicesTab({ data, guestCode, onRequestsUpdate }: {
   const [activeService, setActiveService] = useState<string | null>(null);
   const [serviceNote, setServiceNote] = useState('');
   const [serviceDate, setServiceDate] = useState('');
+
+  // Visitor notification
+  const [showVisitorForm, setShowVisitorForm] = useState(false);
+  const [visitorName, setVisitorName] = useState('');
+  const [visitorPurpose, setVisitorPurpose] = useState('');
+  const [visitorDate, setVisitorDate] = useState('');
+  const [visitorTime, setVisitorTime] = useState('');
+  const [visitorIdFile, setVisitorIdFile] = useState<File | null>(null);
+  const [visitorIdPreview, setVisitorIdPreview] = useState<string | null>(null);
+  const [visitorSubmitting, setVisitorSubmitting] = useState(false);
+  const [visitorError, setVisitorError] = useState('');
+  const [visitorSuccess, setVisitorSuccess] = useState(false);
+  const visitorIdRef = useRef<HTMLInputElement>(null);
+
+  function handleVisitorId(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setVisitorIdFile(file);
+    const reader = new FileReader();
+    reader.onload = () => setVisitorIdPreview(reader.result as string);
+    reader.readAsDataURL(file);
+  }
+
+  async function submitVisitor() {
+    if (!visitorName.trim()) return;
+    setVisitorSubmitting(true);
+    setVisitorError('');
+    try {
+      let idUrl: string | undefined;
+      if (visitorIdFile) {
+        const formData = new FormData();
+        formData.append('file', visitorIdFile);
+        const r = await fetch(`${API_URL}/api/stay/${guestCode}/upload`, { method: 'POST', body: formData });
+        if (r.ok) { const j = await r.json(); idUrl = j.url; }
+      }
+      const res = await fetch(`${API_URL}/api/stay/${guestCode}/visitor`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          visitorName: visitorName.trim(),
+          purpose: visitorPurpose || undefined,
+          expectedDate: visitorDate || undefined,
+          expectedTime: visitorTime || undefined,
+          idUrl,
+        }),
+      });
+      if (!res.ok) { setVisitorError('Failed to notify. Please try again.'); return; }
+      setVisitorSuccess(true);
+      setShowVisitorForm(false);
+      setVisitorName('');
+      setVisitorPurpose('');
+      setVisitorDate('');
+      setVisitorTime('');
+      setVisitorIdFile(null);
+      setVisitorIdPreview(null);
+      if (visitorIdRef.current) visitorIdRef.current.value = '';
+      onRefresh();
+      setTimeout(() => setVisitorSuccess(false), 4000);
+    } catch {
+      setVisitorError('Something went wrong. Please try again.');
+    } finally {
+      setVisitorSubmitting(false);
+    }
+  }
 
   const stayDates = datesBetween(booking.checkIn, booking.checkOut);
 
@@ -749,6 +1016,128 @@ function ServicesTab({ data, guestCode, onRequestsUpdate }: {
                 className="flex-1 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 disabled:opacity-40"
               >
                 {submitting === activeService ? 'Sending...' : 'Request'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Visitor notification ─────────────────────────────────── */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-8 h-8 bg-teal-100 rounded-full flex items-center justify-center flex-shrink-0">
+            <UserPlus size={15} className="text-teal-600" />
+          </div>
+          <div>
+            <p className="font-semibold text-slate-800">Notify about a visitor</p>
+            <p className="text-xs text-slate-400">Let your host know about incoming guests</p>
+          </div>
+        </div>
+
+        {visitorSuccess && (
+          <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 rounded-xl px-3 py-2 mb-3">
+            <Check size={13} /> Visitor notification sent to host.
+          </div>
+        )}
+
+        {/* Past visitors */}
+        {data.visitors.length > 0 && (
+          <div className="space-y-1.5 mb-3">
+            {data.visitors.map((v) => (
+              <div key={v.id} className="flex items-center gap-2 text-xs bg-slate-50 rounded-xl px-3 py-2">
+                <UserPlus size={12} className="text-slate-400 flex-shrink-0" />
+                <span className="font-medium text-slate-700">{v.visitorName}</span>
+                {v.purpose && <span className="text-slate-400">· {v.purpose}</span>}
+                {v.expectedDate && (
+                  <span className="text-slate-400 ml-auto">
+                    {new Date(v.expectedDate + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                    {v.expectedTime && ` ${v.expectedTime}`}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {!showVisitorForm ? (
+          <button onClick={() => setShowVisitorForm(true)}
+            className="flex items-center justify-center gap-2 w-full py-2.5 bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-xl text-teal-700 text-sm font-medium transition-colors">
+            <UserPlus size={14} /> Add visitor
+          </button>
+        ) : (
+          <div className="space-y-2.5">
+            {visitorError && (
+              <div className="flex items-center gap-2 text-xs text-red-700 bg-red-50 rounded-lg px-3 py-2">
+                <AlertTriangle size={12} /> {visitorError}
+              </div>
+            )}
+            <input
+              type="text"
+              value={visitorName}
+              onChange={(e) => setVisitorName(e.target.value)}
+              placeholder="Visitor full name *"
+              className="w-full text-sm text-slate-800 border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-teal-400"
+            />
+            <input
+              type="text"
+              value={visitorPurpose}
+              onChange={(e) => setVisitorPurpose(e.target.value)}
+              placeholder="Purpose of visit (optional)"
+              className="w-full text-sm text-slate-800 border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-teal-400"
+            />
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-xs font-medium text-slate-600 block mb-1">Expected date</label>
+                <select
+                  value={visitorDate}
+                  onChange={(e) => setVisitorDate(e.target.value)}
+                  className="w-full text-sm text-slate-800 border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-teal-400"
+                >
+                  <option value="">Select</option>
+                  {stayDates.map((d) => (
+                    <option key={d} value={d}>
+                      {new Date(d + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-600 block mb-1">Expected time</label>
+                <input
+                  type="time"
+                  value={visitorTime}
+                  onChange={(e) => setVisitorTime(e.target.value)}
+                  className="w-full text-sm text-slate-800 border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-teal-400"
+                />
+              </div>
+            </div>
+
+            {/* Visitor ID upload */}
+            <input ref={visitorIdRef} type="file" accept="image/*" capture="environment" onChange={handleVisitorId} className="hidden" />
+            {visitorIdPreview ? (
+              <div className="relative">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={visitorIdPreview} alt="Visitor ID" className="w-full rounded-xl border border-slate-200 object-cover max-h-32" />
+                <button type="button"
+                  onClick={() => { setVisitorIdFile(null); setVisitorIdPreview(null); if (visitorIdRef.current) visitorIdRef.current.value = ''; }}
+                  className="absolute top-2 right-2 bg-white/90 text-slate-700 rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold shadow">✕</button>
+              </div>
+            ) : (
+              <button type="button" onClick={() => visitorIdRef.current?.click()}
+                className="w-full py-2.5 bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl text-slate-500 text-sm font-medium flex items-center justify-center gap-2 hover:bg-slate-100 transition-colors">
+                <Upload size={14} /> Upload visitor ID (optional)
+              </button>
+            )}
+
+            <div className="flex gap-2">
+              <button onClick={() => { setShowVisitorForm(false); setVisitorName(''); setVisitorPurpose(''); setVisitorDate(''); setVisitorTime(''); setVisitorIdFile(null); setVisitorIdPreview(null); setVisitorError(''); }}
+                className="flex-1 py-2.5 text-sm text-slate-500 border border-slate-200 rounded-xl hover:bg-slate-50">Cancel</button>
+              <button
+                disabled={!visitorName.trim() || visitorSubmitting}
+                onClick={submitVisitor}
+                className="flex-1 py-2.5 text-sm font-medium text-white bg-teal-600 rounded-xl hover:bg-teal-700 disabled:opacity-40"
+              >
+                {visitorSubmitting ? 'Sending…' : 'Notify host'}
               </button>
             </div>
           </div>
@@ -1056,7 +1445,7 @@ export default function StayPage() {
   const [notFound, setNotFound] = useState(false);
   const [tab, setTab] = useState<Tab>('stay');
 
-  useEffect(() => {
+  const loadData = useCallback(() => {
     fetch(`${API_URL}/api/stay/${code}`)
       .then((r) => {
         if (r.status === 404) { setNotFound(true); return null; }
@@ -1065,6 +1454,8 @@ export default function StayPage() {
       .then((d) => { if (d) setData(d); })
       .finally(() => setLoading(false));
   }, [code]);
+
+  useEffect(() => { loadData(); }, [loadData]);
 
   if (loading) {
     return (
@@ -1122,13 +1513,14 @@ export default function StayPage() {
       {/* Tab content */}
       <div className="overflow-y-auto">
         {tab === 'stay'     && <StayTab data={data} />}
-        {tab === 'access'   && <AccessTab data={data} />}
+        {tab === 'access'   && <AccessTab data={data} guestCode={code} onRefresh={loadData} />}
         {tab === 'guide'    && <GuideTab data={data} />}
         {tab === 'services' && (
           <ServicesTab
             data={data}
             guestCode={code}
             onRequestsUpdate={(reqs) => setData((d) => d ? { ...d, serviceRequests: reqs } : d)}
+            onRefresh={loadData}
           />
         )}
         {tab === 'help'     && <HelpTab data={data} guestCode={code} />}

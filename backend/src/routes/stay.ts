@@ -88,12 +88,16 @@ router.get('/:code', async (req: Request, res: Response) => {
           },
         },
         serviceRequests: { orderBy: { createdAt: 'desc' } },
+        guestIds: { orderBy: { createdAt: 'asc' } },
+        visitors: { orderBy: { createdAt: 'desc' } },
       },
     });
 
     if (!booking) return res.status(404).json({ error: 'Stay not found' });
 
     const p = booking.property;
+    const idsUploaded = booking.guestIds.length;
+    const allIdsUploaded = idsUploaded >= booking.guestCount;
 
     return res.json({
       booking: {
@@ -101,7 +105,9 @@ router.get('/:code', async (req: Request, res: Response) => {
         checkIn: booking.checkIn,
         checkOut: booking.checkOut,
         guestCount: booking.guestCount,
-        lockCode: booking.lockCode,
+        idsUploaded,
+        // Lock code only revealed once every guest has uploaded ID
+        lockCode: allIdsUploaded ? booking.lockCode : null,
         status: booking.status,
       },
       property: {
@@ -157,6 +163,20 @@ router.get('/:code', async (req: Request, res: Response) => {
         notes: r.notes,
         status: r.status,
         createdAt: r.createdAt,
+      })),
+      guestIds: booking.guestIds.map((g) => ({
+        id: g.id,
+        guestName: g.guestName,
+        documentType: g.documentType,
+        createdAt: g.createdAt,
+      })),
+      visitors: booking.visitors.map((v) => ({
+        id: v.id,
+        visitorName: v.visitorName,
+        purpose: v.purpose,
+        expectedDate: v.expectedDate,
+        expectedTime: v.expectedTime,
+        createdAt: v.createdAt,
       })),
     });
   } catch (err) {
@@ -411,8 +431,90 @@ router.post('/:code/service-request', async (req: Request, res: Response) => {
   }
 });
 
+// ── POST /api/stay/:code/guest-ids ────────────────────────────────────────────
+// Upload a government ID for one guest. Once all guests have uploaded IDs the
+// lock code becomes visible.
+
+const guestIdSchema = z.object({
+  guestName:    z.string().min(1),
+  documentType: z.enum(['PASSPORT', 'NATIONAL_ID', 'DRIVERS_LICENSE', 'OTHER']).default('PASSPORT'),
+  documentUrl:  z.string().url(),
+});
+
+router.post('/:code/guest-ids', async (req: Request, res: Response) => {
+  try {
+    const booking = await prisma.booking.findUnique({
+      where: { guestCode: req.params.code },
+      select: { id: true, guestCount: true },
+    });
+    if (!booking) return res.status(404).json({ error: 'Stay not found' });
+
+    const parsed = guestIdSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
+
+    const guestId = await prisma.guestID.create({
+      data: {
+        bookingId: booking.id,
+        guestName: parsed.data.guestName,
+        documentType: parsed.data.documentType,
+        documentUrl: parsed.data.documentUrl,
+      },
+    });
+
+    const idsUploaded = await prisma.guestID.count({ where: { bookingId: booking.id } });
+    const allDone = idsUploaded >= booking.guestCount;
+
+    return res.status(201).json({ id: guestId.id, idsUploaded, allDone });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ── POST /api/stay/:code/visitor ──────────────────────────────────────────────
+// Guest notifies the host about an incoming visitor.
+
+const visitorSchema = z.object({
+  visitorName:  z.string().min(1),
+  purpose:      z.string().optional(),
+  expectedDate: z.string().optional(),  // "YYYY-MM-DD"
+  expectedTime: z.string().optional(),  // "HH:MM"
+  idUrl:        z.string().optional(),
+  notes:        z.string().optional(),
+});
+
+router.post('/:code/visitor', async (req: Request, res: Response) => {
+  try {
+    const booking = await prisma.booking.findUnique({
+      where: { guestCode: req.params.code },
+      select: { id: true },
+    });
+    if (!booking) return res.status(404).json({ error: 'Stay not found' });
+
+    const parsed = visitorSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
+
+    const visitor = await prisma.guestVisitor.create({
+      data: {
+        bookingId: booking.id,
+        visitorName:  parsed.data.visitorName,
+        purpose:      parsed.data.purpose ?? null,
+        expectedDate: parsed.data.expectedDate ?? null,
+        expectedTime: parsed.data.expectedTime ?? null,
+        idUrl:        parsed.data.idUrl ?? null,
+        notes:        parsed.data.notes ?? null,
+      },
+    });
+
+    return res.status(201).json({ id: visitor.id });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // ── POST /api/stay/:code/upload ───────────────────────────────────────────────
-// Public file upload for guest issue reports (photo / video)
+// Public file upload for guest issue reports, ID documents, and visitor IDs
 
 router.post('/:code/upload', upload.single('file'), async (req: Request, res: Response) => {
   try {
