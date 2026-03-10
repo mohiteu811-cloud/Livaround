@@ -205,6 +205,12 @@ function PropertyForm({
             onChange={(e) => set('houseRules', e.target.value.split('\n'))}
           />
         </FormField>
+        <FormField label="Housekeeping setup">
+          <Select value={(form as Record<string, unknown>).caretakerType as string || 'PART_TIME'} onChange={(e) => set('caretakerType', e.target.value)}>
+            <option value="PART_TIME">Part-time — guest picks a time slot (9 am–5 pm)</option>
+            <option value="FULL_TIME">Full-time — caretaker available any time 9 am–5 pm</option>
+          </Select>
+        </FormField>
       </div>
 
       {/* Owner assignment — only shown for new properties */}

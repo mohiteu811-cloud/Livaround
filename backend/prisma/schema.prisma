@@ -52,6 +52,7 @@ model Property {
   images      String   @default("[]")
   isActive            Boolean  @default(true)
   airbnbUrl           String?
+  caretakerType       String   @default("PART_TIME") // FULL_TIME | PART_TIME
   // Guest experience
   wifiName            String?
   wifiPassword        String?
@@ -98,7 +99,22 @@ model Booking {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  jobs Job[]
+  jobs            Job[]
+  serviceRequests GuestServiceRequest[]
+}
+
+model GuestServiceRequest {
+  id            String   @id @default(cuid())
+  bookingId     String
+  booking       Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  propertyId    String
+  type          String   // HOUSEKEEPING | COOK | DRIVER | CAR_RENTAL | ARRIVAL_TIME | DEPARTURE_TIME | OTHER
+  requestedDate String?  // "YYYY-MM-DD"
+  requestedTime String?  // "HH:MM" (housekeeping slot)
+  notes         String?
+  status        String   @default("PENDING") // PENDING | CONFIRMED | DECLINED
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 model Worker {

@@ -322,6 +322,7 @@ export interface Property {
   mapUrl?: string;
   checkInInstructions?: string;
   houseRules: string[];
+  caretakerType: 'FULL_TIME' | 'PART_TIME';
   createdAt: string;
   _count?: { bookings: number; jobs: number };
 }

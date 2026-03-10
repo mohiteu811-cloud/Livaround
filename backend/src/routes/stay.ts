@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 
 const router = Router();
@@ -7,8 +8,47 @@ function parseJSON(s: string | null | undefined): string[] {
   try { return JSON.parse(s || '[]'); } catch { return []; }
 }
 
+// ── Emergency services by country (ISO country name) ─────────────────────────
+
+const EMERGENCY: Record<string, { police: string; ambulance: string; fire: string; women?: string }> = {
+  'India':          { police: '100',  ambulance: '108',  fire: '101', women: '1091' },
+  'United States':  { police: '911',  ambulance: '911',  fire: '911' },
+  'United Kingdom': { police: '999',  ambulance: '999',  fire: '999' },
+  'UAE':            { police: '999',  ambulance: '998',  fire: '997' },
+  'Singapore':      { police: '999',  ambulance: '995',  fire: '995' },
+  'Australia':      { police: '000',  ambulance: '000',  fire: '000' },
+  'France':         { police: '17',   ambulance: '15',   fire: '18'  },
+  'Germany':        { police: '110',  ambulance: '112',  fire: '112' },
+  'Italy':          { police: '113',  ambulance: '118',  fire: '115' },
+  'Spain':          { police: '091',  ambulance: '112',  fire: '080' },
+  'Portugal':       { police: '112',  ambulance: '112',  fire: '112' },
+  'Greece':         { police: '100',  ambulance: '166',  fire: '199' },
+  'Turkey':         { police: '155',  ambulance: '112',  fire: '110' },
+  'Thailand':       { police: '191',  ambulance: '1669', fire: '199' },
+  'Indonesia':      { police: '110',  ambulance: '118',  fire: '113' },
+  'Sri Lanka':      { police: '119',  ambulance: '110',  fire: '111' },
+  'Maldives':       { police: '119',  ambulance: '102',  fire: '118' },
+  'Japan':          { police: '110',  ambulance: '119',  fire: '119' },
+  'South Africa':   { police: '10111', ambulance: '10177', fire: '10177' },
+  'Mexico':         { police: '911',  ambulance: '911',  fire: '911' },
+  'Brazil':         { police: '190',  ambulance: '192',  fire: '193' },
+  'Canada':         { police: '911',  ambulance: '911',  fire: '911' },
+  'Netherlands':    { police: '112',  ambulance: '112',  fire: '112' },
+  'Switzerland':    { police: '117',  ambulance: '144',  fire: '118' },
+};
+
+function getEmergencyServices(country: string) {
+  const nums = EMERGENCY[country] ?? { police: '112', ambulance: '112', fire: '112' };
+  const services = [
+    { name: 'Police',    number: nums.police,    icon: '🚔' },
+    { name: 'Ambulance', number: nums.ambulance, icon: '🚑' },
+    { name: 'Fire',      number: nums.fire,      icon: '🚒' },
+  ];
+  if (nums.women) services.push({ name: 'Women Helpline', number: nums.women, icon: '🆘' });
+  return services;
+}
+
 // ── GET /api/stay/:code ───────────────────────────────────────────────────────
-// Public — no authentication. Returns all guest-facing info for a booking.
 
 router.get('/:code', async (req: Request, res: Response) => {
   try {
@@ -23,9 +63,9 @@ router.get('/:code', async (req: Request, res: Response) => {
               include: { docs: { orderBy: { order: 'asc' } } },
             },
             docs: { where: { areaId: null }, orderBy: { order: 'asc' } },
-            contacts: { orderBy: { order: 'asc' } },
           },
         },
+        serviceRequests: { orderBy: { createdAt: 'desc' } },
       },
     });
 
@@ -59,6 +99,7 @@ router.get('/:code', async (req: Request, res: Response) => {
         mapUrl: p.mapUrl,
         checkInInstructions: p.checkInInstructions,
         houseRules: parseJSON(p.houseRules),
+        caretakerType: p.caretakerType,
         host: { name: p.host.user.name, phone: p.host.user.phone },
       },
       guide: {
@@ -84,15 +125,17 @@ router.get('/:code', async (req: Request, res: Response) => {
           photos: parseJSON(d.photos),
           tags: parseJSON(d.tags),
         })),
-        contacts: p.contacts.map((c) => ({
-          id: c.id,
-          agency: c.agency,
-          name: c.name,
-          phones: parseJSON(c.phones),
-          company: c.company,
-          notes: c.notes,
-        })),
+        emergencyServices: getEmergencyServices(p.country),
       },
+      serviceRequests: booking.serviceRequests.map((r) => ({
+        id: r.id,
+        type: r.type,
+        requestedDate: r.requestedDate,
+        requestedTime: r.requestedTime,
+        notes: r.notes,
+        status: r.status,
+        createdAt: r.createdAt,
+      })),
     });
   } catch (err) {
     console.error(err);
@@ -101,7 +144,6 @@ router.get('/:code', async (req: Request, res: Response) => {
 });
 
 // ── POST /api/stay/:code/issue ────────────────────────────────────────────────
-// Guest submits a maintenance/issue report
 
 router.post('/:code/issue', async (req: Request, res: Response) => {
   try {
@@ -125,6 +167,57 @@ router.post('/:code/issue', async (req: Request, res: Response) => {
     });
 
     return res.status(201).json({ id: issue.id });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ── POST /api/stay/:code/service-request ─────────────────────────────────────
+
+const serviceRequestSchema = z.object({
+  type: z.enum(['HOUSEKEEPING', 'COOK', 'DRIVER', 'CAR_RENTAL', 'ARRIVAL_TIME', 'DEPARTURE_TIME', 'OTHER']),
+  requestedDate: z.string().optional(),   // "YYYY-MM-DD"
+  requestedTime: z.string().optional(),   // "HH:MM"
+  notes: z.string().optional(),
+});
+
+router.post('/:code/service-request', async (req: Request, res: Response) => {
+  try {
+    const booking = await prisma.booking.findUnique({
+      where: { guestCode: req.params.code },
+      select: { id: true, propertyId: true, checkIn: true, checkOut: true },
+    });
+    if (!booking) return res.status(404).json({ error: 'Stay not found' });
+
+    const parsed = serviceRequestSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
+
+    const { type, requestedDate, requestedTime, notes } = parsed.data;
+
+    // Enforce once-per-day for housekeeping
+    if (type === 'HOUSEKEEPING' && requestedDate) {
+      const existing = await prisma.guestServiceRequest.findFirst({
+        where: { bookingId: booking.id, type: 'HOUSEKEEPING', requestedDate },
+      });
+      if (existing) {
+        return res.status(409).json({ error: 'Housekeeping already requested for this date' });
+      }
+    }
+
+    const request = await prisma.guestServiceRequest.create({
+      data: {
+        bookingId: booking.id,
+        propertyId: booking.propertyId,
+        type,
+        requestedDate: requestedDate || null,
+        requestedTime: requestedTime || null,
+        notes: notes || null,
+        status: 'PENDING',
+      },
+    });
+
+    return res.status(201).json({ id: request.id, status: request.status });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Internal server error' });

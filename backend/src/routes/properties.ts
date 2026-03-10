@@ -21,6 +21,7 @@ const propertySchema = z.object({
   images: z.array(z.string()).default([]),
   isActive: z.boolean().default(true),
   airbnbUrl: z.string().nullish(),
+  caretakerType: z.enum(['FULL_TIME', 'PART_TIME']).default('PART_TIME'),
   wifiName: z.string().nullish(),
   wifiPassword: z.string().nullish(),
   mapUrl: z.string().nullish(),
