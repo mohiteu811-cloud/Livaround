@@ -217,6 +217,30 @@ router.post('/:code/service-request', async (req: Request, res: Response) => {
       },
     });
 
+    // Auto-create a Job for housekeeping so it appears in the host dashboard
+    if (type === 'HOUSEKEEPING' && requestedDate) {
+      const [year, month, day] = requestedDate.split('-').map(Number);
+      const [hours, minutes] = (requestedTime || '10:00').split(':').map(Number);
+      const scheduledAt = new Date(year, month - 1, day, hours, minutes, 0);
+
+      const DEFAULT_CHECKLIST = [
+        'Vacuum all rooms', 'Change bed linens', 'Clean bathrooms',
+        'Restock toiletries', 'Clean kitchen', 'Empty bins',
+      ];
+
+      await prisma.job.create({
+        data: {
+          propertyId: booking.propertyId,
+          bookingId: booking.id,
+          type: 'CLEANING',
+          status: 'PENDING',
+          scheduledAt,
+          notes: `Housekeeping requested by guest${notes ? ': ' + notes : ''}`,
+          checklist: JSON.stringify(DEFAULT_CHECKLIST.map((item) => ({ item, done: false }))),
+        },
+      });
+    }
+
     return res.status(201).json({ id: request.id, status: request.status });
   } catch (err) {
     console.error(err);
