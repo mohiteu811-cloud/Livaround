@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { api, Venue } from '@/lib/api';
 import { MapPin, Plus, Pencil, Trash2, Star, X, Check } from 'lucide-react';
+import { PlacesAutocomplete } from '@/components/PlacesAutocomplete';
 
 function VenueForm({
   initial,
@@ -56,9 +57,13 @@ function VenueForm({
 
       <div>
         <label className="block text-xs text-slate-400 mb-1">Address</label>
-        <input
+        <PlacesAutocomplete
           value={form.address}
-          onChange={(e) => set('address', e.target.value)}
+          onChange={(v) => set('address', v)}
+          onSelect={({ address, city }) => {
+            setForm((f) => ({ ...f, address, city: city || f.city }));
+            setError('');
+          }}
           placeholder="123 Baga Road, Calangute"
           required
           className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 text-sm focus:outline-none focus:border-brand-500 placeholder:text-slate-600"

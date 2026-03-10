@@ -456,7 +456,10 @@ function ServicesTab({ data, guestCode, onRequestsUpdate }: {
 
   // Housekeeping
   const [hkDate, setHkDate] = useState('');
-  const [hkTime, setHkTime] = useState('10:00');
+  const [hkTime, setHkTime] = useState('anytime');
+  const [availableSlots, setAvailableSlots] = useState<{ value: string; label: string; available: boolean }[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+  const [hasAssignedCleaner, setHasAssignedCleaner] = useState(true);
 
   // Other services
   const [activeService, setActiveService] = useState<string | null>(null);
@@ -465,11 +468,22 @@ function ServicesTab({ data, guestCode, onRequestsUpdate }: {
 
   const stayDates = datesBetween(booking.checkIn, booking.checkOut);
 
-  // Time slots 9am–5pm in 1-hour increments
-  const timeSlots = Array.from({ length: 9 }, (_, i) => {
-    const h = 9 + i;
-    return { value: `${String(h).padStart(2, '0')}:00`, label: `${h > 12 ? h - 12 : h}:00 ${h >= 12 ? 'pm' : 'am'}` };
-  });
+  useEffect(() => {
+    if (!hkDate) { setAvailableSlots([]); return; }
+    let cancelled = false;
+    setLoadingSlots(true);
+    fetch(`${API_URL}/api/stay/${guestCode}/cleaner-slots?date=${hkDate}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        setAvailableSlots(data.slots ?? []);
+        setHasAssignedCleaner(data.hasAssignedCleaner ?? true);
+        setHkTime('anytime');
+      })
+      .catch(() => { /* silently fallback */ })
+      .finally(() => { if (!cancelled) setLoadingSlots(false); });
+    return () => { cancelled = true; };
+  }, [hkDate, guestCode]);
 
   async function submit(type: string, extra: Record<string, string> = {}) {
     setSubmitting(type);
@@ -588,42 +602,91 @@ function ServicesTab({ data, guestCode, onRequestsUpdate }: {
           </p>
         )}
 
-        <div className="space-y-2 mt-3">
-          <div className="grid grid-cols-2 gap-2">
+        <div className="space-y-3 mt-3">
+          <div>
+            <label className="text-xs font-medium text-slate-600 block mb-1">Date</label>
+            <select
+              value={hkDate}
+              onChange={(e) => setHkDate(e.target.value)}
+              className="w-full text-sm text-slate-800 border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-indigo-400"
+            >
+              <option value="">Select date</option>
+              {stayDates.map((d) => (
+                <option key={d} value={d} disabled={bookedHkDates.has(d)}>
+                  {new Date(d + 'T12:00:00').toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
+                  {bookedHkDates.has(d) ? ' ✓' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {property.caretakerType === 'PART_TIME' && hkDate && (
             <div>
-              <label className="text-xs font-medium text-slate-600 block mb-1">Date</label>
-              <select
-                value={hkDate}
-                onChange={(e) => setHkDate(e.target.value)}
-                className="w-full text-sm text-slate-800 border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-indigo-400"
-              >
-                <option value="">Select date</option>
-                {stayDates.map((d) => (
-                  <option key={d} value={d} disabled={bookedHkDates.has(d)}>
-                    {new Date(d + 'T12:00:00').toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
-                    {bookedHkDates.has(d) ? ' ✓' : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-            {property.caretakerType === 'PART_TIME' && (
-              <div>
-                <label className="text-xs font-medium text-slate-600 block mb-1">Preferred time</label>
+              <label className="text-xs font-medium text-slate-600 block mb-1">
+                Preferred time
+                {loadingSlots && <span className="ml-1 text-slate-400 font-normal">Checking availability…</span>}
+              </label>
+              {!loadingSlots && availableSlots.length > 0 ? (
+                <>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setHkTime('anytime')}
+                      className={`py-2 col-span-3 rounded-xl text-xs font-medium border transition-colors ${
+                        hkTime === 'anytime'
+                          ? 'border-sky-500 bg-sky-50 text-sky-700'
+                          : 'border-slate-200 bg-white text-slate-700 hover:border-sky-300'
+                      }`}
+                    >
+                      Anytime
+                    </button>
+                    {availableSlots.map((s) => (
+                      <button
+                        key={s.value}
+                        type="button"
+                        disabled={!s.available}
+                        onClick={() => setHkTime(s.value)}
+                        className={`py-2 rounded-xl text-xs font-medium border transition-colors ${
+                          !s.available
+                            ? 'border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed line-through'
+                            : hkTime === s.value
+                            ? 'border-sky-500 bg-sky-50 text-sky-700'
+                            : 'border-slate-200 bg-white text-slate-700 hover:border-sky-300'
+                        }`}
+                      >
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                  {!hasAssignedCleaner && (
+                    <p className="text-xs text-slate-400 mt-1.5">All times available — your host will confirm a slot.</p>
+                  )}
+                  {availableSlots.every((s) => !s.available) && (
+                    <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2 mt-1.5">
+                      The cleaner is fully booked on this day. Please try another date or add a note below.
+                    </p>
+                  )}
+                </>
+              ) : !loadingSlots ? (
                 <select
                   value={hkTime}
                   onChange={(e) => setHkTime(e.target.value)}
                   className="w-full text-sm text-slate-800 border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-indigo-400"
                 >
-                  {timeSlots.map((s) => (
+                  {Array.from({ length: 9 }, (_, i) => {
+                    const h = 9 + i;
+                    return { value: `${String(h).padStart(2, '0')}:00`, label: `${h > 12 ? h - 12 : h}:00 ${h >= 12 ? 'pm' : 'am'}` };
+                  }).map((s) => (
                     <option key={s.value} value={s.value}>{s.label}</option>
                   ))}
                 </select>
-              </div>
-            )}
-          </div>
+              ) : null}
+            </div>
+          )}
+
           <button
-            disabled={!hkDate || !!submitting}
-            onClick={() => submit('HOUSEKEEPING', { requestedDate: hkDate, requestedTime: hkTime })}
+            disabled={!hkDate || !!submitting || (hkTime !== 'anytime' && availableSlots.length > 0 && !availableSlots.find((s) => s.value === hkTime)?.available)}
+            onClick={() => submit('HOUSEKEEPING', { requestedDate: hkDate, ...(hkTime !== 'anytime' && { requestedTime: hkTime }) })}
             className="w-full py-2.5 text-sm font-medium text-white bg-sky-600 rounded-xl hover:bg-sky-700 disabled:opacity-40"
           >
             {submitting === 'HOUSEKEEPING' ? 'Requesting...' : 'Request housekeeping'}

@@ -408,6 +408,7 @@ export interface Worker {
   jobsCompleted: number;
   bio?: string;
   _count?: { jobs: number };
+  propertyStaff?: { id: string; propertyId: string; role: string; property: { id: string; name: string; type: string } }[];
 }
 
 export interface Job {

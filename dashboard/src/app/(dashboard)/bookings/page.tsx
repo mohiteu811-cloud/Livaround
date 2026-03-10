@@ -33,14 +33,24 @@ function BookingForm({
   const checkout = new Date(tomorrow);
   checkout.setDate(checkout.getDate() + 7);
 
+  function localDateStr(d: Date) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
   const [form, setForm] = useState<Partial<Booking>>({
     propertyId: properties[0]?.id || '',
     guestName: '', guestEmail: '', guestPhone: '',
-    checkIn: tomorrow.toISOString().slice(0, 16),
-    checkOut: checkout.toISOString().slice(0, 16),
+    checkIn: initial?.checkIn ? localDateStr(new Date(initial.checkIn)) : localDateStr(tomorrow),
+    checkOut: initial?.checkOut ? localDateStr(new Date(initial.checkOut)) : localDateStr(checkout),
     guestCount: 2, totalAmount: 0, currency: 'INR',
     source: 'DIRECT', notes: '',
     ...initial,
+    // Always override checkIn/checkOut with date-only strings so the date input works
+    ...(initial?.checkIn ? { checkIn: localDateStr(new Date(initial.checkIn)) } : {}),
+    ...(initial?.checkOut ? { checkOut: localDateStr(new Date(initial.checkOut)) } : {}),
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -52,7 +62,11 @@ function BookingForm({
     setLoading(true);
     setError('');
     try {
-      await onSave({ ...form, checkIn: new Date(form.checkIn as string).toISOString(), checkOut: new Date(form.checkOut as string).toISOString() });
+      await onSave({
+        ...form,
+        checkIn: new Date(`${form.checkIn as string}T15:00:00`).toISOString(),
+        checkOut: new Date(`${form.checkOut as string}T11:00:00`).toISOString(),
+      });
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save');
@@ -87,11 +101,11 @@ function BookingForm({
         </FormField>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <FormField label="Check-in">
-          <Input type="datetime-local" value={form.checkIn as string} onChange={(e) => set('checkIn', e.target.value)} required />
+        <FormField label="Check-in · 3:00 pm">
+          <Input type="date" value={form.checkIn as string} onChange={(e) => set('checkIn', e.target.value)} required />
         </FormField>
-        <FormField label="Check-out">
-          <Input type="datetime-local" value={form.checkOut as string} onChange={(e) => set('checkOut', e.target.value)} required />
+        <FormField label="Check-out · 11:00 am">
+          <Input type="date" value={form.checkOut as string} onChange={(e) => set('checkOut', e.target.value)} required />
         </FormField>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

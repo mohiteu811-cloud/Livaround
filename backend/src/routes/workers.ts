@@ -36,7 +36,14 @@ router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const { skill, available } = req.query;
     let workers = await prisma.worker.findMany({
-      include: { user: { select: { id: true, name: true, email: true, phone: true } }, _count: { select: { jobs: true } } },
+      include: {
+        user: { select: { id: true, name: true, email: true, phone: true } },
+        _count: { select: { jobs: true } },
+        propertyStaff: {
+          where: { property: { host: { userId: req.user!.id } } },
+          include: { property: { select: { id: true, name: true, type: true } } },
+        },
+      },
       orderBy: { jobsCompleted: 'desc' },
     });
 

@@ -194,6 +194,124 @@ router.post('/:code/issue', async (req: Request, res: Response) => {
   }
 });
 
+// ── GET /api/stay/:code/cleaner-slots?date=YYYY-MM-DD ────────────────────────
+// Returns which time slots are available for housekeeping on a given date,
+// taking into account the cleaner's workload across all assigned properties.
+
+const HOUSEKEEPING_SLOTS = Array.from({ length: 9 }, (_, i) => {
+  const h = 9 + i;
+  return {
+    value: `${String(h).padStart(2, '0')}:00`,
+    label: `${h > 12 ? h - 12 : h}:00 ${h >= 12 ? 'pm' : 'am'}`,
+  };
+});
+
+router.get('/:code/cleaner-slots', async (req: Request, res: Response) => {
+  try {
+    const date = req.query.date as string;
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return res.status(400).json({ error: 'date query param required (YYYY-MM-DD)' });
+    }
+
+    const booking = await prisma.booking.findUnique({
+      where: { guestCode: req.params.code },
+      select: { propertyId: true },
+    });
+    if (!booking) return res.status(404).json({ error: 'Stay not found' });
+
+    // Find cleaners assigned to this property
+    const staffAssignments = await prisma.propertyStaff.findMany({
+      where: { propertyId: booking.propertyId, role: 'CLEANER' },
+    });
+
+    if (staffAssignments.length === 0) {
+      // No assigned cleaner — all slots open
+      return res.json({
+        hasAssignedCleaner: false,
+        slots: HOUSEKEEPING_SLOTS.map((s) => ({ ...s, available: true })),
+      });
+    }
+
+    const cleanerIds = staffAssignments.map((s) => s.workerId);
+
+    const dayStart = new Date(`${date}T00:00:00`);
+    const dayEnd   = new Date(`${date}T23:59:59`);
+
+    // Jobs already assigned to these cleaners on this date
+    const assignedJobs = await prisma.job.findMany({
+      where: {
+        workerId: { in: cleanerIds },
+        scheduledAt: { gte: dayStart, lte: dayEnd },
+        status: { notIn: ['CANCELLED'] },
+      },
+      select: { scheduledAt: true },
+    });
+
+    // Other properties these cleaners are assigned to
+    const otherAssignments = await prisma.propertyStaff.findMany({
+      where: {
+        workerId: { in: cleanerIds },
+        role: 'CLEANER',
+        propertyId: { not: booking.propertyId },
+      },
+      select: { propertyId: true },
+    });
+    const otherPropertyIds = [...new Set(otherAssignments.map((a) => a.propertyId))];
+
+    // Check-ins at those other properties on this date (cleaner must prepare the villa)
+    const otherCheckIns = otherPropertyIds.length > 0
+      ? await prisma.booking.findMany({
+          where: {
+            propertyId: { in: otherPropertyIds },
+            checkIn: { gte: dayStart, lte: dayEnd },
+            status: { notIn: ['CANCELLED', 'CHECKED_OUT'] },
+          },
+          include: {
+            serviceRequests: { where: { type: 'ARRIVAL_TIME' }, take: 1 },
+          },
+        })
+      : [];
+
+    // Build blocked minute ranges (minutes since midnight)
+    // Each cleaning job takes ~2 hours; add 1 hr travel buffer before
+    const SLOT_DURATION_MIN = 120; // 2 hours per clean
+    const TRAVEL_BUFFER_MIN = 60;  // 1 hour travel before job
+
+    const blockedRanges: Array<{ start: number; end: number }> = [];
+
+    for (const job of assignedJobs) {
+      const h = job.scheduledAt.getHours();
+      const m = job.scheduledAt.getMinutes();
+      const mid = h * 60 + m;
+      blockedRanges.push({ start: mid - TRAVEL_BUFFER_MIN, end: mid + SLOT_DURATION_MIN });
+    }
+
+    for (const checkIn of otherCheckIns) {
+      // Cleaner needs to finish cleaning before the guests arrive
+      const arrivalReq = checkIn.serviceRequests[0];
+      const arrivalStr = arrivalReq?.requestedTime ?? '15:00'; // default 3 pm
+      const [ah, am] = arrivalStr.split(':').map(Number);
+      const arrivalMin = ah * 60 + am;
+
+      // Assume checkout at 11 am → cleaner starts cleaning at 11 am
+      const cleanStartMin = 11 * 60;
+      blockedRanges.push({ start: cleanStartMin, end: arrivalMin });
+    }
+
+    const slots = HOUSEKEEPING_SLOTS.map((slot) => {
+      const [h] = slot.value.split(':').map(Number);
+      const slotMin = h * 60;
+      const blocked = blockedRanges.some((r) => slotMin >= r.start && slotMin < r.end);
+      return { ...slot, available: !blocked };
+    });
+
+    return res.json({ hasAssignedCleaner: true, slots });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // ── POST /api/stay/:code/service-request ─────────────────────────────────────
 
 const serviceRequestSchema = z.object({

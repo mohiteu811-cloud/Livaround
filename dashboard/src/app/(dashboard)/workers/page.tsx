@@ -1,14 +1,18 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Plus, Star, MapPin, Trash2 } from 'lucide-react';
-import { api, Worker } from '@/lib/api';
+import { Plus, Star, MapPin, Trash2, Building2, X } from 'lucide-react';
+import { api, Worker, Property } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Input, Textarea, FormField } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
-import { Badge, skillBadge } from '@/components/ui/Badge';
+import { skillBadge } from '@/components/ui/Badge';
 
 const SKILLS = ['CLEANING', 'COOKING', 'DRIVING', 'MAINTENANCE'];
+
+const TYPE_ICONS: Record<string, string> = {
+  VILLA: '🏡', APARTMENT: '🏢', HOUSE: '🏠', CONDO: '🏙️',
+};
 
 function WorkerForm({ onSave, onClose }: { onSave: (d: unknown) => Promise<void>; onClose: () => void }) {
   const [form, setForm] = useState({ name: '', email: '', phone: '', skills: [] as string[], location: '', bio: '' });
@@ -101,16 +105,106 @@ function WorkerForm({ onSave, onClose }: { onSave: (d: unknown) => Promise<void>
   );
 }
 
+function ManagePropertiesModal({
+  worker,
+  allProperties,
+  onClose,
+  onChanged,
+}: {
+  worker: Worker;
+  allProperties: Property[];
+  onClose: () => void;
+  onChanged: () => void;
+}) {
+  const assigned = new Map(
+    (worker.propertyStaff ?? []).map((ps) => [ps.propertyId, ps.role])
+  );
+  const [saving, setSaving] = useState<string | null>(null);
+
+  async function toggle(property: Property) {
+    setSaving(property.id);
+    try {
+      if (assigned.has(property.id)) {
+        await api.propertyStaff.remove(property.id, worker.id);
+      } else {
+        await api.propertyStaff.assign(property.id, { workerId: worker.id, role: 'CLEANER' });
+      }
+      onChanged();
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-slate-400">
+        Select which properties <span className="text-slate-200 font-medium">{worker.user.name}</span> is assigned to.
+        They'll be scheduled as a Cleaner by default — change the role per-property from the Property → Staff page.
+      </p>
+      {allProperties.length === 0 ? (
+        <p className="text-slate-500 text-sm italic text-center py-4">No properties found.</p>
+      ) : (
+        <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+          {allProperties.map((p) => {
+            const isAssigned = assigned.has(p.id);
+            const role = assigned.get(p.id);
+            const isSaving = saving === p.id;
+            return (
+              <button
+                key={p.id}
+                onClick={() => toggle(p)}
+                disabled={isSaving}
+                className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl border text-left transition-colors ${
+                  isAssigned
+                    ? 'border-brand-500/50 bg-brand-500/10'
+                    : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
+                }`}
+              >
+                <span className="text-xl">{TYPE_ICONS[p.type] || '🏠'}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-100 truncate">{p.name}</p>
+                  <p className="text-xs text-slate-500">{p.city}</p>
+                </div>
+                {isAssigned ? (
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-xs text-brand-400 bg-brand-500/10 px-2 py-0.5 rounded-full">
+                      {role === 'CARETAKER' ? 'Caretaker' : role === 'SUPERVISOR' ? 'Supervisor' : 'Cleaner'}
+                    </span>
+                    <X size={14} className="text-slate-500" />
+                  </div>
+                ) : (
+                  <span className="text-xs text-slate-500 shrink-0">{isSaving ? 'Saving…' : 'Assign'}</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      <div className="pt-2">
+        <Button variant="secondary" onClick={onClose} className="w-full justify-center">Done</Button>
+      </div>
+    </div>
+  );
+}
+
 export default function WorkersPage() {
   const [workers, setWorkers] = useState<Worker[]>([]);
+  const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
-  const [modal, setModal] = useState(false);
+  const [addModal, setAddModal] = useState(false);
+  const [manageWorker, setManageWorker] = useState<Worker | null>(null);
 
   useEffect(() => { load(); }, []);
 
   async function load() {
     setLoading(true);
-    try { setWorkers(await api.workers.list()); } finally { setLoading(false); }
+    try {
+      const [ws, ps] = await Promise.all([api.workers.list(), api.properties.list()]);
+      setWorkers(ws);
+      setProperties(ps);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleDelete(id: string) {
@@ -131,7 +225,7 @@ export default function WorkersPage() {
           <h1 className="text-2xl font-bold text-slate-100">Workers</h1>
           <p className="text-slate-400 text-sm mt-1">{workers.length} workers on the platform</p>
         </div>
-        <Button onClick={() => setModal(true)}><Plus size={16} /> Add worker</Button>
+        <Button onClick={() => setAddModal(true)}><Plus size={16} /> Add worker</Button>
       </div>
 
       {loading ? (
@@ -142,69 +236,130 @@ export default function WorkersPage() {
         <div className="bg-slate-900 border border-slate-800 rounded-xl flex flex-col items-center justify-center py-16 gap-3">
           <span className="text-5xl">👷</span>
           <p className="text-slate-400">No workers yet</p>
-          <Button onClick={() => setModal(true)}>Add your first worker</Button>
+          <Button onClick={() => setAddModal(true)}>Add your first worker</Button>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {workers.map((w) => (
-            <div key={w.id} className="bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-brand-600/20 border border-brand-500/30 flex items-center justify-center text-brand-400 font-semibold text-sm">
-                    {w.user.name.charAt(0).toUpperCase()}
+          {workers.map((w) => {
+            const assignedProperties = w.propertyStaff ?? [];
+            return (
+              <div key={w.id} className="bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-brand-600/20 border border-brand-500/30 flex items-center justify-center text-brand-400 font-semibold text-sm">
+                      {w.user.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-slate-100">{w.user.name}</p>
+                      <p className="text-xs text-slate-500">{w.user.email}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-semibold text-slate-100">{w.user.name}</p>
-                    <p className="text-xs text-slate-500">{w.user.email}</p>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => toggleAvailable(w)}
+                      className={`px-2 py-1 rounded-full text-xs font-medium transition-colors ${w.isAvailable ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}
+                    >
+                      {w.isAvailable ? 'Available' : 'Unavailable'}
+                    </button>
+                    <button onClick={() => handleDelete(w.id)} className="p-1 rounded hover:bg-slate-800 text-slate-500 hover:text-red-400 transition-colors">
+                      <Trash2 size={13} />
+                    </button>
                   </div>
                 </div>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => toggleAvailable(w)}
-                    className={`px-2 py-1 rounded-full text-xs font-medium transition-colors ${w.isAvailable ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}
-                  >
-                    {w.isAvailable ? 'Available' : 'Unavailable'}
-                  </button>
-                  <button onClick={() => handleDelete(w.id)} className="p-1 rounded hover:bg-slate-800 text-slate-500 hover:text-red-400 transition-colors">
-                    <Trash2 size={13} />
-                  </button>
+
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                  {w.skills.map((s) => skillBadge(s))}
                 </div>
-              </div>
 
-              <div className="flex flex-wrap gap-1.5 mb-4">
-                {w.skills.map((s) => skillBadge(s))}
-              </div>
-
-              {w.location && (
-                <div className="flex items-center gap-1 text-xs text-slate-500 mb-3">
-                  <MapPin size={11} /> {w.location}
-                </div>
-              )}
-
-              {w.bio && <p className="text-xs text-slate-500 mb-3 line-clamp-2">{w.bio}</p>}
-
-              <div className="pt-3 border-t border-slate-800 flex justify-between text-xs text-slate-500">
-                <span>{w.jobsCompleted} jobs completed</span>
-                {w.rating && (
-                  <span className="flex items-center gap-1 text-amber-400">
-                    <Star size={11} className="fill-amber-400" /> {w.rating.toFixed(1)}
-                  </span>
+                {w.location && (
+                  <div className="flex items-center gap-1 text-xs text-slate-500 mb-3">
+                    <MapPin size={11} /> {w.location}
+                  </div>
                 )}
+
+                {w.bio && <p className="text-xs text-slate-500 mb-3 line-clamp-2">{w.bio}</p>}
+
+                {/* Property assignments */}
+                <div className="pt-3 border-t border-slate-800">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="flex items-center gap-1.5 text-xs font-medium text-slate-400">
+                      <Building2 size={11} />
+                      Properties
+                      {assignedProperties.length > 0 && (
+                        <span className="bg-slate-800 text-slate-400 rounded-full px-1.5 py-0.5 text-xs">
+                          {assignedProperties.length}
+                        </span>
+                      )}
+                    </span>
+                    <button
+                      onClick={() => setManageWorker(w)}
+                      className="text-xs text-brand-400 hover:text-brand-300 transition-colors"
+                    >
+                      Manage
+                    </button>
+                  </div>
+                  {assignedProperties.length === 0 ? (
+                    <button
+                      onClick={() => setManageWorker(w)}
+                      className="w-full text-xs text-slate-600 border border-dashed border-slate-700 rounded-lg py-2 hover:border-slate-500 hover:text-slate-400 transition-colors"
+                    >
+                      + Assign to a property
+                    </button>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5">
+                      {assignedProperties.map((ps) => (
+                        <span key={ps.propertyId} className="flex items-center gap-1 text-xs text-slate-300 bg-slate-800 rounded-md px-2 py-1">
+                          {TYPE_ICONS[ps.property.type] || '🏠'} {ps.property.name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-3 pt-3 border-t border-slate-800 flex justify-between text-xs text-slate-500">
+                  <span>{w.jobsCompleted} jobs completed</span>
+                  {w.rating && (
+                    <span className="flex items-center gap-1 text-amber-400">
+                      <Star size={11} className="fill-amber-400" /> {w.rating.toFixed(1)}
+                    </span>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
-      <Modal open={modal} onClose={() => setModal(false)} title="Add worker">
+      <Modal open={addModal} onClose={() => setAddModal(false)} title="Add worker">
         <WorkerForm
           onSave={async (d) => {
             await api.workers.create(d as Parameters<typeof api.workers.create>[0]);
             await load();
           }}
-          onClose={() => setModal(false)}
+          onClose={() => setAddModal(false)}
         />
       </Modal>
+
+      {manageWorker && (
+        <Modal
+          open={!!manageWorker}
+          onClose={() => setManageWorker(null)}
+          title={`${manageWorker.user.name} — Properties`}
+        >
+          <ManagePropertiesModal
+            worker={manageWorker}
+            allProperties={properties}
+            onClose={() => setManageWorker(null)}
+            onChanged={async () => {
+              const [ws, ps] = await Promise.all([api.workers.list(), api.properties.list()]);
+              setWorkers(ws);
+              setProperties(ps);
+              // Refresh the open modal with fresh worker data
+              setManageWorker((prev) => prev ? ws.find((w) => w.id === prev.id) ?? null : null);
+            }}
+          />
+        </Modal>
+      )}
     </div>
   );
 }
