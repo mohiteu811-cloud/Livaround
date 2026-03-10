@@ -331,7 +331,7 @@ export interface Booking {
   propertyId: string;
   property?: { id: string; name: string; city: string; country?: string };
   guestName: string;
-  guestEmail: string;
+  guestEmail?: string;
   guestPhone?: string;
   checkIn: string;
   checkOut: string;

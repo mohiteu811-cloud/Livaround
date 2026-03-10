@@ -83,7 +83,7 @@ function BookingForm({
           <Input placeholder="Sneha Kapoor" value={form.guestName} onChange={(e) => set('guestName', e.target.value)} required />
         </FormField>
         <FormField label="Guest email">
-          <Input type="email" placeholder="guest@example.com" value={form.guestEmail} onChange={(e) => set('guestEmail', e.target.value)} required />
+          <Input type="email" placeholder="guest@example.com" value={form.guestEmail} onChange={(e) => set('guestEmail', e.target.value)} />
         </FormField>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -168,7 +168,7 @@ export default function BookingsPage() {
   }
 
   const filtered = bookings.filter((b) => {
-    const matchSearch = !search || b.guestName.toLowerCase().includes(search.toLowerCase()) || b.guestEmail.toLowerCase().includes(search.toLowerCase());
+    const matchSearch = !search || b.guestName.toLowerCase().includes(search.toLowerCase()) || (b.guestEmail || '').toLowerCase().includes(search.toLowerCase());
     const matchStatus = !statusFilter || b.status === statusFilter;
     return matchSearch && matchStatus;
   });
