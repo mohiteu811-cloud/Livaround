@@ -103,7 +103,17 @@ router.put('/:id', validate(bookingSchema.partial()), async (req: AuthRequest, r
     });
     if (!existing) return res.status(404).json({ error: 'Booking not found' });
 
-    const booking = await prisma.booking.update({ where: { id: req.params.id }, data: req.body });
+    // Auto-generate guestCode if this booking doesn't have one yet
+    let extraData: Record<string, string> = {};
+    if (!existing.guestCode) {
+      let guestCode = generateGuestCode();
+      while (await prisma.booking.findUnique({ where: { guestCode } })) {
+        guestCode = generateGuestCode();
+      }
+      extraData = { guestCode };
+    }
+
+    const booking = await prisma.booking.update({ where: { id: req.params.id }, data: { ...req.body, ...extraData } });
     return res.json(booking);
   } catch (err) {
     console.error(err);
