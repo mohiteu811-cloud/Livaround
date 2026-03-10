@@ -11,8 +11,8 @@ router.use(authenticate);
 const bookingSchema = z.object({
   propertyId: z.string(),
   guestName: z.string().min(2),
-  guestEmail: z.string().email().nullish(),
-  guestPhone: z.string().nullish(),
+  guestEmail: z.preprocess((v) => (v === '' ? null : v), z.string().email().nullish()),
+  guestPhone: z.preprocess((v) => (v === '' ? null : v), z.string().nullish()),
   checkIn: z.string().datetime(),
   checkOut: z.string().datetime(),
   guestCount: z.number().int().min(1).default(1),
