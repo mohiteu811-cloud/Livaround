@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
-import { Plus, Search, LogIn, LogOut, X, Link2, Check } from 'lucide-react';
+import { Plus, Search, LogIn, LogOut, X, Link2, Check, Trash2 } from 'lucide-react';
 import { api, Booking, Property } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Input, Select, Textarea, FormField } from '@/components/ui/Input';
@@ -164,6 +164,10 @@ export default function BookingsPage() {
   }
   async function handleCancel(id: string) {
     if (!confirm('Cancel this booking?')) return;
+    await api.bookings.update(id, { status: 'CANCELLED' }); load();
+  }
+  async function handleDelete(id: string) {
+    if (!confirm('Permanently delete this booking? This cannot be undone.')) return;
     await api.bookings.cancel(id); load();
   }
 
@@ -257,10 +261,13 @@ export default function BookingsPage() {
                         </button>
                       )}
                       {['CONFIRMED', 'CHECKED_IN'].includes(b.status) && (
-                        <button onClick={() => handleCancel(b.id)} className="p-1.5 rounded hover:bg-slate-800 text-red-400 hover:text-red-300" title="Cancel">
+                        <button onClick={() => handleCancel(b.id)} className="p-1.5 rounded hover:bg-slate-800 text-red-400 hover:text-red-300" title="Cancel booking">
                           <X size={14} />
                         </button>
                       )}
+                      <button onClick={() => handleDelete(b.id)} className="p-1.5 rounded hover:bg-slate-800 text-slate-600 hover:text-red-400 transition-colors" title="Delete booking">
+                        <Trash2 size={14} />
+                      </button>
                     </div>
                   </td>
                 </tr>

@@ -164,7 +164,7 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
     });
     if (!existing) return res.status(404).json({ error: 'Booking not found' });
 
-    await prisma.booking.update({ where: { id: req.params.id }, data: { status: 'CANCELLED' } });
+    await prisma.booking.delete({ where: { id: req.params.id } });
     return res.status(204).send();
   } catch (err) {
     console.error(err);
