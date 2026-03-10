@@ -43,7 +43,55 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
+    registerClient: (data: { name: string; email: string; password: string; phone?: string; businessName: string; businessType: string; city: string; gstNumber?: string }) =>
+      request<{ token: string; user: User }>('/api/auth/register-client', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
     me: () => request<User>('/api/auth/me'),
+  },
+
+  client: {
+    me: () => request<ClientProfile>('/api/clients/me'),
+    update: (data: Partial<ClientProfile>) =>
+      request<ClientProfile>('/api/clients/me', { method: 'PUT', body: JSON.stringify(data) }),
+  },
+
+  venues: {
+    list: () => request<Venue[]>('/api/venues'),
+    create: (data: { name: string; address: string; city: string; latitude?: number; longitude?: number; isDefault?: boolean }) =>
+      request<Venue>('/api/venues', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: Partial<{ name: string; address: string; city: string; latitude: number; longitude: number; isDefault: boolean }>) =>
+      request<Venue>(`/api/venues/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: string) => request<void>(`/api/venues/${id}`, { method: 'DELETE' }),
+  },
+
+  shifts: {
+    list: (params?: { status?: string; upcoming?: string }) => {
+      const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
+      return request<Shift[]>(`/api/shifts${qs}`);
+    },
+    myShifts: (params?: { status?: string }) => {
+      const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
+      return request<ShiftApplication[]>(`/api/shifts${qs}`);
+    },
+    available: () => request<Shift[]>('/api/shifts/available'),
+    get: (id: string) => request<Shift>(`/api/shifts/${id}`),
+    create: (data: {
+      venueId: string; role: string; date: string; startTime: string; endTime: string;
+      hourlyRate: number; currency?: string; workersNeeded?: number;
+      notes?: string; requirements?: string[]; urgency?: string;
+    }) => request<Shift>('/api/shifts', { method: 'POST', body: JSON.stringify(data) }),
+    cancel: (id: string) => request<Shift>(`/api/shifts/${id}/cancel`, { method: 'POST' }),
+    apply: (id: string) => request<ShiftApplication>(`/api/shifts/${id}/apply`, { method: 'POST' }),
+    withdraw: (shiftId: string, appId: string) =>
+      request<ShiftApplication>(`/api/shifts/${shiftId}/applications/${appId}/withdraw`, { method: 'POST' }),
+    checkIn: (shiftId: string, appId: string) =>
+      request<ShiftCheckIn>(`/api/shifts/${shiftId}/applications/${appId}/checkin`, { method: 'POST' }),
+    checkOut: (shiftId: string, appId: string) =>
+      request<ShiftCheckIn>(`/api/shifts/${shiftId}/applications/${appId}/checkout`, { method: 'POST' }),
+    rate: (shiftId: string, appId: string, data: { rating: number; note?: string }) =>
+      request<ShiftApplication>(`/api/shifts/${shiftId}/applications/${appId}/rate`, { method: 'POST', body: JSON.stringify(data) }),
   },
 
   analytics: {
@@ -618,6 +666,77 @@ export interface OwnerDashboard {
       maintenanceRequests?: MaintenanceRequest[];
     };
   }[];
+}
+
+export interface ClientProfile {
+  id: string;
+  userId: string;
+  businessName: string;
+  businessType: 'RESTAURANT' | 'HOTEL' | 'VILLA' | 'RETAIL' | 'EVENT' | 'OTHER';
+  gstNumber?: string;
+  city: string;
+  phone?: string;
+  venues?: Venue[];
+  _count?: { shifts: number };
+  createdAt: string;
+}
+
+export interface Venue {
+  id: string;
+  clientId: string;
+  name: string;
+  address: string;
+  city: string;
+  latitude?: number;
+  longitude?: number;
+  isDefault: boolean;
+  createdAt: string;
+}
+
+export interface Shift {
+  id: string;
+  clientId: string;
+  client?: { id: string; businessName: string; businessType: string };
+  venueId: string;
+  venue?: { id: string; name: string; address: string; city: string };
+  role: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  hourlyRate: number;
+  currency: string;
+  workersNeeded: number;
+  status: 'OPEN' | 'PARTIALLY_FILLED' | 'FILLED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+  notes?: string;
+  requirements: string[];
+  urgency: 'ASAP' | 'SCHEDULED';
+  cancelledAt?: string;
+  createdAt: string;
+  applications?: ShiftApplication[];
+  _count?: { applications: number };
+}
+
+export interface ShiftApplication {
+  id: string;
+  shiftId: string;
+  shift?: Shift;
+  workerId: string;
+  worker?: Worker & { user: { name: string; phone?: string; email: string } };
+  status: 'PENDING' | 'CONFIRMED' | 'WITHDRAWN' | 'NO_SHOW' | 'COMPLETED';
+  confirmedAt?: string;
+  clientRating?: number;
+  clientNote?: string;
+  checkIn?: ShiftCheckIn;
+  createdAt: string;
+}
+
+export interface ShiftCheckIn {
+  id: string;
+  applicationId: string;
+  checkInAt?: string;
+  checkOutAt?: string;
+  hoursWorked?: number;
+  createdAt: string;
 }
 
 export interface DashboardStats {

@@ -13,13 +13,14 @@ model User {
   password  String
   name      String
   phone     String?
-  role      String   @default("HOST")
+  role      String   @default("HOST") // HOST | WORKER | OWNER | CLIENT
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   host   Host?
   worker Worker?
   owner  Owner?
+  client Client?
 }
 
 model Host {
@@ -118,20 +119,24 @@ model GuestServiceRequest {
 }
 
 model Worker {
-  id            String     @id @default(cuid())
-  userId        String     @unique
-  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  skills        String     @default("[]")
-  isAvailable   Boolean    @default(true)
-  location      String?
-  rating        Float?
-  jobsCompleted Int        @default(0)
-  bio           String?
-  pushToken     String?
-  tradeRoleId   String?
-  tradeRole     TradeRole? @relation(fields: [tradeRoleId], references: [id], onDelete: SetNull)
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  id              String     @id @default(cuid())
+  userId          String     @unique
+  user            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skills          String     @default("[]")
+  isAvailable     Boolean    @default(true)
+  location        String?
+  city            String?    // for shift marketplace city-based matching
+  latitude        Float?
+  longitude       Float?
+  rating          Float?
+  jobsCompleted   Int        @default(0)
+  shiftsCompleted Int        @default(0)
+  bio             String?
+  pushToken       String?
+  tradeRoleId     String?
+  tradeRole       TradeRole? @relation(fields: [tradeRoleId], references: [id], onDelete: SetNull)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
 
   jobs                     Job[]
   propertyStaff            PropertyStaff[]
@@ -139,6 +144,7 @@ model Worker {
   assignedMaintenanceReqs  MaintenanceRequest[] @relation("AssignedTo")
   audits                   JobAudit[]
   reportedIssues           Issue[]              @relation("ReportedIssues")
+  shiftApplications        ShiftApplication[]
 }
 
 model Job {
@@ -438,4 +444,91 @@ model JobAudit {
   notes        String
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+}
+
+// ── B2B Shift Marketplace ─────────────────────────────────────────────────────
+
+model Client {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessName String
+  businessType String   @default("RESTAURANT") // RESTAURANT | HOTEL | VILLA | RETAIL | EVENT | OTHER
+  gstNumber    String?
+  city         String
+  phone        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  venues Venue[]
+  shifts Shift[]
+}
+
+model Venue {
+  id        String   @id @default(cuid())
+  clientId  String
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name      String
+  address   String
+  city      String
+  latitude  Float?
+  longitude Float?
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  shifts Shift[]
+}
+
+model Shift {
+  id            String   @id @default(cuid())
+  clientId      String
+  client        Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  venueId       String
+  venue         Venue    @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  role          String   // WAITER | BARTENDER | COOK | HOUSEKEEPER | SECURITY | DRIVER | CLEANER | OTHER
+  date          String   // "YYYY-MM-DD"
+  startTime     String   // "HH:MM"
+  endTime       String   // "HH:MM"
+  hourlyRate    Float
+  currency      String   @default("INR")
+  workersNeeded Int      @default(1)
+  status        String   @default("OPEN") // OPEN | PARTIALLY_FILLED | FILLED | IN_PROGRESS | COMPLETED | CANCELLED
+  notes         String?
+  requirements  String   @default("[]") // JSON array of requirement strings
+  urgency       String   @default("SCHEDULED") // ASAP | SCHEDULED
+  cancelledAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  applications ShiftApplication[]
+}
+
+model ShiftApplication {
+  id           String    @id @default(cuid())
+  shiftId      String
+  shift        Shift     @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  workerId     String
+  worker       Worker    @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  status       String    @default("PENDING") // PENDING | CONFIRMED | WITHDRAWN | NO_SHOW | COMPLETED
+  confirmedAt  DateTime?
+  clientRating Int?      // 1-5, submitted post-shift by client
+  clientNote   String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  checkIn ShiftCheckIn?
+
+  @@unique([shiftId, workerId])
+}
+
+model ShiftCheckIn {
+  id            String           @id @default(cuid())
+  applicationId String           @unique
+  application   ShiftApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  checkInAt     DateTime?
+  checkOutAt    DateTime?
+  hoursWorked   Float?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
 }

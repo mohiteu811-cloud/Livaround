@@ -7,10 +7,11 @@ import { saveToken } from '@/lib/auth';
 import { Button } from '@/components/ui/Button';
 import { Input, FormField } from '@/components/ui/Input';
 
-type Role = 'HOST' | 'OWNER' | 'WORKER';
+type Role = 'HOST' | 'OWNER' | 'WORKER' | 'CLIENT';
 
-const ROLES: { id: Role; label: string; icon: string; description: string; redirect: string }[] = [
-  { id: 'HOST',   label: 'Host',   icon: '🏠', description: 'Manage properties, bookings and staff', redirect: '/dashboard' },
+const ROLES: { id: Role; label: string; icon: string; description: string; redirect: string; canRegister?: boolean }[] = [
+  { id: 'HOST',   label: 'Host',   icon: '🏠', description: 'Manage properties, bookings and staff', redirect: '/dashboard', canRegister: true },
+  { id: 'CLIENT', label: 'Business', icon: '🏢', description: 'Post shifts and hire on-demand staff', redirect: '/client/dashboard', canRegister: true },
   { id: 'OWNER',  label: 'Owner',  icon: '👤', description: 'View your property performance and reports', redirect: '/owner/dashboard' },
   { id: 'WORKER', label: 'Worker', icon: '🔧', description: 'Access your jobs and property guides', redirect: '/worker/jobs' },
 ];
@@ -21,7 +22,7 @@ export default function LoginPage() {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [form, setForm] = useState({ name: '', email: '', password: '', phone: '' });
+  const [form, setForm] = useState({ name: '', email: '', password: '', phone: '', businessName: '', businessType: 'RESTAURANT', city: '' });
 
   function set(key: string, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -42,6 +43,8 @@ export default function LoginPage() {
       let res: { token: string; user: { role: string } };
       if (role === 'HOST' && mode === 'register') {
         res = await api.auth.register(form);
+      } else if (role === 'CLIENT' && mode === 'register') {
+        res = await api.auth.registerClient(form);
       } else {
         res = await api.auth.login(form.email.trim().toLowerCase(), form.password);
         if (res.user.role !== role) {
@@ -97,7 +100,9 @@ export default function LoginPage() {
           {/* Form */}
           <div className="p-8">
             <h1 className="text-xl font-semibold text-slate-100 mb-1">
-              {role === 'HOST' && mode === 'register' ? 'Create host account' : `Sign in as ${activeRole.label.toLowerCase()}`}
+              {(role === 'HOST' || role === 'CLIENT') && mode === 'register'
+                ? `Create ${role === 'CLIENT' ? 'business' : 'host'} account`
+                : `Sign in as ${activeRole.label.toLowerCase()}`}
             </h1>
             <p className="text-sm text-slate-400 mb-6">{activeRole.description}</p>
 
@@ -108,9 +113,32 @@ export default function LoginPage() {
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              {role === 'HOST' && mode === 'register' && (
+              {(role === 'HOST' || role === 'CLIENT') && mode === 'register' && (
                 <FormField label="Full name">
                   <Input placeholder="Arjun Sharma" value={form.name} onChange={(e) => set('name', e.target.value)} required />
+                </FormField>
+              )}
+              {role === 'CLIENT' && mode === 'register' && (
+                <FormField label="Business name">
+                  <Input placeholder="The Beach Bar" value={form.businessName} onChange={(e) => set('businessName', e.target.value)} required />
+                </FormField>
+              )}
+              {role === 'CLIENT' && mode === 'register' && (
+                <FormField label="Business type">
+                  <select
+                    value={form.businessType}
+                    onChange={(e) => set('businessType', e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 text-sm focus:outline-none focus:border-brand-500"
+                  >
+                    {['RESTAURANT', 'HOTEL', 'VILLA', 'RETAIL', 'EVENT', 'OTHER'].map((t) => (
+                      <option key={t} value={t}>{t.charAt(0) + t.slice(1).toLowerCase()}</option>
+                    ))}
+                  </select>
+                </FormField>
+              )}
+              {role === 'CLIENT' && mode === 'register' && (
+                <FormField label="City">
+                  <Input placeholder="Goa" value={form.city} onChange={(e) => set('city', e.target.value)} required />
                 </FormField>
               )}
               <FormField label="Email address">
@@ -119,17 +147,17 @@ export default function LoginPage() {
               <FormField label="Password">
                 <Input type="password" placeholder="••••••••" value={form.password} onChange={(e) => set('password', e.target.value)} required minLength={8} />
               </FormField>
-              {role === 'HOST' && mode === 'register' && (
+              {(role === 'HOST' || role === 'CLIENT') && mode === 'register' && (
                 <FormField label="Phone (optional)">
                   <Input placeholder="+91 98765 43210" value={form.phone} onChange={(e) => set('phone', e.target.value)} />
                 </FormField>
               )}
               <Button type="submit" loading={loading} className="w-full justify-center">
-                {role === 'HOST' && mode === 'register' ? 'Create account' : 'Sign in'}
+                {(role === 'HOST' || role === 'CLIENT') && mode === 'register' ? 'Create account' : 'Sign in'}
               </Button>
             </form>
 
-            {role === 'HOST' && (
+            {(role === 'HOST' || role === 'CLIENT') && (
               <p className="mt-4 text-center text-sm text-slate-500">
                 {mode === 'login' ? "Don't have an account?" : 'Already have an account?'}{' '}
                 <button

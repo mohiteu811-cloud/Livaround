@@ -15,6 +15,17 @@ const registerSchema = z.object({
   phone: z.string().optional(),
 });
 
+const registerClientSchema = z.object({
+  name: z.string().min(2),
+  email: z.string().email(),
+  password: z.string().min(8),
+  phone: z.string().optional(),
+  businessName: z.string().min(2),
+  businessType: z.enum(['RESTAURANT', 'HOTEL', 'VILLA', 'RETAIL', 'EVENT', 'OTHER']).default('RESTAURANT'),
+  city: z.string().min(2),
+  gstNumber: z.string().optional(),
+});
+
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
@@ -70,7 +81,7 @@ router.post('/login', validate(loginSchema), async (req: Request, res: Response)
 
     const user = await prisma.user.findUnique({
       where: { email },
-      include: { host: true, worker: true, owner: true },
+      include: { host: true, worker: true, owner: true, client: true },
     });
 
     if (!user || !(await bcrypt.compare(password, user.password))) {
@@ -84,9 +95,50 @@ router.post('/login', validate(loginSchema), async (req: Request, res: Response)
       hostId: user.host?.id,
       workerId: user.worker?.id,
       ownerId: user.owner?.id,
+      clientId: user.client?.id,
     });
 
     return res.json({
+      token,
+      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/register-client', validate(registerClientSchema), async (req: Request, res: Response) => {
+  try {
+    const { name, email, password, phone, businessName, businessType, city, gstNumber } = req.body;
+
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      return res.status(409).json({ error: 'Email already registered' });
+    }
+
+    const hashed = await bcrypt.hash(password, 12);
+
+    const user = await prisma.user.create({
+      data: {
+        name,
+        email,
+        password: hashed,
+        phone,
+        role: 'CLIENT',
+        client: { create: { businessName, businessType, city, phone, gstNumber } },
+      },
+      include: { client: true },
+    });
+
+    const token = signToken({
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      clientId: user.client?.id,
+    });
+
+    return res.status(201).json({
       token,
       user: { id: user.id, name: user.name, email: user.email, role: user.role },
     });
