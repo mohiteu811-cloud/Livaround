@@ -82,7 +82,7 @@ model Booking {
   propertyId  String
   property    Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   guestName   String
-  guestEmail  String
+  guestEmail  String?
   guestPhone  String?
   checkIn     DateTime
   checkOut    DateTime

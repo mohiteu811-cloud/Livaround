@@ -11,8 +11,8 @@ router.use(authenticate);
 const bookingSchema = z.object({
   propertyId: z.string(),
   guestName: z.string().min(2),
-  guestEmail: z.string().email().optional(),
-  guestPhone: z.string().optional(),
+  guestEmail: z.string().email().nullish(),
+  guestPhone: z.string().nullish(),
   checkIn: z.string().datetime(),
   checkOut: z.string().datetime(),
   guestCount: z.number().int().min(1).default(1),
@@ -20,9 +20,9 @@ const bookingSchema = z.object({
   currency: z.string().default('INR'),
   status: z.enum(['CONFIRMED', 'CHECKED_IN', 'CHECKED_OUT', 'CANCELLED']).default('CONFIRMED'),
   source: z.enum(['DIRECT', 'AIRBNB', 'BOOKING_COM', 'VRBO', 'LIVAROUND']).default('DIRECT'),
-  externalId: z.string().optional(),
-  notes: z.string().optional(),
-  lockCode: z.string().optional(),
+  externalId: z.string().nullish(),
+  notes: z.string().nullish(),
+  lockCode: z.string().nullish(),
 });
 
 function generateGuestCode(): string {
