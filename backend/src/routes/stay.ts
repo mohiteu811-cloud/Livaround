@@ -4,6 +4,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { prisma } from '../lib/prisma';
+import { sendPushNotification } from '../lib/pushNotifications';
 
 const router = Router();
 
@@ -367,17 +368,40 @@ router.post('/:code/service-request', async (req: Request, res: Response) => {
         'Restock toiletries', 'Clean kitchen', 'Empty bins',
       ];
 
-      await prisma.job.create({
+      // Find the cleaner/caretaker assigned to the property for auto-claiming
+      const staffAssignments = await prisma.propertyStaff.findMany({
+        where: { propertyId: booking.propertyId, role: { in: ['CLEANER', 'CARETAKER'] } },
+        include: { worker: { select: { id: true, pushToken: true } } },
+      });
+      const cleaner =
+        staffAssignments.find((s) => s.role === 'CLEANER')?.worker ??
+        staffAssignments.find((s) => s.role === 'CARETAKER')?.worker ??
+        null;
+
+      const job = await prisma.job.create({
         data: {
           propertyId: booking.propertyId,
           bookingId: booking.id,
           type: 'CLEANING',
-          status: 'PENDING',
+          status: cleaner ? 'ACCEPTED' : 'PENDING',
           scheduledAt,
           notes: `Housekeeping requested by guest${notes ? ': ' + notes : ''}`,
           checklist: JSON.stringify(DEFAULT_CHECKLIST.map((item) => ({ item, done: false }))),
+          ...(cleaner ? { workerId: cleaner.id } : {}),
         },
+        include: { property: { select: { name: true } } },
       });
+
+      if (cleaner?.pushToken) {
+        await sendPushNotification(cleaner.pushToken, {
+          title: 'Housekeeping Request 🧹',
+          body: `Guest requested cleaning at ${job.property?.name} on ${scheduledAt.toLocaleDateString()}`,
+          data: { jobId: job.id },
+          sound: 'default',
+          priority: 'high',
+          channelId: 'jobs',
+        });
+      }
     }
 
     return res.status(201).json({ id: request.id, status: request.status });
