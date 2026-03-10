@@ -372,13 +372,16 @@ router.post('/:id/issues', validate(issueSchema), async (req: AuthRequest, res: 
         jobId: req.params.id,
         propertyId: job.propertyId,
         reportedById: reportedById ?? undefined,
-        ...req.body,
+        description: req.body.description,
+        severity: req.body.severity,
+        photoUrl: req.body.photoUrl ?? null,
+        videoUrl: req.body.videoUrl ?? null,
       },
     });
     return res.status(201).json(issue);
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: 'Internal server error' });
+  } catch (err: any) {
+    console.error('Issue create error:', err);
+    return res.status(500).json({ error: err?.message ?? 'Internal server error' });
   }
 });
 
