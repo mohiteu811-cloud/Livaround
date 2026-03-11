@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { GuestCheckoutForm } from '@/components/checkout/guest-checkout-form'
-import { HostCheckoutForm } from '@/components/checkout/host-checkout-form'
+import { GuestActions, HostActions } from '@/components/checkout/checkout-actions'
 import { CheckoutStatusCard } from '@/components/checkout/checkout-status-card'
 import { ScoreBadge } from '@/components/ui/score-badge'
 import { Home, Calendar } from 'lucide-react'
@@ -106,10 +105,9 @@ export default async function CheckoutPage({ params }: PageProps) {
         {/* Action forms */}
         {isGuest && verification?.status === 'pending_guest' && (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-            <GuestCheckoutForm
+            <GuestActions
               bookingId={bookingId}
               verificationId={verification.id}
-              onComplete={() => {}}
             />
           </div>
         )}
@@ -125,12 +123,11 @@ export default async function CheckoutPage({ params }: PageProps) {
 
         {isHost && verification?.status === 'guest_submitted' && (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-            <HostCheckoutForm
+            <HostActions
               bookingId={bookingId}
               verificationId={verification.id}
               guestName={booking.guest.full_name}
-              guestVideoUrl={verification.guest_video_url}
-              onComplete={() => {}}
+              guestVideoUrl={verification.guest_video_url ?? undefined}
             />
           </div>
         )}
