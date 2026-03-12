@@ -1,7 +1,12 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM = 'Livinbnb <hello@livinbnb.com>';
+
+function getResend(): Resend | null {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) return null;
+  return new Resend(key);
+}
 
 // Sent to the person who just listed their home
 export async function sendListingConfirmation({
@@ -9,6 +14,8 @@ export async function sendListingConfirmation({
 }: {
   to: string; name: string; location: string; destination: string;
 }) {
+  const resend = getResend();
+  if (!resend) return;
   await resend.emails.send({
     from: FROM,
     to,
@@ -45,6 +52,8 @@ export async function sendDestinationAlert({
   to: string; recipientName: string; newListerName: string;
   newListerLocation: string; theirDestination: string; boardUrl: string;
 }) {
+  const resend = getResend();
+  if (!resend) return;
   await resend.emails.send({
     from: FROM,
     to,
@@ -82,6 +91,8 @@ export async function sendMatchFound({
 }: {
   to: string; recipientName: string; cycleDescription: string; boardUrl: string;
 }) {
+  const resend = getResend();
+  if (!resend) return;
   await resend.emails.send({
     from: FROM,
     to,
