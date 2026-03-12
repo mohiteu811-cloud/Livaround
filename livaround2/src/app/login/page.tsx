@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { LogIn, Mail, CheckCircle } from 'lucide-react'
@@ -9,6 +9,14 @@ import { Button } from '@/components/ui/button'
 type State = 'idle' | 'loading' | 'sent' | 'error'
 
 export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
+  )
+}
+
+function LoginForm() {
   const searchParams = useSearchParams()
   const next = searchParams.get('next') ?? '/'
   const [email, setEmail] = useState('')
