@@ -1,4 +1,5 @@
 import UrlImportForm from '@/components/UrlImportForm';
+import ListingsBoard from '@/components/ListingsBoard';
 import { ArrowRight, Globe2, Users, Zap, ShieldCheck } from 'lucide-react';
 
 export default function Home() {
@@ -126,13 +127,27 @@ export default function Home() {
       <section id="get-started" className="py-24 px-6 bg-white">
         <div className="max-w-2xl mx-auto text-center mb-12">
           <h2 className="text-3xl font-bold text-slate-900 mb-4">
-            Find your exchange
+            List your home. Find your exchange.
           </h2>
           <p className="text-slate-500">
-            Join the waitlist. We match in batches — the sooner you&apos;re in, the sooner you&apos;re matched.
+            Your home goes on the public board instantly — the more homes listed, the more exchange routes we find.
           </p>
         </div>
         <UrlImportForm />
+      </section>
+
+      {/* Public listings board */}
+      <section className="py-16 px-6 bg-slate-50 border-t border-slate-100">
+        <div className="max-w-6xl mx-auto">
+          <div className="mb-10 text-center">
+            <h2 className="text-2xl font-bold text-slate-900 mb-2">Homes on the exchange</h2>
+            <p className="text-slate-500 text-sm max-w-lg mx-auto">
+              Real homes from real people — click any listing to see the full property on Airbnb or HomeExchange.
+              List yours above to appear here.
+            </p>
+          </div>
+          <ListingsBoard />
+        </div>
       </section>
 
       {/* Trust bar */}

@@ -1,0 +1,108 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/db';
+import { scrapeOg } from '@/lib/scrapeOg';
+import { findCycles, ListingNode } from '@/lib/matcher';
+
+// GET /api/listings — returns all public listings + match count
+export async function GET() {
+  const listings = await prisma.livinbnbListing.findMany({
+    where: { isPublic: true },
+    orderBy: { createdAt: 'desc' },
+  });
+
+  const matchCount = await prisma.livinbnbMatch.count();
+
+  return NextResponse.json({ listings, matchCount });
+}
+
+// POST /api/listings — create a listing, scrape OG data, then re-run matcher
+export async function POST(req: NextRequest) {
+  const body = await req.json();
+
+  const {
+    name, email,
+    platform, listingUrl,
+    location, city, country,
+    destination, destCity, destCountry,
+    startDate, endDate,
+  } = body;
+
+  // Basic validation
+  if (!email || !listingUrl || !destination || !startDate || !endDate) {
+    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+  }
+
+  // Scrape title + image from the listing URL
+  const og = await scrapeOg(listingUrl);
+
+  const listing = await prisma.livinbnbListing.create({
+    data: {
+      name: name ?? 'Anonymous',
+      email,
+      platform: platform ?? 'other',
+      listingUrl,
+      title: og.title || `Home in ${city}`,
+      location: location || `${city}, ${country}`,
+      city,
+      country,
+      imageUrl: og.imageUrl,
+      destination,
+      destCity,
+      destCountry,
+      travelStart: new Date(startDate),
+      travelEnd: new Date(endDate),
+    },
+  });
+
+  // Re-run matcher on all active listings
+  await runMatcher();
+
+  return NextResponse.json({ listing }, { status: 201 });
+}
+
+// ── Matcher runner ───────────────────────────────────────────────────────────
+
+async function runMatcher() {
+  const all = await prisma.livinbnbListing.findMany({ where: { isPublic: true } });
+
+  const nodes: ListingNode[] = all.map(l => ({
+    id: l.id,
+    city: l.city,
+    country: l.country,
+    destCity: l.destCity,
+    destCountry: l.destCountry,
+    travelStart: l.travelStart,
+    travelEnd: l.travelEnd,
+  }));
+
+  const cycles = findCycles(nodes);
+
+  // Persist new matches (skip ones already stored)
+  for (const cycle of cycles) {
+    const sorted = [...cycle.ids].sort().join('|');
+
+    // Check if this exact cycle already exists
+    const existing = await prisma.livinbnbMatch.findFirst({
+      include: { participants: { orderBy: { position: 'asc' } } },
+    });
+
+    const alreadyExists = existing?.participants
+      ? [...existing.participants].map(p => p.listingId).sort().join('|') === sorted
+      : false;
+
+    if (!alreadyExists) {
+      await prisma.livinbnbMatch.create({
+        data: {
+          wayCount: cycle.wayCount,
+          status: 'PROPOSED',
+          participants: {
+            create: cycle.ids.map((id, position) => ({
+              listingId: id,
+              position,
+            })),
+          },
+        },
+      });
+    }
+  }
+}
