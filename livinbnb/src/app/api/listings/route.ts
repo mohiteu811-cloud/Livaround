@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { scrapeOg } from '@/lib/scrapeOg';
-import { fireEmails } from '@/app/api/admin/seed/route';
+import { fireEmails } from '@/lib/fireEmails';
 
 // GET /api/listings — returns all public listings + match count + destination demand
 export async function GET() {
