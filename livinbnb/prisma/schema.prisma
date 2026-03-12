@@ -15,9 +15,9 @@ model LivinbnbListing {
   name        String
   email       String
 
-  // Property (imported from URL)
-  platform    String
-  listingUrl  String
+  // Property (imported from URL — at least one of airbnbUrl / homeExchangeUrl required)
+  airbnbUrl       String?
+  homeExchangeUrl String?
   title       String
   location    String
   city        String

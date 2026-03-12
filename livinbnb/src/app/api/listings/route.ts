@@ -26,24 +26,25 @@ export async function POST(req: NextRequest) {
 
     const {
       name, email,
-      platform, listingUrl,
+      airbnbUrl, homeExchangeUrl,
       location, city, country,
       destination, destCity, destCountry,
       startDate, endDate,
     } = body;
 
-    if (!email || !listingUrl || !destination || !startDate || !endDate) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    if (!email || (!airbnbUrl && !homeExchangeUrl) || !destination || !startDate || !endDate) {
+      return NextResponse.json({ error: 'Please provide at least one listing URL and all required fields.' }, { status: 400 });
     }
 
-    const og = await scrapeOg(listingUrl);
+    // Scrape OG data — prefer Airbnb for image quality, fall back to HomeExchange
+    const og = await scrapeOg(airbnbUrl || homeExchangeUrl);
 
     const listing = await prisma.livinbnbListing.create({
       data: {
         name: name ?? 'Anonymous',
         email,
-        platform: platform ?? 'other',
-        listingUrl,
+        airbnbUrl: airbnbUrl || null,
+        homeExchangeUrl: homeExchangeUrl || null,
         title: og.title || `Home in ${city}`,
         location: location || `${city}, ${country}`,
         city,

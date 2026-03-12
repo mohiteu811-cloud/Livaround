@@ -1,19 +1,18 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowRight, Link2, MapPin, Calendar, Loader2, CheckCircle2, AlertCircle, User } from 'lucide-react';
+import { ArrowRight, Link2, MapPin, Loader2, CheckCircle2, AlertCircle, User } from 'lucide-react';
 
 type Step = 'listing' | 'destination' | 'dates' | 'done';
 
 interface FormData {
   name: string;
   email: string;
-  listingUrl: string;
-  // location fields (auto-parsed or user-typed)
-  location: string;   // "North Goa, India"
+  airbnbUrl: string;
+  homeExchangeUrl: string;
+  location: string;
   city: string;
   country: string;
-  // destination
   destination: string;
   destCity: string;
   destCountry: string;
@@ -21,34 +20,21 @@ interface FormData {
   endDate: string;
 }
 
-function detectPlatform(url: string): 'airbnb' | 'homeexchange' | 'other' | null {
-  if (!url) return null;
-  if (url.includes('airbnb.')) return 'airbnb';
-  if (url.includes('homeexchange.')) return 'homeexchange';
-  try { new URL(url); return 'other'; } catch { return null; }
+function isValidUrl(url: string) {
+  if (!url) return false;
+  try { new URL(url); return true; } catch { return false; }
 }
 
-/** Very naive "City, Country" splitter — e.g. "North Goa, India" → {city, country} */
 function splitLocation(input: string): { city: string; country: string; location: string } {
   const parts = input.split(',').map(s => s.trim());
-  return {
-    city: parts[0] ?? input,
-    country: parts[parts.length - 1] ?? input,
-    location: input,
-  };
+  return { city: parts[0] ?? input, country: parts[parts.length - 1] ?? input, location: input };
 }
-
-const PLATFORM_LABELS: Record<string, string> = {
-  airbnb: 'Airbnb',
-  homeexchange: 'HomeExchange',
-  other: 'listing',
-};
 
 export default function UrlImportForm({ onListingAdded }: { onListingAdded?: () => void }) {
   const [step, setStep] = useState<Step>('listing');
   const [form, setForm] = useState<FormData>({
     name: '', email: '',
-    listingUrl: '',
+    airbnbUrl: '', homeExchangeUrl: '',
     location: '', city: '', country: '',
     destination: '', destCity: '', destCountry: '',
     startDate: '', endDate: '',
@@ -56,16 +42,28 @@ export default function UrlImportForm({ onListingAdded }: { onListingAdded?: () 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  const platform = detectPlatform(form.listingUrl);
-
   function update(field: keyof FormData, value: string) {
     setForm(f => ({ ...f, [field]: value }));
     setError('');
   }
 
   function handleListingNext() {
-    if (!platform) { setError('Please paste a valid Airbnb or HomeExchange listing URL.'); return; }
-    if (!form.location.trim()) { setError('Where is your property located? e.g. "North Goa, India"'); return; }
+    if (!form.airbnbUrl && !form.homeExchangeUrl) {
+      setError('Paste at least one listing URL — Airbnb or HomeExchange.');
+      return;
+    }
+    if (form.airbnbUrl && !isValidUrl(form.airbnbUrl)) {
+      setError('Airbnb URL doesn\'t look right. Make sure it starts with https://');
+      return;
+    }
+    if (form.homeExchangeUrl && !isValidUrl(form.homeExchangeUrl)) {
+      setError('HomeExchange URL doesn\'t look right. Make sure it starts with https://');
+      return;
+    }
+    if (!form.location.trim()) {
+      setError('Where is your property? e.g. "North Goa, India"');
+      return;
+    }
     const parsed = splitLocation(form.location);
     setForm(f => ({ ...f, ...parsed }));
     setStep('destination');
@@ -92,8 +90,8 @@ export default function UrlImportForm({ onListingAdded }: { onListingAdded?: () 
         body: JSON.stringify({
           name: form.name || 'Anonymous',
           email: form.email,
-          platform,
-          listingUrl: form.listingUrl,
+          airbnbUrl: form.airbnbUrl || null,
+          homeExchangeUrl: form.homeExchangeUrl || null,
           location: form.location,
           city: form.city,
           country: form.country,
@@ -126,8 +124,7 @@ export default function UrlImportForm({ onListingAdded }: { onListingAdded?: () 
         <h3 className="text-2xl font-semibold text-slate-900">You&apos;re listed!</h3>
         <p className="text-slate-500 max-w-xs">
           Your home is now visible on the board below. We&apos;ll email{' '}
-          <strong>{form.email}</strong> when we find a match for{' '}
-          <strong>{form.destination}</strong>.
+          <strong>{form.email}</strong> when we find a match for <strong>{form.destination}</strong>.
         </p>
       </div>
     );
@@ -141,13 +138,9 @@ export default function UrlImportForm({ onListingAdded }: { onListingAdded?: () 
       <div className="flex items-center gap-2 mb-8">
         {[0, 1, 2].map(i => (
           <div key={i} className="flex items-center gap-2 flex-1">
-            <div
-              className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-semibold transition-colors ${
-                i === stepIndex ? 'bg-sand-500 text-white'
-                  : i < stepIndex ? 'bg-green-500 text-white'
-                  : 'bg-slate-100 text-slate-400'
-              }`}
-            >
+            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-semibold transition-colors ${
+              i === stepIndex ? 'bg-sand-500 text-white' : i < stepIndex ? 'bg-green-500 text-white' : 'bg-slate-100 text-slate-400'
+            }`}>
               {i < stepIndex ? '✓' : i + 1}
             </div>
             {i < 2 && <div className="flex-1 h-px bg-slate-200" />}
@@ -155,30 +148,59 @@ export default function UrlImportForm({ onListingAdded }: { onListingAdded?: () 
         ))}
       </div>
 
-      {/* Step 1 — Listing URL + location */}
+      {/* Step 1 — Listing URLs + location */}
       {step === 'listing' && (
         <div className="flex flex-col gap-4">
           <div>
-            <h3 className="text-xl font-semibold mb-1">Link your existing listing</h3>
+            <h3 className="text-xl font-semibold mb-1">Link your listing profiles</h3>
             <p className="text-slate-500 text-sm">
-              Paste your Airbnb or HomeExchange URL — we import your property details automatically.
+              Add your Airbnb and/or HomeExchange URL — others can see both profiles for the same property.
+              At least one is required.
             </p>
           </div>
-          <div className="relative">
-            <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              type="url"
-              placeholder="https://www.airbnb.com/rooms/..."
-              value={form.listingUrl}
-              onChange={e => update('listingUrl', e.target.value)}
-              className="w-full pl-9 pr-36 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 focus:border-transparent transition"
-            />
-            {platform && (
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
-                {PLATFORM_LABELS[platform]} detected
-              </span>
-            )}
+
+          {/* Airbnb URL */}
+          <div>
+            <label className="text-xs font-medium text-slate-500 mb-1.5 flex items-center gap-1.5 block">
+              <span className="w-4 h-4 rounded bg-rose-500 flex items-center justify-center text-white text-[9px] font-bold">A</span>
+              Airbnb listing URL <span className="text-slate-400 font-normal">(optional)</span>
+            </label>
+            <div className="relative">
+              <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="url"
+                placeholder="https://www.airbnb.com/rooms/..."
+                value={form.airbnbUrl}
+                onChange={e => update('airbnbUrl', e.target.value)}
+                className="w-full pl-9 pr-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 focus:border-transparent transition"
+              />
+              {form.airbnbUrl && isValidUrl(form.airbnbUrl) && (
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full">✓</span>
+              )}
+            </div>
           </div>
+
+          {/* HomeExchange URL */}
+          <div>
+            <label className="text-xs font-medium text-slate-500 mb-1.5 flex items-center gap-1.5 block">
+              <span className="w-4 h-4 rounded bg-green-600 flex items-center justify-center text-white text-[9px] font-bold">H</span>
+              HomeExchange listing URL <span className="text-slate-400 font-normal">(optional)</span>
+            </label>
+            <div className="relative">
+              <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="url"
+                placeholder="https://www.homeexchange.com/en/listing/..."
+                value={form.homeExchangeUrl}
+                onChange={e => update('homeExchangeUrl', e.target.value)}
+                className="w-full pl-9 pr-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 focus:border-transparent transition"
+              />
+              {form.homeExchangeUrl && isValidUrl(form.homeExchangeUrl) && (
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full">✓</span>
+              )}
+            </div>
+          </div>
+
           <div className="relative">
             <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
@@ -190,6 +212,7 @@ export default function UrlImportForm({ onListingAdded }: { onListingAdded?: () 
               className="w-full pl-9 pr-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 focus:border-transparent transition"
             />
           </div>
+
           {error && <ErrorMsg>{error}</ErrorMsg>}
           <button onClick={handleListingNext} className="btn-primary">
             Continue <ArrowRight className="w-4 h-4" />
@@ -202,9 +225,7 @@ export default function UrlImportForm({ onListingAdded }: { onListingAdded?: () 
         <div className="flex flex-col gap-4">
           <div>
             <h3 className="text-xl font-semibold mb-1">Where do you want to go?</h3>
-            <p className="text-slate-500 text-sm">
-              Be as specific or broad as you like — &quot;London&quot;, &quot;UK&quot;, &quot;Europe&quot;.
-            </p>
+            <p className="text-slate-500 text-sm">Be as specific or broad as you like — &quot;London&quot;, &quot;UK&quot;, &quot;Europe&quot;.</p>
           </div>
           <div className="relative">
             <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -236,48 +257,27 @@ export default function UrlImportForm({ onListingAdded }: { onListingAdded?: () 
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-slate-500 font-medium mb-1 block">From</label>
-              <input
-                type="date"
-                value={form.startDate}
-                onChange={e => update('startDate', e.target.value)}
-                className="w-full px-3 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 focus:border-transparent transition"
-              />
+              <input type="date" value={form.startDate} onChange={e => update('startDate', e.target.value)}
+                className="w-full px-3 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 focus:border-transparent transition" />
             </div>
             <div>
               <label className="text-xs text-slate-500 font-medium mb-1 block">To</label>
-              <input
-                type="date"
-                value={form.endDate}
-                min={form.startDate}
-                onChange={e => update('endDate', e.target.value)}
-                className="w-full px-3 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 focus:border-transparent transition"
-              />
+              <input type="date" value={form.endDate} min={form.startDate} onChange={e => update('endDate', e.target.value)}
+                className="w-full px-3 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 focus:border-transparent transition" />
             </div>
           </div>
           <div className="relative">
             <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Your first name (shown publicly)"
-              value={form.name}
+            <input type="text" placeholder="Your first name (shown publicly)" value={form.name}
               onChange={e => update('name', e.target.value)}
-              className="w-full pl-9 pr-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 focus:border-transparent transition"
-            />
+              className="w-full pl-9 pr-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 focus:border-transparent transition" />
           </div>
-          <input
-            type="email"
-            placeholder="your@email.com (private — for match notifications)"
-            value={form.email}
+          <input type="email" placeholder="your@email.com (private — for match notifications)" value={form.email}
             onChange={e => update('email', e.target.value)}
-            className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 focus:border-transparent transition"
-          />
+            className="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sand-400 focus:border-transparent transition" />
           {error && <ErrorMsg>{error}</ErrorMsg>}
           <button type="submit" disabled={submitting} className="btn-primary disabled:opacity-60">
-            {submitting ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /> Listing your home…</>
-            ) : (
-              <>List my home &amp; find exchanges <ArrowRight className="w-4 h-4" /></>
-            )}
+            {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Listing your home…</> : <>List my home &amp; find exchanges <ArrowRight className="w-4 h-4" /></>}
           </button>
           <p className="text-xs text-center text-slate-400">Your email is never shown publicly.</p>
           <button type="button" onClick={() => setStep('destination')} className="btn-ghost">Back</button>

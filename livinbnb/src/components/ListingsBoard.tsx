@@ -6,8 +6,8 @@ import { MapPin, ArrowRight, ExternalLink, Calendar, Users } from 'lucide-react'
 interface Listing {
   id: string;
   name: string;
-  platform: string;
-  listingUrl: string;
+  airbnbUrl: string | null;
+  homeExchangeUrl: string | null;
   title: string;
   location: string;
   imageUrl: string | null;
@@ -23,14 +23,9 @@ function formatDateRange(start: string, end: string) {
   return `${fmt(s)} – ${fmt(e)}`;
 }
 
-function platformLabel(p: string) {
-  if (p === 'airbnb') return { label: 'Airbnb', color: 'bg-rose-50 text-rose-600' };
-  if (p === 'homeexchange') return { label: 'HomeExchange', color: 'bg-green-50 text-green-600' };
-  return { label: 'Listing', color: 'bg-slate-100 text-slate-500' };
-}
-
 function ListingCard({ listing }: { listing: Listing }) {
-  const plat = platformLabel(listing.platform);
+  const hasBoth = listing.airbnbUrl && listing.homeExchangeUrl;
+
   return (
     <div className="group bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200">
       {/* Image */}
@@ -45,18 +40,22 @@ function ListingCard({ listing }: { listing: Listing }) {
         ) : (
           <div className="w-full h-full flex items-center justify-center text-4xl">🏠</div>
         )}
-        <span className={`absolute top-3 left-3 text-xs font-semibold px-2 py-1 rounded-full ${plat.color}`}>
-          {plat.label}
-        </span>
+        {/* Platform badges */}
+        <div className="absolute top-3 left-3 flex gap-1.5">
+          {listing.airbnbUrl && (
+            <span className="text-xs font-semibold px-2 py-1 rounded-full bg-rose-50 text-rose-600">Airbnb</span>
+          )}
+          {listing.homeExchangeUrl && (
+            <span className="text-xs font-semibold px-2 py-1 rounded-full bg-green-50 text-green-700">HomeExchange</span>
+          )}
+        </div>
       </div>
 
       {/* Content */}
       <div className="p-4 flex flex-col gap-3">
         <div>
           <p className="text-xs text-slate-400 font-medium mb-0.5">{listing.name}</p>
-          <h3 className="font-semibold text-slate-900 text-sm leading-tight line-clamp-2">
-            {listing.title}
-          </h3>
+          <h3 className="font-semibold text-slate-900 text-sm leading-tight line-clamp-2">{listing.title}</h3>
         </div>
 
         <div className="flex items-center gap-1.5 text-xs text-slate-500">
@@ -76,14 +75,29 @@ function ListingCard({ listing }: { listing: Listing }) {
           {formatDateRange(listing.travelStart, listing.travelEnd)}
         </div>
 
-        <a
-          href={listing.listingUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center justify-center gap-1.5 text-xs font-medium text-slate-500 hover:text-sand-600 transition-colors pt-1 border-t border-slate-50"
-        >
-          View {plat.label} listing <ExternalLink className="w-3 h-3" />
-        </a>
+        {/* Profile links */}
+        <div className={`flex gap-2 pt-1 border-t border-slate-50 ${hasBoth ? 'flex-row' : ''}`}>
+          {listing.airbnbUrl && (
+            <a
+              href={listing.airbnbUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 flex items-center justify-center gap-1 text-xs font-medium text-rose-500 hover:text-rose-600 transition-colors py-1 px-2 rounded-lg hover:bg-rose-50"
+            >
+              <ExternalLink className="w-3 h-3" /> Airbnb
+            </a>
+          )}
+          {listing.homeExchangeUrl && (
+            <a
+              href={listing.homeExchangeUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 flex items-center justify-center gap-1 text-xs font-medium text-green-600 hover:text-green-700 transition-colors py-1 px-2 rounded-lg hover:bg-green-50"
+            >
+              <ExternalLink className="w-3 h-3" /> HomeExchange
+            </a>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -126,7 +140,6 @@ export default function ListingsBoard() {
 
   return (
     <div>
-      {/* Stats bar */}
       <div className="flex items-center gap-6 mb-8">
         <div className="flex items-center gap-2 text-sm text-slate-500">
           <Users className="w-4 h-4 text-sand-400" />
