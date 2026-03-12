@@ -105,14 +105,15 @@ export default function UrlImportForm({ onListingAdded }: { onListingAdded?: () 
         }),
       });
       if (!res.ok) {
-        const data = await res.json();
-        setError(data.error ?? 'Something went wrong. Please try again.');
+        let msg = `Server error (${res.status}) — please try again.`;
+        try { const d = await res.json(); msg = d.error ?? msg; } catch { /* non-JSON body */ }
+        setError(msg);
         return;
       }
       setStep('done');
       onListingAdded?.();
-    } catch {
-      setError('Network error — please try again.');
+    } catch (err) {
+      setError(`Could not reach the server — ${err instanceof Error ? err.message : 'please try again'}.`);
     } finally {
       setSubmitting(false);
     }

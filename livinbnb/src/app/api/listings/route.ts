@@ -6,59 +6,65 @@ import { findCycles, ListingNode } from '@/lib/matcher';
 
 // GET /api/listings — returns all public listings + match count
 export async function GET() {
-  const listings = await prisma.livinbnbListing.findMany({
-    where: { isPublic: true },
-    orderBy: { createdAt: 'desc' },
-  });
-
-  const matchCount = await prisma.livinbnbMatch.count();
-
-  return NextResponse.json({ listings, matchCount });
+  try {
+    const listings = await prisma.livinbnbListing.findMany({
+      where: { isPublic: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    const matchCount = await prisma.livinbnbMatch.count();
+    return NextResponse.json({ listings, matchCount });
+  } catch (err) {
+    console.error('[GET /api/listings]', err);
+    return NextResponse.json({ error: 'Database error', detail: String(err) }, { status: 500 });
+  }
 }
 
 // POST /api/listings — create a listing, scrape OG data, then re-run matcher
 export async function POST(req: NextRequest) {
-  const body = await req.json();
+  try {
+    const body = await req.json();
 
-  const {
-    name, email,
-    platform, listingUrl,
-    location, city, country,
-    destination, destCity, destCountry,
-    startDate, endDate,
-  } = body;
+    const {
+      name, email,
+      platform, listingUrl,
+      location, city, country,
+      destination, destCity, destCountry,
+      startDate, endDate,
+    } = body;
 
-  // Basic validation
-  if (!email || !listingUrl || !destination || !startDate || !endDate) {
-    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    if (!email || !listingUrl || !destination || !startDate || !endDate) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    const og = await scrapeOg(listingUrl);
+
+    const listing = await prisma.livinbnbListing.create({
+      data: {
+        name: name ?? 'Anonymous',
+        email,
+        platform: platform ?? 'other',
+        listingUrl,
+        title: og.title || `Home in ${city}`,
+        location: location || `${city}, ${country}`,
+        city,
+        country,
+        imageUrl: og.imageUrl,
+        destination,
+        destCity,
+        destCountry,
+        travelStart: new Date(startDate),
+        travelEnd: new Date(endDate),
+      },
+    });
+
+    // Run matcher async — don't block the response
+    runMatcher().catch(e => console.error('[matcher]', e));
+
+    return NextResponse.json({ listing }, { status: 201 });
+  } catch (err) {
+    console.error('[POST /api/listings]', err);
+    return NextResponse.json({ error: 'Database error', detail: String(err) }, { status: 500 });
   }
-
-  // Scrape title + image from the listing URL
-  const og = await scrapeOg(listingUrl);
-
-  const listing = await prisma.livinbnbListing.create({
-    data: {
-      name: name ?? 'Anonymous',
-      email,
-      platform: platform ?? 'other',
-      listingUrl,
-      title: og.title || `Home in ${city}`,
-      location: location || `${city}, ${country}`,
-      city,
-      country,
-      imageUrl: og.imageUrl,
-      destination,
-      destCity,
-      destCountry,
-      travelStart: new Date(startDate),
-      travelEnd: new Date(endDate),
-    },
-  });
-
-  // Re-run matcher on all active listings
-  await runMatcher();
-
-  return NextResponse.json({ listing }, { status: 201 });
 }
 
 // ── Matcher runner ───────────────────────────────────────────────────────────
@@ -78,11 +84,9 @@ async function runMatcher() {
 
   const cycles = findCycles(nodes);
 
-  // Persist new matches (skip ones already stored)
   for (const cycle of cycles) {
     const sorted = [...cycle.ids].sort().join('|');
 
-    // Check if this exact cycle already exists
     const existing = await prisma.livinbnbMatch.findFirst({
       include: { participants: { orderBy: { position: 'asc' } } },
     });
@@ -97,10 +101,7 @@ async function runMatcher() {
           wayCount: cycle.wayCount,
           status: 'PROPOSED',
           participants: {
-            create: cycle.ids.map((id, position) => ({
-              listingId: id,
-              position,
-            })),
+            create: cycle.ids.map((id, position) => ({ listingId: id, position })),
           },
         },
       });
