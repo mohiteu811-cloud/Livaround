@@ -1,0 +1,61 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// One row per person who lists their home + specifies where they want to go.
+model LivinbnbListing {
+  id          String   @id @default(cuid())
+
+  // Owner
+  name        String
+  email       String
+
+  // Property (imported from URL)
+  platform    String
+  listingUrl  String
+  title       String
+  location    String
+  city        String
+  country     String
+  imageUrl    String?
+
+  // Where they want to go
+  destination     String
+  destCity        String
+  destCountry     String
+  travelStart     DateTime
+  travelEnd       DateTime
+
+  isPublic    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  matchParticipations LivinbnbMatchParticipant[]
+}
+
+// A match is a detected exchange cycle (2, 3, or 4-way).
+model LivinbnbMatch {
+  id        String   @id @default(cuid())
+  wayCount  Int
+  status    String   @default("PROPOSED")
+  createdAt DateTime @default(now())
+
+  participants LivinbnbMatchParticipant[]
+}
+
+model LivinbnbMatchParticipant {
+  id        String          @id @default(cuid())
+  matchId   String
+  match     LivinbnbMatch   @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  listingId String
+  listing   LivinbnbListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  position  Int
+
+  @@unique([matchId, listingId])
+  @@unique([matchId, position])
+}
