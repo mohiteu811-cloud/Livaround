@@ -2,11 +2,13 @@
   "name": "livaround",
   "version": "1.0.0",
   "private": true,
-  "workspaces": ["backend", "dashboard"],
+  "workspaces": ["backend", "dashboard", "livinbnb"],
   "scripts": {
     "dev:backend": "npm run dev --workspace=backend",
     "dev:dashboard": "npm run dev --workspace=dashboard",
-    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:dashboard\""
+    "dev:livinbnb": "npm run dev --workspace=livinbnb",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:dashboard\"",
+    "dev:all": "concurrently \"npm run dev:backend\" \"npm run dev:dashboard\" \"npm run dev:livinbnb\""
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
