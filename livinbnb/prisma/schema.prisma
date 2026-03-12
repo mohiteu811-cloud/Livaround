@@ -59,3 +59,19 @@ model LivinbnbMatchParticipant {
   @@unique([matchId, listingId])
   @@unique([matchId, position])
 }
+
+// Lead pipeline — potential hosts the CEO agent has identified / is pursuing
+model LivinbnbLead {
+  id          String   @id @default(cuid())
+  name        String
+  contact     String   // email, FB profile URL, or phone
+  source      String   // e.g. "FB: Home Exchange Community", "HomeExchange.com search"
+  location    String   // where their home is
+  destination String   // where they want to go
+  // IDENTIFIED → CONTACTED → RESPONDED → LISTED | DECLINED
+  status      String   @default("IDENTIFIED")
+  notes       String?
+  followUpAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
