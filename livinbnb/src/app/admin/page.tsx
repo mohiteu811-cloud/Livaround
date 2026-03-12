@@ -4,9 +4,16 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   Loader2, Trash2, Plus, LogIn, ExternalLink,
   Users, Megaphone, Home, ChevronDown, Copy, Check,
-  ArrowRight, RefreshCw,
+  ArrowRight, RefreshCw, CalendarClock, ExternalLink as Open,
+  CheckCircle2, XCircle, Clock,
 } from 'lucide-react';
 import type { OutreachKit } from '@/app/api/admin/outreach/route';
+
+interface OutreachPost {
+  id: string; groupName: string; groupUrl: string | null;
+  copy: string; scheduledAt: string; status: string;
+  fromCity: string | null; toCity: string | null;
+}
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -60,7 +67,7 @@ export default function AdminPage() {
   const [password, setPassword] = useState('');
   const [authed, setAuthed] = useState(false);
   const [authError, setAuthError] = useState('');
-  const [tab, setTab] = useState<'listings' | 'leads' | 'outreach'>('listings');
+  const [tab, setTab] = useState<'listings' | 'leads' | 'outreach' | 'queue'>('listings');
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -97,6 +104,7 @@ export default function AdminPage() {
               { id: 'listings', icon: Home, label: 'Listings' },
               { id: 'leads', icon: Users, label: 'Leads' },
               { id: 'outreach', icon: Megaphone, label: 'Outreach' },
+              { id: 'queue', icon: CalendarClock, label: 'Post Queue' },
             ] as const).map(({ id, icon: Icon, label }) => (
               <button key={id} onClick={() => setTab(id)}
                 className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -110,7 +118,8 @@ export default function AdminPage() {
 
         {tab === 'listings' && <ListingsTab password={password} />}
         {tab === 'leads' && <LeadsTab password={password} />}
-        {tab === 'outreach' && <OutreachTab password={password} />}
+        {tab === 'outreach' && <OutreachTab password={password} onScheduled={() => setTab('queue')} />}
+        {tab === 'queue' && <QueueTab password={password} />}
       </div>
     </div>
   );
@@ -399,28 +408,62 @@ function LeadsTab({ password }: { password: string }) {
 }
 
 // ── OUTREACH TAB ───────────────────────────────────────────────────────────────
-function OutreachTab({ password }: { password: string }) {
+function OutreachTab({ password, onScheduled }: { password: string; onScheduled: () => void }) {
   const [fromCity, setFromCity] = useState('');
   const [fromCountry, setFromCountry] = useState('');
   const [toCity, setToCity] = useState('');
   const [toCountry, setToCountry] = useState('');
   const [listerName, setListerName] = useState('');
   const [generating, setGenerating] = useState(false);
+  const [scheduling, setScheduling] = useState(false);
   const [kit, setKit] = useState<OutreachKit | null>(null);
   const [openSection, setOpenSection] = useState<string>('fbGroupPost');
+  // Schedule: one time slot per group (defaults to next hour, 1 hr apart)
+  const [scheduleTimes, setScheduleTimes] = useState<Record<string, string>>({});
+
+  const headers = { 'Content-Type': 'application/json', 'x-admin-password': password };
 
   async function generate(e: React.FormEvent) {
     e.preventDefault();
     if (!fromCity || !toCity) return;
     setGenerating(true);
     const res = await fetch('/api/admin/outreach', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-admin-password': password },
+      method: 'POST', headers,
       body: JSON.stringify({ fromCity, fromCountry, toCity, toCountry, listerName }),
     });
-    const data = await res.json();
+    const data: OutreachKit = await res.json();
     setKit(data);
+    // Pre-fill schedule times: one per group, 1h apart from next hour
+    const base = new Date();
+    base.setMinutes(0, 0, 0);
+    base.setHours(base.getHours() + 1);
+    const times: Record<string, string> = {};
+    data.suggestedGroups.forEach((g, i) => {
+      const t = new Date(base.getTime() + i * 60 * 60 * 1000);
+      times[g] = t.toISOString().slice(0, 16);
+    });
+    setScheduleTimes(times);
     setGenerating(false);
+  }
+
+  async function scheduleAll() {
+    if (!kit) return;
+    setScheduling(true);
+    const posts = kit.suggestedGroups.map(g => ({
+      groupName: g,
+      groupUrl: null,
+      copy: kit.fbGroupPost,
+      scheduledAt: new Date(scheduleTimes[g] || new Date()).toISOString(),
+      status: 'PENDING',
+      fromCity: fromCity || null,
+      toCity: toCity || null,
+    }));
+    await fetch('/api/admin/queue', {
+      method: 'POST', headers,
+      body: JSON.stringify(posts),
+    });
+    setScheduling(false);
+    onScheduled();
   }
 
   const sections: { key: keyof OutreachKit; label: string; isText: boolean }[] = [
@@ -464,12 +507,24 @@ function OutreachTab({ password }: { password: string }) {
             </ul>
           </div>
 
-          {/* Suggested groups */}
+          {/* Schedule all groups */}
           <div className="bg-white rounded-2xl border border-slate-100 p-5">
-            <h3 className="text-sm font-semibold mb-3 text-slate-700">Suggested Facebook groups to post in</h3>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-slate-700">Schedule posts to these groups</h3>
+              <button onClick={scheduleAll} disabled={scheduling}
+                className="flex items-center gap-1.5 text-sm font-semibold bg-sand-500 hover:bg-sand-600 text-white px-4 py-2 rounded-xl transition-colors disabled:opacity-60">
+                {scheduling ? <><Loader2 className="w-3.5 h-3.5 animate-spin" />Scheduling…</> : <><CalendarClock className="w-3.5 h-3.5" />Add all to Post Queue</>}
+              </button>
+            </div>
+            <p className="text-xs text-slate-400 mb-4">Adjust times then click "Add all to Post Queue". Each post goes into the queue — when it's time, one click opens the group and copies the text.</p>
+            <div className="grid grid-cols-2 gap-2">
               {kit.suggestedGroups.map(g => (
-                <span key={g} className="text-xs bg-blue-50 text-blue-700 px-3 py-1 rounded-full">{g}</span>
+                <div key={g} className="flex items-center gap-2 bg-slate-50 rounded-xl px-3 py-2">
+                  <span className="text-xs text-slate-700 flex-1 truncate">{g}</span>
+                  <input type="datetime-local" value={scheduleTimes[g] ?? ''}
+                    onChange={e => setScheduleTimes(t => ({ ...t, [g]: e.target.value }))}
+                    className="text-xs border border-slate-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-sand-400" />
+                </div>
               ))}
             </div>
           </div>
@@ -499,6 +554,208 @@ function OutreachTab({ password }: { password: string }) {
             ))}
           </div>
         </>
+      )}
+    </div>
+  );
+}
+
+// ── QUEUE TAB ──────────────────────────────────────────────────────────────────
+function QueueTab({ password }: { password: string }) {
+  const [posts, setPosts] = useState<OutreachPost[]>([]);
+  const [form, setForm] = useState({ groupName: '', groupUrl: '', copy: '', scheduledAt: '', fromCity: '', toCity: '' });
+  const [adding, setAdding] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const headers = { 'Content-Type': 'application/json', 'x-admin-password': password };
+
+  const load = useCallback(async () => {
+    const res = await fetch('/api/admin/queue', { headers: { 'x-admin-password': password } });
+    const d = await res.json();
+    setPosts(d.posts ?? []);
+  }, [password]);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function handleAdd(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.groupName || !form.copy || !form.scheduledAt) return;
+    setAdding(true);
+    await fetch('/api/admin/queue', {
+      method: 'POST', headers,
+      body: JSON.stringify({
+        groupName: form.groupName, groupUrl: form.groupUrl || null,
+        copy: form.copy, scheduledAt: new Date(form.scheduledAt).toISOString(),
+        status: 'PENDING',
+        fromCity: form.fromCity || null, toCity: form.toCity || null,
+      }),
+    });
+    setForm({ groupName: '', groupUrl: '', copy: '', scheduledAt: '', fromCity: '', toCity: '' });
+    setAdding(false);
+    load();
+  }
+
+  async function markDone(id: string) {
+    await fetch('/api/admin/queue', { method: 'PATCH', headers, body: JSON.stringify({ id, status: 'DONE' }) });
+    load();
+  }
+
+  async function markSkip(id: string) {
+    await fetch('/api/admin/queue', { method: 'PATCH', headers, body: JSON.stringify({ id, status: 'SKIPPED' }) });
+    load();
+  }
+
+  async function del(id: string) {
+    await fetch('/api/admin/queue', { method: 'DELETE', headers, body: JSON.stringify({ id }) });
+    load();
+  }
+
+  function openAndCopy(post: OutreachPost) {
+    navigator.clipboard.writeText(post.copy);
+    setCopiedId(post.id);
+    setTimeout(() => setCopiedId(null), 3000);
+    if (post.groupUrl) window.open(post.groupUrl, '_blank');
+  }
+
+  const now = new Date();
+  const pending = posts.filter(p => p.status === 'PENDING');
+  const done = posts.filter(p => p.status !== 'PENDING');
+  const overdue = pending.filter(p => new Date(p.scheduledAt) < now);
+  const upcoming = pending.filter(p => new Date(p.scheduledAt) >= now);
+
+  const upd = (k: keyof typeof form, v: string) => setForm(f => ({ ...f, [k]: v }));
+
+  return (
+    <div className="flex flex-col gap-6">
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { label: 'Overdue', count: overdue.length, color: 'text-red-600', bg: 'bg-red-50 border-red-100' },
+          { label: 'Upcoming', count: upcoming.length, color: 'text-blue-600', bg: 'bg-blue-50 border-blue-100' },
+          { label: 'Done', count: done.length, color: 'text-green-600', bg: 'bg-green-50 border-green-100' },
+        ].map(({ label, count, color, bg }) => (
+          <div key={label} className={`rounded-2xl border p-4 text-center ${bg}`}>
+            <div className={`text-3xl font-bold ${color}`}>{count}</div>
+            <div className="text-xs font-medium text-slate-500 mt-1">{label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Overdue banner */}
+      {overdue.length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-center gap-3">
+          <Clock className="w-5 h-5 text-red-500 flex-shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-red-700">{overdue.length} post{overdue.length > 1 ? 's' : ''} overdue</p>
+            <p className="text-xs text-red-500">Click "Open + Copy" to paste into the Facebook group, then mark Done.</p>
+          </div>
+        </div>
+      )}
+
+      {/* Pending posts */}
+      {pending.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-50">
+            <span className="text-sm font-semibold text-slate-700">Pending posts</span>
+          </div>
+          <div className="divide-y divide-slate-50">
+            {pending.sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime()).map(p => {
+              const isOverdue = new Date(p.scheduledAt) < now;
+              return (
+                <div key={p.id} className={`px-5 py-4 flex items-start gap-4 ${isOverdue ? 'bg-red-50/40' : ''}`}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-sm text-slate-800">{p.groupName}</span>
+                      {p.fromCity && p.toCity && (
+                        <span className="text-xs text-slate-400">{p.fromCity} → {p.toCity}</span>
+                      )}
+                      {p.groupUrl && (
+                        <a href={p.groupUrl} target="_blank" rel="noopener noreferrer"
+                          className="text-xs text-blue-500 hover:underline flex items-center gap-0.5">
+                          Group<ExternalLink className="w-3 h-3" />
+                        </a>
+                      )}
+                    </div>
+                    <div className={`text-xs mt-0.5 flex items-center gap-1 ${isOverdue ? 'text-red-500 font-semibold' : 'text-slate-400'}`}>
+                      <Clock className="w-3 h-3" />
+                      {isOverdue ? 'Overdue · ' : ''}
+                      {new Date(p.scheduledAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1 line-clamp-2">{p.copy.slice(0, 120)}…</p>
+                  </div>
+                  <div className="flex gap-2 flex-shrink-0">
+                    <button onClick={() => openAndCopy(p)}
+                      className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl transition-colors ${
+                        copiedId === p.id
+                          ? 'bg-green-500 text-white'
+                          : 'bg-sand-500 hover:bg-sand-600 text-white'
+                      }`}>
+                      {copiedId === p.id
+                        ? <><Check className="w-3.5 h-3.5" />Copied!</>
+                        : <><Copy className="w-3.5 h-3.5" />{p.groupUrl ? 'Open + Copy' : 'Copy text'}</>
+                      }
+                    </button>
+                    <button onClick={() => markDone(p.id)} title="Mark done"
+                      className="p-2 rounded-xl bg-green-50 hover:bg-green-100 text-green-600 transition-colors">
+                      <CheckCircle2 className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => markSkip(p.id)} title="Skip"
+                      className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-400 transition-colors">
+                      <XCircle className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Add single post */}
+      <div className="bg-white rounded-2xl border border-slate-100 p-6">
+        <h2 className="text-base font-semibold mb-4 flex items-center gap-2">
+          <Plus className="w-4 h-4 text-sand-500" /> Schedule a single post
+        </h2>
+        <form onSubmit={handleAdd} className="grid grid-cols-2 gap-3">
+          <input placeholder="Group name *" value={form.groupName} onChange={e => upd('groupName', e.target.value)} className="input-field" />
+          <input type="url" placeholder="Group URL (optional)" value={form.groupUrl} onChange={e => upd('groupUrl', e.target.value)} className="input-field" />
+          <input placeholder="From city" value={form.fromCity} onChange={e => upd('fromCity', e.target.value)} className="input-field" />
+          <input placeholder="To city" value={form.toCity} onChange={e => upd('toCity', e.target.value)} className="input-field" />
+          <textarea placeholder="Post copy *" value={form.copy} onChange={e => upd('copy', e.target.value)}
+            className="input-field col-span-2 resize-none" rows={4} />
+          <div className="col-span-2">
+            <label className="text-xs text-slate-500 mb-1 block">Scheduled time *</label>
+            <input type="datetime-local" value={form.scheduledAt} onChange={e => upd('scheduledAt', e.target.value)} className="input-field w-full" />
+          </div>
+          <button type="submit" disabled={adding} className="col-span-2 btn-primary disabled:opacity-60">
+            {adding ? <><Loader2 className="w-4 h-4 animate-spin" />Scheduling…</> : 'Add to queue'}
+          </button>
+        </form>
+      </div>
+
+      {/* Done/skipped history */}
+      {done.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-50">
+            <span className="text-sm font-semibold text-slate-500">History ({done.length})</span>
+          </div>
+          <div className="divide-y divide-slate-50">
+            {done.map(p => (
+              <div key={p.id} className="px-5 py-3 flex items-center gap-3">
+                {p.status === 'DONE'
+                  ? <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
+                  : <XCircle className="w-4 h-4 text-slate-300 flex-shrink-0" />}
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm text-slate-600">{p.groupName}</span>
+                  {p.fromCity && p.toCity && <span className="text-xs text-slate-400 ml-2">{p.fromCity} → {p.toCity}</span>}
+                </div>
+                <span className="text-xs text-slate-400">{new Date(p.scheduledAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
+                <button onClick={() => del(p.id)} className="text-slate-200 hover:text-red-400 transition-colors">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );

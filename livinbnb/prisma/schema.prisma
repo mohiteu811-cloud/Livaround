@@ -75,3 +75,17 @@ model LivinbnbLead {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
+
+// Scheduled outreach posts — one entry per FB group post to be made
+model LivinbnbOutreachPost {
+  id          String   @id @default(cuid())
+  groupName   String
+  groupUrl    String?
+  copy        String
+  scheduledAt DateTime
+  // PENDING | DONE | SKIPPED
+  status      String   @default("PENDING")
+  fromCity    String?
+  toCity      String?
+  createdAt   DateTime @default(now())
+}
