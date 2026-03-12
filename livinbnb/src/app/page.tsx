@@ -1,5 +1,6 @@
 import UrlImportForm from '@/components/UrlImportForm';
 import ListingsBoard from '@/components/ListingsBoard';
+import DemandTicker from '@/components/DemandTicker';
 import { ArrowRight, Globe2, Users, Zap, ShieldCheck } from 'lucide-react';
 
 export default function Home() {
@@ -48,6 +49,7 @@ export default function Home() {
             List your home for free <ArrowRight className="w-4 h-4" />
           </a>
           <p className="text-sm text-slate-400 mt-4">No credit card · Takes 2 minutes</p>
+          <DemandTicker />
         </div>
       </section>
 
