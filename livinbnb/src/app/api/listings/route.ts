@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { LivinbnbListing } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { scrapeOg } from '@/lib/scrapeOg';
 import { findCycles, ListingNode } from '@/lib/matcher';
@@ -65,7 +66,7 @@ export async function POST(req: NextRequest) {
 async function runMatcher() {
   const all = await prisma.livinbnbListing.findMany({ where: { isPublic: true } });
 
-  const nodes: ListingNode[] = all.map(l => ({
+  const nodes: ListingNode[] = all.map((l: LivinbnbListing) => ({
     id: l.id,
     city: l.city,
     country: l.country,
