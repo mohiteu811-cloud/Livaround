@@ -24,11 +24,20 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { name, email, airbnbUrl, homeExchangeUrl, location, city, country,
-            destination, destCity, destCountry, startDate, endDate } = body;
+            destination, destCity, destCountry, startDate, endDate, wishes } = body;
 
-    if (!email || (!airbnbUrl && !homeExchangeUrl) || !destination || !startDate || !endDate) {
+    if (!email || (!airbnbUrl && !homeExchangeUrl) || !startDate || !endDate) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
+
+    const wishesList: { city: string; country: string; display: string }[] = wishes?.length
+      ? wishes
+      : destCity ? [{ city: destCity, country: destCountry ?? '', display: destination ?? destCity }] : [];
+
+    if (wishesList.length === 0) {
+      return NextResponse.json({ error: 'At least one destination required' }, { status: 400 });
+    }
+    const primary = wishesList[0];
 
     const og = await scrapeOg(airbnbUrl || homeExchangeUrl);
 
@@ -43,12 +52,14 @@ export async function POST(req: NextRequest) {
         city,
         country,
         imageUrl: og.imageUrl,
-        destination,
-        destCity,
-        destCountry,
+        destination: primary.display,
+        destCity: primary.city,
+        destCountry: primary.country,
         travelStart: new Date(startDate),
         travelEnd: new Date(endDate),
+        destinationWishes: { create: wishesList },
       },
+      include: { destinationWishes: true },
     });
 
     const boardUrl = process.env.NEXT_PUBLIC_URL ?? 'https://livinbnb.up.railway.app';

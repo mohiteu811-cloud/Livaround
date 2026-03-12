@@ -1,27 +1,48 @@
-import { LivinbnbListing } from '@prisma/client';
+import { LivinbnbListing, LivinbnbDestinationWish } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { findCycles, ListingNode } from '@/lib/matcher';
 import { sendListingConfirmation, sendDestinationAlert, sendMatchFound } from '@/lib/email';
 
-export async function fireEmails(listing: LivinbnbListing, boardUrl: string) {
+type ListingWithWishes = LivinbnbListing & { destinationWishes: LivinbnbDestinationWish[] };
+
+export async function fireEmails(listing: ListingWithWishes | LivinbnbListing, boardUrl: string) {
+  const wishes = 'destinationWishes' in listing ? listing.destinationWishes : [];
+  const destinationDisplay = wishes.length > 0
+    ? wishes.map(w => w.display).join(', ')
+    : listing.destination;
+
   // 1. Confirmation to the new lister
   await sendListingConfirmation({
     to: listing.email,
     name: listing.name,
     location: listing.location,
-    destination: listing.destination,
+    destination: destinationDisplay,
   }).catch(console.error);
 
-  // 2. Alert anyone whose destination matches the new listing's city/country
+  // 2. Alert anyone whose ANY wish matches the new listing's city/country
+  // Check via destinationWishes table (new) + legacy destCity (old listings)
   const others = await prisma.livinbnbListing.findMany({
     where: {
       id: { not: listing.id },
       isPublic: true,
       OR: [
+        // New-style: someone has a wish for the new listing's city
+        {
+          destinationWishes: {
+            some: {
+              OR: [
+                { city: { equals: listing.city, mode: 'insensitive' } },
+                { country: { equals: listing.country, mode: 'insensitive' } },
+              ],
+            },
+          },
+        },
+        // Legacy: single destCity/destCountry
         { destCity: { equals: listing.city, mode: 'insensitive' } },
         { destCountry: { equals: listing.country, mode: 'insensitive' } },
       ],
     },
+    include: { destinationWishes: true },
   });
 
   for (const other of others) {
@@ -30,17 +51,28 @@ export async function fireEmails(listing: LivinbnbListing, boardUrl: string) {
       recipientName: other.name,
       newListerName: listing.name,
       newListerLocation: listing.location,
-      theirDestination: other.destination,
+      theirDestination: other.destinationWishes.length > 0
+        ? other.destinationWishes.map(w => w.display).join(', ')
+        : other.destination,
       boardUrl,
     }).catch(console.error);
   }
 
   // 3. Run matcher and notify on new cycles
-  const all = await prisma.livinbnbListing.findMany({ where: { isPublic: true } });
-  const nodes: ListingNode[] = all.map((l: LivinbnbListing) => ({
-    id: l.id, city: l.city, country: l.country,
-    destCity: l.destCity, destCountry: l.destCountry,
-    travelStart: l.travelStart, travelEnd: l.travelEnd,
+  const all = await prisma.livinbnbListing.findMany({
+    where: { isPublic: true },
+    include: { destinationWishes: true },
+  });
+
+  const nodes: ListingNode[] = all.map(l => ({
+    id: l.id,
+    city: l.city,
+    country: l.country,
+    wishes: l.destinationWishes.length > 0
+      ? l.destinationWishes.map(w => ({ city: w.city, country: w.country }))
+      : [{ city: l.destCity, country: l.destCountry }],
+    travelStart: l.travelStart,
+    travelEnd: l.travelEnd,
   }));
 
   const cycles = findCycles(nodes);

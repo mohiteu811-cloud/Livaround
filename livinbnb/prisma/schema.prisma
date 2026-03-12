@@ -36,6 +36,20 @@ model LivinbnbListing {
   updatedAt   DateTime @updatedAt
 
   matchParticipations LivinbnbMatchParticipant[]
+  destinationWishes   LivinbnbDestinationWish[]
+}
+
+// One row per wishlist destination for a listing.
+// Replaces the single destCity/destCountry for matching purposes.
+model LivinbnbDestinationWish {
+  id        String          @id @default(cuid())
+  listingId String
+  listing   LivinbnbListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  city      String
+  country   String
+  display   String          // e.g. "London, UK"
+
+  @@index([listingId])
 }
 
 // A match is a detected exchange cycle (2, 3, or 4-way).

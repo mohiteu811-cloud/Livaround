@@ -4,19 +4,27 @@
  * Model:
  *   Each listing is a directed node.
  *   Edge A → B exists when:
- *     - A's destination matches B's location (city or country, case-insensitive)
+ *     - ANY of A's destination wishes matches B's location (city or country)
  *     - A's travel window overlaps with B's travel window
  *
  *   A valid exchange is a cycle: A→B→C→A
  *   meaning everyone gets where they want to go and their home is occupied.
  */
 
+export interface DestinationWish {
+  city: string;
+  country: string;
+}
+
 export interface ListingNode {
   id: string;
   city: string;       // where they live
   country: string;
-  destCity: string;   // where they want to go
-  destCountry: string;
+  // Wishlist — at least one entry (replaces old single destCity/destCountry)
+  wishes: DestinationWish[];
+  // Fallback for old listings that only have destCity/destCountry
+  destCity?: string;
+  destCountry?: string;
   travelStart: Date;
   travelEnd: Date;
 }
@@ -36,17 +44,26 @@ function datesOverlap(a: ListingNode, b: ListingNode): boolean {
   return overlapDays >= MIN_OVERLAP_DAYS;
 }
 
-function locationMatches(destCity: string, destCountry: string, city: string, country: string): boolean {
-  const norm = (s: string) => s.toLowerCase().trim();
-  return norm(destCity) === norm(city) || norm(destCountry) === norm(country);
+function norm(s: string) { return s.toLowerCase().trim(); }
+
+function locationMatches(wish: DestinationWish, city: string, country: string): boolean {
+  return norm(wish.city) === norm(city) || norm(wish.country) === norm(country);
+}
+
+function getWishes(a: ListingNode): DestinationWish[] {
+  if (a.wishes && a.wishes.length > 0) return a.wishes;
+  // Backward compat: old listings with only destCity/destCountry
+  if (a.destCity) return [{ city: a.destCity, country: a.destCountry ?? '' }];
+  return [];
 }
 
 /**
  * Returns true if A wants to go to where B lives AND their dates overlap.
- * (A → B in the exchange graph)
+ * Checks ALL of A's destination wishes.
  */
 function canExchange(a: ListingNode, b: ListingNode): boolean {
-  return locationMatches(a.destCity, a.destCountry, b.city, b.country) && datesOverlap(a, b);
+  const wishes = getWishes(a);
+  return wishes.some(w => locationMatches(w, b.city, b.country)) && datesOverlap(a, b);
 }
 
 /**
@@ -58,7 +75,6 @@ export function findCycles(listings: ListingNode[]): ExchangeCycle[] {
   const seen = new Set<string>();
 
   function cycleKey(ids: string[]): string {
-    // Canonical form: rotation starting with the lexicographically smallest id
     let min = 0;
     for (let i = 1; i < ids.length; i++) {
       if (ids[i] < ids[min]) min = i;

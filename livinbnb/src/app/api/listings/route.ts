@@ -9,16 +9,20 @@ export async function GET() {
     const listings = await prisma.livinbnbListing.findMany({
       where: { isPublic: true },
       orderBy: { createdAt: 'desc' },
+      include: { destinationWishes: true },
     });
     const matchCount = await prisma.livinbnbMatch.count();
 
-    // Aggregate demand: how many people want each destination city
+    // Aggregate demand across all wishes + legacy destCity
     const demand: Record<string, number> = {};
     for (const l of listings) {
-      const key = l.destCity;
-      demand[key] = (demand[key] ?? 0) + 1;
+      const cities = l.destinationWishes.length > 0
+        ? l.destinationWishes.map(w => w.city)
+        : [l.destCity];
+      for (const city of cities) {
+        if (city) demand[city] = (demand[city] ?? 0) + 1;
+      }
     }
-    // Top 5 destinations sorted by demand
     const topDestinations = Object.entries(demand)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
@@ -35,14 +39,28 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { name, email, airbnbUrl, homeExchangeUrl, location, city, country,
-            destination, destCity, destCountry, startDate, endDate } = body;
+    const {
+      name, email, airbnbUrl, homeExchangeUrl, location, city, country,
+      destination, destCity, destCountry, startDate, endDate,
+      // wishes: [{city, country, display}] — if provided, overrides single destination
+      wishes,
+    } = body;
 
-    if (!email || (!airbnbUrl && !homeExchangeUrl) || !destination || !startDate || !endDate) {
+    if (!email || (!airbnbUrl && !homeExchangeUrl) || !startDate || !endDate) {
       return NextResponse.json({ error: 'Please provide at least one listing URL and all required fields.' }, { status: 400 });
     }
 
+    const wishesList: { city: string; country: string; display: string }[] = wishes?.length
+      ? wishes
+      : destCity ? [{ city: destCity, country: destCountry ?? '', display: destination ?? destCity }] : [];
+
+    if (wishesList.length === 0) {
+      return NextResponse.json({ error: 'Please add at least one destination.' }, { status: 400 });
+    }
+
     const og = await scrapeOg(airbnbUrl || homeExchangeUrl);
+    // Primary destination = first wish
+    const primary = wishesList[0];
 
     const listing = await prisma.livinbnbListing.create({
       data: {
@@ -55,12 +73,14 @@ export async function POST(req: NextRequest) {
         city,
         country,
         imageUrl: og.imageUrl,
-        destination,
-        destCity,
-        destCountry,
+        destination: primary.display,
+        destCity: primary.city,
+        destCountry: primary.country,
         travelStart: new Date(startDate),
         travelEnd: new Date(endDate),
+        destinationWishes: { create: wishesList },
       },
+      include: { destinationWishes: true },
     });
 
     const boardUrl = process.env.NEXT_PUBLIC_URL ?? 'https://livinbnb.up.railway.app';
