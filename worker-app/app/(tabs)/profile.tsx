@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import {
   View, Text, Switch, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Alert, SafeAreaView, ScrollView,
+  ActivityIndicator, Alert, ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { api, clearToken, User } from '../../src/lib/api';
 
@@ -77,7 +78,7 @@ export default function ProfileScreen() {
   const jobsCompleted = (user.worker as any)?.jobsCompleted ?? 0;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.headerTitle}>Profile</Text>
 

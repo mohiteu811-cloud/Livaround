@@ -121,15 +121,6 @@ async function main() {
   });
 
   await prisma.job.upsert({
-    where: { id: 'job-002' }, update: {},
-    create: {
-      id: 'job-002', propertyId: villa.id, type: 'COOKING', status: 'PENDING',
-      scheduledAt: new Date(now.getTime() + 86400000 + 18*3600000),
-      notes: 'Dinner for 2. Traditional Goan seafood — fish curry, prawn balchão.',
-    },
-  });
-
-  await prisma.job.upsert({
     where: { id: 'job-003' }, update: {},
     create: {
       id: 'job-003', propertyId: villa.id, workerId: driverUser.worker!.id,

@@ -26,14 +26,14 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: 'Jobs',
-          tabBarIcon: ({ focused }) => <Icon emoji={"🔧\uFE0F"} focused={focused} />,
+          tabBarIcon: ({ focused }) => <Icon emoji="🔧" focused={focused} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ focused }) => <Icon emoji={"👤\uFE0F"} focused={focused} />,
+          tabBarIcon: ({ focused }) => <Icon emoji="👤" focused={focused} />,
         }}
       />
     </Tabs>
