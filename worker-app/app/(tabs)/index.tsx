@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
-  RefreshControl, ActivityIndicator, Platform, StatusBar,
+  RefreshControl, ActivityIndicator,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { api, getToken, User, Job } from '../../src/lib/api';
 
@@ -56,6 +57,7 @@ function JobCard({ job, onPress, embedded }: { job: Job; onPress: () => void; em
 }
 
 export default function JobsScreen() {
+  const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<TabType>('My Jobs');
   const [jobs, setJobs] = useState<Job[]>([]);
   const [user, setUser] = useState<User | null>(null);
@@ -107,7 +109,7 @@ export default function JobsScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <Text style={styles.headerTitle}>Jobs</Text>
         <Text style={styles.headerSub}>
           {user ? `Hey, ${user.name.split(' ')[0]} 👋` : ''}
@@ -176,7 +178,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0f172a' },
   header: {
     paddingHorizontal: 20,
-    paddingTop: (Platform.OS === 'android' ? (StatusBar.currentHeight ?? 44) : 44) + 12,
     paddingBottom: 12,
     flexDirection: 'row',
     alignItems: 'center',

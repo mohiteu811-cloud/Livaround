@@ -14,7 +14,13 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.livaround.worker"
+      "bundleIdentifier": "com.livaround.worker",
+      "infoPlist": {
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "LivAround needs your location to help hosts track worker arrivals.",
+        "NSLocationAlwaysUsageDescription": "LivAround needs background location to keep hosts updated on your whereabouts.",
+        "NSLocationWhenInUseUsageDescription": "LivAround needs your location while using the app.",
+        "UIBackgroundModes": ["location", "fetch"]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -28,7 +34,12 @@
         "RECEIVE_BOOT_COMPLETED",
         "VIBRATE",
         "USE_EXACT_ALARM",
-        "SCHEDULE_EXACT_ALARM"
+        "SCHEDULE_EXACT_ALARM",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION"
       ]
     },
     "plugins": [
@@ -36,6 +47,16 @@
       "./plugins/withFirebaseMultiProcess",
       "expo-router",
       "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "LivAround needs your location to help hosts track worker arrivals.",
+          "locationAlwaysPermission": "LivAround needs background location to keep hosts updated on your whereabouts.",
+          "locationWhenInUsePermission": "LivAround needs your location while using the app.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ],
       [
         "expo-notifications",
         {

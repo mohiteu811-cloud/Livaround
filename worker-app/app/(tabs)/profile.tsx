@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import {
   View, Text, Switch, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Alert, ScrollView, Platform, StatusBar,
+  ActivityIndicator, Alert, ScrollView,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { api, clearToken, User } from '../../src/lib/api';
 
@@ -14,6 +15,7 @@ const SKILL_ICON: Record<string, string> = {
 };
 
 export default function ProfileScreen() {
+  const insets = useSafeAreaInsets();
   const [user, setUser] = useState<User | null>(null);
   const [available, setAvailable] = useState(false);
   const [toggling, setToggling] = useState(false);
@@ -78,7 +80,7 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }]}>
         <Text style={styles.headerTitle}>Profile</Text>
 
         {/* Avatar */}
@@ -163,7 +165,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0f172a' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0f172a' },
   content: { paddingHorizontal: 20, paddingBottom: 40, gap: 20 },
-  headerTitle: { fontSize: 28, fontWeight: '700', color: '#f8fafc', paddingTop: (Platform.OS === 'android' ? (StatusBar.currentHeight ?? 44) : 44) + 12 },
+  headerTitle: { fontSize: 28, fontWeight: '700', color: '#f8fafc' },
   avatarSection: { alignItems: 'center', paddingVertical: 20 },
   avatar: {
     width: 80, height: 80, borderRadius: 40,
