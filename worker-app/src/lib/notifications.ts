@@ -1,5 +1,6 @@
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
 Notifications.setNotificationHandler({
@@ -29,11 +30,26 @@ export async function registerForPushNotifications(): Promise<string | null> {
     await Notifications.setNotificationChannelAsync('jobs', {
       name: 'Job Notifications',
       importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
+      vibrationPattern: [0, 400, 200, 400],
       lightColor: '#3b82f6',
+      sound: 'default',
+      enableVibrate: true,
+      showBadge: true,
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      bypassDnd: true,
     });
   }
 
-  const token = await Notifications.getExpoPushTokenAsync();
+  const projectId =
+    Constants.expoConfig?.extra?.eas?.projectId ??
+    Constants.easConfig?.projectId;
+
+  if (!projectId) {
+    console.warn('No EAS projectId found — push token may not work in production builds');
+  }
+
+  const token = await Notifications.getExpoPushTokenAsync(
+    projectId ? { projectId } : undefined
+  );
   return token.data;
 }

@@ -41,13 +41,23 @@ export interface User {
   email: string;
   phone?: string;
   role: string;
-  worker?: { id: string; skills: string[]; rating: number };
+  worker?: { id: string; skills: string[]; rating: number; isAvailable: boolean; jobsCompleted?: number };
+}
+
+export interface Property {
+  id: string;
+  name: string;
+  city: string;
+  address?: string;
+  wifiName?: string;
+  wifiPassword?: string;
+  lockCode?: string;
 }
 
 export interface Job {
   id: string;
   propertyId: string;
-  property?: { id: string; name: string; city: string };
+  property?: Property;
   bookingId?: string;
   booking?: { id: string; guestName: string; checkIn: string; checkOut: string };
   workerId?: string;

@@ -27,7 +27,7 @@ export default function ProfileScreen() {
     try {
       const u = await api.auth.me();
       setUser(u);
-      setAvailable(!!u.worker);
+      setAvailable(u.worker?.isAvailable ?? false);
     } catch {
       router.replace('/(auth)/login');
     } finally {

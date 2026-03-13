@@ -143,6 +143,25 @@ export default function JobDetailScreen() {
           {job.notes && <InfoRow icon="📝" label="Notes" value={job.notes} />}
         </View>
 
+        {/* Property Briefing — shown once accepted */}
+        {job.property && ['ACCEPTED', 'IN_PROGRESS', 'COMPLETED'].includes(job.status) && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Property Briefing</Text>
+            {job.property.address && (
+              <InfoRow icon="📍" label="Address" value={job.property.address} />
+            )}
+            {job.property.wifiName && (
+              <InfoRow icon="📶" label="Wi-Fi Network" value={job.property.wifiName} />
+            )}
+            {job.property.wifiPassword && (
+              <InfoRow icon="🔑" label="Wi-Fi Password" value={job.property.wifiPassword} />
+            )}
+            {job.property.lockCode && (
+              <InfoRow icon="🚪" label="Door Code" value={job.property.lockCode} />
+            )}
+          </View>
+        )}
+
         {/* Checklist */}
         {checklist.length > 0 && (
           <View style={styles.section}>
