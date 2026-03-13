@@ -137,6 +137,7 @@ export const api = {
       request<Worker>(`/api/workers/${id}`, { method: 'PUT', body: JSON.stringify({ isAvailable }) }),
     delete: (id: string) => request<void>(`/api/workers/${id}`, { method: 'DELETE' }),
     resetPassword: (id: string) => request<{ tempPassword: string }>(`/api/workers/${id}/reset-password`, { method: 'POST' }),
+    getLocation: (id: string) => request<WorkerLocation>(`/api/workers/${id}/location`),
   },
 
   jobs: {
@@ -405,11 +406,20 @@ export interface Worker {
   skills: string[];
   isAvailable: boolean;
   location?: string;
+  latitude?: number;
+  longitude?: number;
   rating?: number;
   jobsCompleted: number;
   bio?: string;
   _count?: { jobs: number };
   propertyStaff?: { id: string; propertyId: string; role: string; property: { id: string; name: string; type: string } }[];
+}
+
+export interface WorkerLocation {
+  latitude: number | null;
+  longitude: number | null;
+  updatedAt: string;
+  user: { name: string };
 }
 
 export interface Job {

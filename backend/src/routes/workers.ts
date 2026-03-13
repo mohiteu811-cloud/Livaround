@@ -9,6 +9,42 @@ import { sendWorkerWelcomeEmail } from '../lib/email';
 const router = Router();
 router.use(authenticate);
 
+// Lightweight location update — worker identifies themselves via JWT
+router.post('/me/location', async (req: AuthRequest, res: Response) => {
+  try {
+    const { latitude, longitude } = req.body;
+    if (typeof latitude !== 'number' || typeof longitude !== 'number') {
+      return res.status(400).json({ error: 'latitude and longitude are required' });
+    }
+    const worker = await prisma.worker.findUnique({ where: { userId: req.user!.id } });
+    if (!worker) return res.status(404).json({ error: 'Worker not found' });
+
+    await prisma.worker.update({
+      where: { id: worker.id },
+      data: { latitude, longitude },
+    });
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get a worker's current location (for dashboard)
+router.get('/:id/location', async (req: AuthRequest, res: Response) => {
+  try {
+    const worker = await prisma.worker.findUnique({
+      where: { id: req.params.id },
+      select: { latitude: true, longitude: true, updatedAt: true, user: { select: { name: true } } },
+    });
+    if (!worker) return res.status(404).json({ error: 'Worker not found' });
+    return res.json(worker);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 const createWorkerSchema = z.object({
   name: z.string().min(2),
   email: z.string().email(),
