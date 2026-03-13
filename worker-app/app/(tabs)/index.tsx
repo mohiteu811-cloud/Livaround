@@ -1,9 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
-  RefreshControl, ActivityIndicator,
+  RefreshControl, ActivityIndicator, Platform, StatusBar,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { api, getToken, User, Job } from '../../src/lib/api';
 
@@ -107,7 +106,7 @@ export default function JobsScreen() {
   const displayJobs = jobs;
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Jobs</Text>
         <Text style={styles.headerSub}>
@@ -169,7 +168,7 @@ export default function JobsScreen() {
           }
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -177,7 +176,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0f172a' },
   header: {
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: (Platform.OS === 'android' ? (StatusBar.currentHeight ?? 44) : 44) + 12,
     paddingBottom: 12,
     flexDirection: 'row',
     alignItems: 'center',
