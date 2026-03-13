@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
 import { getToken, api } from '../src/lib/api';
 import { registerForPushNotifications } from '../src/lib/notifications';
@@ -89,7 +90,7 @@ export default function RootLayout() {
   if (!checked) return null;
 
   return (
-    <>
+    <SafeAreaProvider>
       <StatusBar style="light" />
       <Stack screenOptions={{ headerShown: false }} />
 
@@ -118,7 +119,7 @@ export default function RootLayout() {
           </View>
         </Animated.View>
       )}
-    </>
+    </SafeAreaProvider>
   );
 }
 
