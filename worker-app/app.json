@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "LivAround Worker",
-    "slug": "livaround-worker",
+    "slug": "livaroundgoa",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -45,7 +45,7 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "livaround-worker"
+        "projectId": "02df0810-cc85-4da0-b74e-dfc543be4cd2"
       }
     },
     "experiments": {
