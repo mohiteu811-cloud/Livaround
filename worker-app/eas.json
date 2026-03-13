@@ -20,6 +20,9 @@
     "production": {
       "android": {
         "buildType": "app-bundle"
+      },
+      "cache": {
+        "disabled": true
       }
     }
   },
