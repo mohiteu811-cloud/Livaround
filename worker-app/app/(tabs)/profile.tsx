@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
 import {
   View, Text, Switch, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Alert, ScrollView,
+  ActivityIndicator, Alert, ScrollView, Platform, StatusBar,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { api, clearToken, User } from '../../src/lib/api';
 
@@ -14,8 +13,9 @@ const SKILL_ICON: Record<string, string> = {
   MAINTENANCE: '🔨',
 };
 
+const STATUS_BAR_HEIGHT = Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 0;
+
 export default function ProfileScreen() {
-  const insets = useSafeAreaInsets();
   const [user, setUser] = useState<User | null>(null);
   const [available, setAvailable] = useState(false);
   const [toggling, setToggling] = useState(false);
@@ -80,7 +80,7 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }]}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingTop: STATUS_BAR_HEIGHT + 16 }]}>
         <Text style={styles.headerTitle}>Profile</Text>
 
         {/* Avatar */}

@@ -1,9 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
-  RefreshControl, ActivityIndicator,
+  RefreshControl, ActivityIndicator, Platform, StatusBar,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { api, getToken, User, Job } from '../../src/lib/api';
 
@@ -56,8 +55,9 @@ function JobCard({ job, onPress, embedded }: { job: Job; onPress: () => void; em
   );
 }
 
+const STATUS_BAR_HEIGHT = Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 0;
+
 export default function JobsScreen() {
-  const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<TabType>('My Jobs');
   const [jobs, setJobs] = useState<Job[]>([]);
   const [user, setUser] = useState<User | null>(null);
@@ -109,7 +109,7 @@ export default function JobsScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+      <View style={[styles.header, { paddingTop: STATUS_BAR_HEIGHT + 16 }]}>
         <Text style={styles.headerTitle}>Jobs</Text>
         <Text style={styles.headerSub}>
           {user ? `Hey, ${user.name.split(' ')[0]} 👋` : ''}
