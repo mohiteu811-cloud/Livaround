@@ -31,10 +31,10 @@ function formatDate(iso: string) {
   return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
-function JobCard({ job, onPress }: { job: Job; onPress: () => void }) {
+function JobCard({ job, onPress, embedded }: { job: Job; onPress: () => void; embedded?: boolean }) {
   const color = STATUS_COLOR[job.status] ?? '#64748b';
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
+    <TouchableOpacity style={embedded ? styles.cardEmbedded : styles.card} onPress={onPress} activeOpacity={0.7}>
       <View style={styles.cardHeader}>
         <Text style={styles.jobIcon}>{JOB_ICON[job.type] ?? '🔧'}</Text>
         <View style={styles.cardInfo}>
@@ -107,7 +107,7 @@ export default function JobsScreen() {
   const displayJobs = jobs;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Jobs</Text>
         <Text style={styles.headerSub}>
@@ -138,8 +138,8 @@ export default function JobsScreen() {
           contentContainerStyle={styles.list}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#3b82f6" />}
           renderItem={({ item }) => (
-            <View>
-              <JobCard job={item} onPress={() => router.push(`/job/${item.id}`)} />
+            <View style={activeTab === 'Available' ? styles.cardWithClaim : undefined}>
+              <JobCard job={item} onPress={() => router.push(`/job/${item.id}`)} embedded={activeTab === 'Available'} />
               {activeTab === 'Available' && (
                 <TouchableOpacity
                   style={styles.claimButton}
@@ -205,6 +205,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#334155',
   },
+  cardEmbedded: {
+    backgroundColor: '#1e293b',
+    padding: 16,
+  },
   cardHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   jobIcon: { fontSize: 32, lineHeight: 40 },
   cardInfo: { flex: 1 },
@@ -225,13 +229,15 @@ const styles = StyleSheet.create({
   emptyIcon: { fontSize: 48 },
   emptyText: { fontSize: 18, fontWeight: '600', color: '#f8fafc' },
   emptySubtext: { fontSize: 14, color: '#64748b' },
+  cardWithClaim: {
+    overflow: 'hidden',
+    borderRadius: 16,
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
   claimButton: {
-    marginHorizontal: 0,
-    marginTop: -4,
-    marginBottom: 8,
     backgroundColor: '#2563eb',
-    borderBottomLeftRadius: 16,
-    borderBottomRightRadius: 16,
     paddingVertical: 12,
     alignItems: 'center',
   },
