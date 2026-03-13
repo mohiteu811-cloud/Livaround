@@ -245,8 +245,13 @@ export default function BookingsPage() {
               {filtered.map((b) => (
                 <tr key={b.id} className="hover:bg-slate-800/30 transition-colors">
                   <td className="px-6 py-4">
-                    <p className="font-medium text-slate-200">{b.guestName}</p>
-                    <p className="text-xs text-slate-500">{b.guestEmail}</p>
+                    <div className="flex items-center gap-1.5">
+                      <div>
+                        <p className="font-medium text-slate-200">{b.guestName}</p>
+                        <p className="text-xs text-slate-500">{b.guestEmail}</p>
+                      </div>
+                      <GuestLinkButton guestCode={b.guestCode} />
+                    </div>
                   </td>
                   <td className="px-6 py-4 text-slate-300">{b.property?.name}</td>
                   <td className="px-6 py-4 text-slate-400 text-xs">
@@ -263,7 +268,6 @@ export default function BookingsPage() {
                   <td className="px-6 py-4">{statusBadge(b.status)}</td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-1 justify-end">
-                      <GuestLinkButton guestCode={b.guestCode} />
                       {b.status === 'CONFIRMED' && (
                         <button onClick={() => handleCheckIn(b.id)} className="p-1.5 rounded hover:bg-slate-800 text-emerald-400 hover:text-emerald-300" title="Check in">
                           <LogIn size={14} />
