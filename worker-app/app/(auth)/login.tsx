@@ -6,6 +6,7 @@ import {
 import { router } from 'expo-router';
 import { api, setToken } from '../../src/lib/api';
 import { registerForPushNotifications } from '../../src/lib/notifications';
+import { startLocationTracking } from '../../src/lib/location';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -31,6 +32,9 @@ export default function LoginScreen() {
       if (pushToken && user.worker?.id) {
         await api.workers.registerPushToken(user.worker.id, pushToken).catch(() => {});
       }
+
+      // Request location permission and start tracking
+      startLocationTracking().catch(() => {});
 
       router.replace('/(tabs)');
     } catch (err: any) {

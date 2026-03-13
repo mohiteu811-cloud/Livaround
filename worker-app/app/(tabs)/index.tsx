@@ -109,7 +109,7 @@ export default function JobsScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
         <Text style={styles.headerTitle}>Jobs</Text>
         <Text style={styles.headerSub}>
           {user ? `Hey, ${user.name.split(' ')[0]} 👋` : ''}
