@@ -121,6 +121,22 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       },
       orderBy: { checkIn: 'desc' },
     });
+
+    // Backfill guestCode for any bookings created before the feature was added
+    const withoutCode = bookings.filter((b) => !b.guestCode);
+    if (withoutCode.length > 0) {
+      await Promise.all(
+        withoutCode.map(async (b) => {
+          let code = generateGuestCode();
+          while (await prisma.booking.findUnique({ where: { guestCode: code } })) {
+            code = generateGuestCode();
+          }
+          await prisma.booking.update({ where: { id: b.id }, data: { guestCode: code } });
+          (b as any).guestCode = code;
+        }),
+      );
+    }
+
     return res.json(bookings);
   } catch (err) {
     console.error(err);

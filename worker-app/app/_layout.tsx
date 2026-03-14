@@ -6,6 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
 import { getToken, api } from '../src/lib/api';
 import { registerForPushNotifications } from '../src/lib/notifications';
+import { startLocationTracking } from '../src/lib/location';
 
 interface JobBanner {
   jobId: string;
@@ -79,6 +80,8 @@ export default function RootLayout() {
       if (pushToken && user.worker?.id) {
         await api.workers.registerPushToken(user.worker.id, pushToken).catch(() => {});
       }
+      // Start background location tracking
+      startLocationTracking().catch(() => {});
       router.replace('/(tabs)');
     } catch {
       router.replace('/(auth)/login');
