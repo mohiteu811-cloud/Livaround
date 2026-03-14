@@ -33,8 +33,8 @@ export default function LoginScreen() {
         await api.workers.registerPushToken(user.worker.id, pushToken).catch(() => {});
       }
 
-      // Request location permission and start tracking
-      startLocationTracking().catch(() => {});
+      // Request location permission and start tracking (must await before navigating)
+      await startLocationTracking().catch(() => {});
 
       router.replace('/(tabs)');
     } catch (err: any) {

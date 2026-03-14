@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
-  RefreshControl, ActivityIndicator,
+  RefreshControl, ActivityIndicator, Platform, StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -55,6 +55,8 @@ function JobCard({ job, onPress }: { job: Job; onPress: () => void }) {
     </TouchableOpacity>
   );
 }
+
+const STATUS_BAR_HEIGHT = Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 0;
 
 export default function JobsScreen() {
   const [activeTab, setActiveTab] = useState<TabType>('My Jobs');

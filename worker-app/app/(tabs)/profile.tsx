@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   View, Text, Switch, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Alert, ScrollView,
+  ActivityIndicator, Alert, ScrollView, Platform, StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -13,6 +13,8 @@ const SKILL_ICON: Record<string, string> = {
   DRIVING: '🚗',
   MAINTENANCE: '🔨',
 };
+
+const STATUS_BAR_HEIGHT = Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 0;
 
 export default function ProfileScreen() {
   const [user, setUser] = useState<User | null>(null);

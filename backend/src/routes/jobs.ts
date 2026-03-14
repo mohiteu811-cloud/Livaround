@@ -52,7 +52,7 @@ router.get('/available', async (req: AuthRequest, res: Response) => {
   try {
     if (!isWorker(req)) return res.status(403).json({ error: 'Workers only' });
     const jobs = await prisma.job.findMany({
-      where: { workerId: null, status: 'PENDING' },
+      where: { workerId: null, status: 'PENDING', property: { isActive: true } },
       include: {
         property: { select: { id: true, name: true, city: true } },
         booking: { select: { id: true, guestName: true, checkIn: true, checkOut: true } },
@@ -76,7 +76,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     if (isWorker(req)) {
       const worker = await prisma.worker.findUnique({ where: { userId: req.user!.id } });
       if (!worker) return res.json([]);
-      baseWhere = { workerId: worker.id };
+      baseWhere = { workerId: worker.id, property: { isActive: true } };
     } else {
       baseWhere = { property: { host: { userId: req.user!.id } } };
     }
