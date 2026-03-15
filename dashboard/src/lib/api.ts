@@ -156,8 +156,8 @@ export const api = {
       request<Job>(`/api/jobs/${id}/accept`, { method: 'POST' }),
     start: (id: string) =>
       request<Job>(`/api/jobs/${id}/start`, { method: 'POST' }),
-    complete: (id: string) =>
-      request<Job>(`/api/jobs/${id}/complete`, { method: 'POST' }),
+    complete: (id: string, data?: { completionPhotoUrl?: string; completionVideoUrl?: string }) =>
+      request<Job>(`/api/jobs/${id}/complete`, { method: 'POST', ...(data ? { body: JSON.stringify(data) } : {}) }),
     cancel: (id: string) =>
       request<Job>(`/api/jobs/${id}/cancel`, { method: 'POST' }),
     reportIssue: (id: string, data: { description: string; severity: 'LOW' | 'MEDIUM' | 'HIGH'; photoUrl?: string; videoUrl?: string }) =>
@@ -438,6 +438,8 @@ export interface Job {
   status: 'PENDING' | 'DISPATCHED' | 'ACCEPTED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
   scheduledAt: string;
   completedAt?: string;
+  completionPhotoUrl?: string;
+  completionVideoUrl?: string;
   notes?: string;
   checklist?: { item: string; done: boolean }[];
   _count?: { issues: number };
