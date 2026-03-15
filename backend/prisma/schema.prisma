@@ -188,6 +188,7 @@ model Job {
   completionVideoUrl   String?
   notes                String?
   checklist            String?
+  archivedAt           DateTime?
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 
