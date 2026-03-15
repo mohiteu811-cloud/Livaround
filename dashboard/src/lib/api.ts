@@ -141,7 +141,7 @@ export const api = {
   },
 
   jobs: {
-    list: (params?: { propertyId?: string; status?: string; type?: string }) => {
+    list: (params?: { propertyId?: string; status?: string; type?: string; archived?: string; weekStart?: string }) => {
       const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
       return request<Job[]>(`/api/jobs${qs}`);
     },
@@ -160,6 +160,10 @@ export const api = {
       request<Job>(`/api/jobs/${id}/complete`, { method: 'POST', ...(data ? { body: JSON.stringify(data) } : {}) }),
     cancel: (id: string) =>
       request<Job>(`/api/jobs/${id}/cancel`, { method: 'POST' }),
+    archive: (id: string) =>
+      request<Job>(`/api/jobs/${id}/archive`, { method: 'POST' }),
+    unarchive: (id: string) =>
+      request<Job>(`/api/jobs/${id}/unarchive`, { method: 'POST' }),
     reportIssue: (id: string, data: { description: string; severity: 'LOW' | 'MEDIUM' | 'HIGH'; photoUrl?: string; videoUrl?: string }) =>
       request<{ id: string }>(`/api/jobs/${id}/issues`, { method: 'POST', body: JSON.stringify(data) }),
     listIssues: (params?: { severity?: string; status?: string }) => {
@@ -440,6 +444,7 @@ export interface Job {
   completedAt?: string;
   completionPhotoUrl?: string;
   completionVideoUrl?: string;
+  archivedAt?: string;
   notes?: string;
   checklist?: { item: string; done: boolean }[];
   _count?: { issues: number };
