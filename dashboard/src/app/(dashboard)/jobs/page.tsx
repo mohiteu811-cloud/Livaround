@@ -50,6 +50,8 @@ function JobForm({
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [dispatchWorkers, setDispatchWorkers] = useState<{ workerId: string; role: string; worker: { user: { name: string } } }[]>([]);
+  const [dispatchWorkerId, setDispatchWorkerId] = useState('');
 
   function set(k: string, v: unknown) { setForm((f) => ({ ...f, [k]: v })); }
 
@@ -61,10 +63,17 @@ function JobForm({
     }));
   }
 
+  useEffect(() => {
+    if (!form.propertyId) return;
+    api.jobs.dispatchWorkers(form.propertyId).then((ws) => {
+      setDispatchWorkers(ws);
+      setDispatchWorkerId(ws.length === 1 ? ws[0].workerId : '');
+    }).catch(() => setDispatchWorkers([]));
+  }, [form.propertyId]);
+
   const propertyBookings = bookings.filter((b) => b.propertyId === form.propertyId && ['CONFIRMED', 'CHECKED_IN'].includes(b.status));
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleCreate(withDispatch: boolean) {
     setLoading(true);
     setError('');
     try {
@@ -72,6 +81,7 @@ function JobForm({
         ...form,
         bookingId: form.bookingId || undefined,
         scheduledAt: new Date(form.scheduledAt).toISOString(),
+        ...(withDispatch && dispatchWorkerId ? { workerId: dispatchWorkerId } : {}),
       });
       onClose();
     } catch (err) {
@@ -79,6 +89,11 @@ function JobForm({
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    await handleCreate(false);
   }
 
   return (
@@ -139,9 +154,31 @@ function JobForm({
             className="text-xs text-brand-400 hover:text-brand-300">+ Add item</button>
         </div>
       </div>
+      {dispatchWorkers.length === 1 && (
+        <p className="text-xs text-slate-500">
+          Dispatching will assign to <strong className="text-slate-300">{dispatchWorkers[0].worker.user.name}</strong> automatically.
+        </p>
+      )}
+      {dispatchWorkers.length > 1 && (
+        <FormField label="Dispatch to">
+          <Select value={dispatchWorkerId} onChange={(e) => setDispatchWorkerId(e.target.value)}>
+            <option value="">— Select worker —</option>
+            {dispatchWorkers.map((s) => (
+              <option key={s.workerId} value={s.workerId}>
+                {s.worker.user.name} ({s.role.charAt(0) + s.role.slice(1).toLowerCase()})
+              </option>
+            ))}
+          </Select>
+        </FormField>
+      )}
       <div className="flex gap-3 pt-2">
         <Button type="button" variant="secondary" onClick={onClose} className="flex-1 justify-center">Cancel</Button>
-        <Button type="submit" loading={loading} className="flex-1 justify-center">Create job</Button>
+        <Button type="submit" variant="secondary" loading={loading} className="flex-1 justify-center">Create job</Button>
+        {dispatchWorkers.length > 0 && (
+          <Button type="button" loading={loading} disabled={!dispatchWorkerId} onClick={() => handleCreate(true)} className="flex-1 justify-center">
+            <Send size={14} /> Create & dispatch
+          </Button>
+        )}
       </div>
     </form>
   );

@@ -168,6 +168,10 @@ export const api = {
     },
     resolveIssue: (issueId: string, status: 'OPEN' | 'IN_REVIEW' | 'RESOLVED') =>
       request<JobIssue>(`/api/jobs/issues/${issueId}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+    dispatchWorkers: (propertyId: string) =>
+      request<{ workerId: string; role: string; worker: { user: { name: string } } }[]>(
+        `/api/jobs/dispatch-workers?propertyId=${encodeURIComponent(propertyId)}`
+      ),
   },
 
   issues: {
