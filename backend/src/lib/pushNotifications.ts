@@ -25,7 +25,7 @@ export async function sendPushNotification(pushToken: string, message: Omit<Expo
         body: JSON.stringify({ to: pushToken, ...message }),
         signal: AbortSignal.timeout(10_000),
       });
-      const result: { data?: { status?: string } } = await response.json();
+      const result = (await response.json()) as { data?: { status?: string } };
       if (!response.ok || result.data?.status === 'error') {
         console.error('Expo push error:', JSON.stringify(result));
       } else {
