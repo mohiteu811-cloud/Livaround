@@ -184,6 +184,8 @@ model Job {
   status               String             @default("PENDING")
   scheduledAt          DateTime
   completedAt          DateTime?
+  completionPhotoUrl   String?
+  completionVideoUrl   String?
   notes                String?
   checklist            String?
   createdAt            DateTime           @default(now())

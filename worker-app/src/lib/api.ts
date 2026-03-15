@@ -111,7 +111,8 @@ export const api = {
     get: (id: string) => request<Job>(`/api/jobs/${id}`),
     accept: (id: string) => request<Job>(`/api/jobs/${id}/accept`, { method: 'POST' }),
     start: (id: string) => request<Job>(`/api/jobs/${id}/start`, { method: 'POST' }),
-    complete: (id: string) => request<Job>(`/api/jobs/${id}/complete`, { method: 'POST' }),
+    complete: (id: string, data?: { completionPhotoUrl?: string; completionVideoUrl?: string }) =>
+      request<Job>(`/api/jobs/${id}/complete`, { method: 'POST', ...(data ? { body: JSON.stringify(data) } : {}) }),
     reportIssue: (id: string, data: { description: string; severity: 'LOW' | 'MEDIUM' | 'HIGH'; photoUrl?: string; videoUrl?: string }) =>
       request<Issue>(`/api/jobs/${id}/issues`, { method: 'POST', body: JSON.stringify(data) }),
   },

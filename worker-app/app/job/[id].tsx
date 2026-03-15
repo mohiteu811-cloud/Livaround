@@ -59,34 +59,27 @@ export default function JobDetailScreen() {
     );
   }
 
-  async function handleAction(action: 'accept' | 'start' | 'complete') {
-    if (action === 'complete') {
-      const undone = checklist.filter(c => !c.done);
-      if (undone.length > 0) {
-        Alert.alert(
-          'Incomplete Checklist',
-          `${undone.length} item(s) not checked off. Complete anyway?`,
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Complete', style: 'destructive', onPress: () => doAction(action) },
-          ]
-        );
-        return;
-      }
+  function handleComplete() {
+    const undone = checklist.filter(c => !c.done);
+    if (undone.length > 0) {
+      Alert.alert(
+        'Incomplete Checklist',
+        `${undone.length} item(s) not checked off. Complete anyway?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Complete', style: 'destructive', onPress: () => router.push(`/job/${id}/complete`) },
+        ]
+      );
+      return;
     }
-    doAction(action);
+    router.push(`/job/${id}/complete`);
   }
 
-  async function doAction(action: 'accept' | 'start' | 'complete') {
+  async function doAction(action: 'accept' | 'start') {
     setActionLoading(true);
     try {
       const updated = await api.jobs[action](id);
       setJob(updated);
-      if (action === 'complete') {
-        Alert.alert('✅ Job Complete!', 'Great work! The job has been marked as completed.', [
-          { text: 'Back to Jobs', onPress: () => router.replace('/(tabs)') },
-        ]);
-      }
     } catch (err: any) {
       Alert.alert('Error', err.message);
     } finally {
@@ -207,7 +200,7 @@ export default function JobDetailScreen() {
                 label="Accept Job"
                 color="#3b82f6"
                 loading={actionLoading}
-                onPress={() => handleAction('accept')}
+                onPress={() => doAction('accept')}
               />
             )}
             {job.status === 'ACCEPTED' && (
@@ -215,15 +208,15 @@ export default function JobDetailScreen() {
                 label="Start Job"
                 color="#8b5cf6"
                 loading={actionLoading}
-                onPress={() => handleAction('start')}
+                onPress={() => doAction('start')}
               />
             )}
             {job.status === 'IN_PROGRESS' && (
               <ActionButton
                 label="Mark Complete ✅"
                 color="#10b981"
-                loading={actionLoading}
-                onPress={() => handleAction('complete')}
+                loading={false}
+                onPress={handleComplete}
               />
             )}
             {(job.status === 'ACCEPTED' || job.status === 'IN_PROGRESS') && (

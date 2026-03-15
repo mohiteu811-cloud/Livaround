@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
-import { Plus, Send, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { Plus, Send, CheckCircle, XCircle, AlertTriangle, Camera } from 'lucide-react';
 import { api, Job, Property, Worker, Booking } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Input, Select, Textarea, FormField } from '@/components/ui/Input';
@@ -237,6 +237,61 @@ function DispatchModal({ job, workers, onDispatch, onClose }: {
   );
 }
 
+function CompletionMediaModal({ job, onClose }: { job: Job; onClose: () => void }) {
+  return (
+    <div className="space-y-5">
+      {/* Job info */}
+      <div className="bg-slate-800/60 rounded-lg p-4 text-sm space-y-1.5">
+        <div className="flex items-center gap-2 text-slate-200 font-medium">
+          <span>{JOB_TYPE_ICONS[job.type] ?? '📋'}</span>
+          <span>{job.type.charAt(0) + job.type.slice(1).toLowerCase()} job</span>
+        </div>
+        {job.property && <p className="text-slate-400">📍 {job.property.name}</p>}
+        {job.worker && <p className="text-slate-400">👷 {job.worker.user.name}</p>}
+        {job.completedAt && (
+          <p className="text-slate-500 text-xs">
+            Completed {format(new Date(job.completedAt), 'dd MMM yyyy, HH:mm')}
+          </p>
+        )}
+      </div>
+
+      {/* Photo */}
+      {job.completionPhotoUrl && (
+        <div>
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Photo</p>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={job.completionPhotoUrl}
+            alt="Completion photo"
+            className="w-full rounded-lg border border-slate-700 object-cover max-h-72"
+          />
+        </div>
+      )}
+
+      {/* Video */}
+      {job.completionVideoUrl && (
+        <div>
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Video</p>
+          <video
+            src={job.completionVideoUrl}
+            controls
+            playsInline
+            className="w-full rounded-lg border border-slate-700 max-h-72 bg-black"
+          />
+        </div>
+      )}
+
+      {!job.completionPhotoUrl && !job.completionVideoUrl && (
+        <p className="text-sm text-slate-500 text-center py-4">No completion media attached.</p>
+      )}
+
+      <div className="flex gap-3 pt-1">
+        <Button variant="secondary" onClick={onClose} className="flex-1 justify-center">Close</Button>
+      </div>
+    </div>
+  );
+}
+
 export default function JobsPage() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
@@ -245,6 +300,7 @@ export default function JobsPage() {
   const [loading, setLoading] = useState(true);
   const [createModal, setCreateModal] = useState(false);
   const [dispatchModal, setDispatchModal] = useState<Job | null>(null);
+  const [completionModal, setCompletionModal] = useState<Job | null>(null);
   const [statusFilter, setStatusFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
 
@@ -358,6 +414,12 @@ export default function JobsPage() {
                           <CheckCircle size={14} />
                         </button>
                       )}
+                      {j.status === 'COMPLETED' && (j.completionPhotoUrl || j.completionVideoUrl) && (
+                        <button onClick={() => setCompletionModal(j)}
+                          className="p-1.5 rounded hover:bg-slate-800 text-blue-400 hover:text-blue-300" title="View completion media">
+                          <Camera size={14} />
+                        </button>
+                      )}
                       {!['COMPLETED', 'CANCELLED'].includes(j.status) && (
                         <button onClick={() => handleCancel(j.id)}
                           className="p-1.5 rounded hover:bg-slate-800 text-red-400 hover:text-red-300" title="Cancel">
@@ -388,6 +450,12 @@ export default function JobsPage() {
             onDispatch={async (wId) => { await api.jobs.dispatch(dispatchModal.id, wId); await load(); }}
             onClose={() => setDispatchModal(null)}
           />
+        </Modal>
+      )}
+
+      {completionModal && (
+        <Modal open={!!completionModal} onClose={() => setCompletionModal(null)} title="Completion media">
+          <CompletionMediaModal job={completionModal} onClose={() => setCompletionModal(null)} />
         </Modal>
       )}
     </div>
