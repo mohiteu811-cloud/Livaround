@@ -7,22 +7,25 @@ import { router } from 'expo-router';
 import { api, setToken } from '../../src/lib/api';
 import { registerForPushNotifications } from '../../src/lib/notifications';
 import { startLocationTracking } from '../../src/lib/location';
+import { useLang, t } from '../../src/lib/i18n';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [lang, setLangVal] = useLang();
+  const tr = t(lang);
 
   async function handleLogin() {
     if (!email.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please enter your email and password.');
+      Alert.alert(tr.errorTitle, tr.enterCredentials);
       return;
     }
     setLoading(true);
     try {
       const { token, user } = await api.auth.login(email.trim().toLowerCase(), password);
       if (user.role !== 'WORKER') {
-        Alert.alert('Access Denied', 'This app is for workers only. Please use the host dashboard.');
+        Alert.alert(tr.accessDenied, tr.workerOnly);
         return;
       }
       await setToken(token);
@@ -38,7 +41,7 @@ export default function LoginScreen() {
 
       router.replace('/(tabs)');
     } catch (err: any) {
-      Alert.alert('Login Failed', err.message || 'Invalid email or password.');
+      Alert.alert(tr.loginFailed, err.message || tr.invalidCredentials);
     } finally {
       setLoading(false);
     }
@@ -50,14 +53,24 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={styles.inner}>
+        {/* Language toggle */}
+        <TouchableOpacity
+          style={styles.langToggle}
+          onPress={() => setLangVal(lang === 'en' ? 'hi' : 'en')}
+        >
+          <Text style={styles.langToggleText}>
+            {lang === 'en' ? 'हिन्दी' : 'English'}
+          </Text>
+        </TouchableOpacity>
+
         <View style={styles.logoWrapper}>
           <Text style={styles.logoIcon}>🏠</Text>
           <Text style={styles.logoText}>LivAround</Text>
-          <Text style={styles.tagline}>Worker Portal</Text>
+          <Text style={styles.tagline}>{tr.workerPortal}</Text>
         </View>
 
         <View style={styles.form}>
-          <Text style={styles.label}>Email</Text>
+          <Text style={styles.label}>{tr.email}</Text>
           <TextInput
             style={styles.input}
             value={email}
@@ -69,7 +82,7 @@ export default function LoginScreen() {
             autoCorrect={false}
           />
 
-          <Text style={styles.label}>Password</Text>
+          <Text style={styles.label}>{tr.password}</Text>
           <TextInput
             style={styles.input}
             value={password}
@@ -86,7 +99,7 @@ export default function LoginScreen() {
           >
             {loading
               ? <ActivityIndicator color="#fff" />
-              : <Text style={styles.buttonText}>Sign In</Text>
+              : <Text style={styles.buttonText}>{tr.signIn}</Text>
             }
           </TouchableOpacity>
         </View>
@@ -104,6 +117,22 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     paddingHorizontal: 24,
+  },
+  langToggle: {
+    position: 'absolute',
+    top: 56,
+    right: 0,
+    backgroundColor: '#1e293b',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  langToggleText: {
+    color: '#3b82f6',
+    fontSize: 13,
+    fontWeight: '600',
   },
   logoWrapper: {
     alignItems: 'center',
