@@ -31,6 +31,7 @@ const createJobSchema = z.object({
   scheduledAt: z.string().datetime(),
   notes: z.string().optional(),
   checklist: z.array(z.object({ item: z.string(), done: z.boolean().default(false) })).optional(),
+  workerId: z.string().optional(), // if provided, job is created and immediately dispatched
 });
 
 const dispatchSchema = z.object({
@@ -111,13 +112,43 @@ router.post('/', validate(createJobSchema), async (req: AuthRequest, res: Respon
       where: { id: req.body.propertyId, host: { userId: req.user!.id } },
     });
     if (!prop) return res.status(403).json({ error: 'Property not found or access denied' });
-    const { checklist, ...rest } = req.body;
+
+    const { checklist, workerId, ...rest } = req.body;
+
+    // If dispatching immediately, verify the worker is assigned to this property
+    if (workerId) {
+      const staffAssignment = await prisma.propertyStaff.findFirst({
+        where: { propertyId: req.body.propertyId, workerId },
+      });
+      if (!staffAssignment) {
+        return res.status(400).json({ error: 'Worker is not assigned to this property' });
+      }
+    }
+
     const job = await prisma.job.create({
       data: {
         ...rest,
         ...(checklist ? { checklist: JSON.stringify(checklist) } : {}),
+        ...(workerId ? { workerId, status: 'DISPATCHED' } : {}),
       },
+      include: JOB_INCLUDE,
     });
+
+    // Send push notification if dispatching immediately
+    if (workerId) {
+      const worker = await prisma.worker.findUnique({ where: { id: workerId } });
+      if (worker?.pushToken) {
+        await sendPushNotification(worker.pushToken, {
+          title: `New ${job.type} Job 🔔`,
+          body: `You've been assigned a job at ${prop.name}`,
+          data: { jobId: job.id },
+          sound: 'default',
+          priority: 'high',
+          channelId: 'jobs',
+        });
+      }
+    }
+
     return res.status(201).json(parseJob(job));
   } catch (err) {
     console.error(err);
@@ -198,6 +229,39 @@ router.post('/:id/claim', async (req: AuthRequest, res: Response) => {
       include: JOB_INCLUDE,
     });
     return res.json(parseJob(updated));
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/jobs/dispatch-workers?propertyId=xxx
+// Returns cleaners/caretakers assigned to a property so the frontend can determine:
+//   - 0 workers → only "Create job" available
+//   - 1 worker  → "Create and dispatch" auto-selects them (no picker needed)
+//   - 2+ workers → "Create and dispatch" shows a worker selector
+router.get('/dispatch-workers', async (req: AuthRequest, res: Response) => {
+  try {
+    if (!isHost(req)) return res.status(403).json({ error: 'Hosts only' });
+    const { propertyId } = req.query;
+    if (!propertyId) return res.status(400).json({ error: 'propertyId is required' });
+
+    const prop = await prisma.property.findFirst({
+      where: { id: propertyId as string, host: { userId: req.user!.id } },
+    });
+    if (!prop) return res.status(403).json({ error: 'Property not found or access denied' });
+
+    const staff = await prisma.propertyStaff.findMany({
+      where: { propertyId: propertyId as string, role: { in: ['CLEANER', 'CARETAKER'] } },
+      include: {
+        worker: {
+          include: { user: { select: { id: true, name: true, email: true, phone: true } } },
+        },
+      },
+      orderBy: { role: 'asc' }, // CLEANERs first
+    });
+
+    return res.json(staff.map((s) => ({ workerId: s.workerId, role: s.role, worker: s.worker })));
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Internal server error' });
