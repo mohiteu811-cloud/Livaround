@@ -7,6 +7,7 @@ import * as Notifications from 'expo-notifications';
 import { getToken, api } from '../src/lib/api';
 import { registerForPushNotifications } from '../src/lib/notifications';
 import { startLocationTracking } from '../src/lib/location';
+import { initLang } from '../src/lib/i18n';
 
 interface JobBanner {
   jobId: string;
@@ -21,7 +22,7 @@ export default function RootLayout() {
   const dismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    checkAuth();
+    initLang().then(() => checkAuth());
   }, []);
 
   useEffect(() => {

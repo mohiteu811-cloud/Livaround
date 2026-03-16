@@ -7,17 +7,21 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { api } from '../../../src/lib/api';
-
-const SEVERITIES = [
-  { value: 'LOW',    label: 'Low',    color: '#10b981', desc: 'Minor, non-urgent' },
-  { value: 'MEDIUM', label: 'Medium', color: '#f59e0b', desc: 'Needs attention soon' },
-  { value: 'HIGH',   label: 'High',   color: '#ef4444', desc: 'Urgent / safety issue' },
-] as const;
+import { useLang, t } from '../../../src/lib/i18n';
 
 type Severity = 'LOW' | 'MEDIUM' | 'HIGH';
 
 export default function ReportIssueScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const [lang] = useLang();
+  const tr = t(lang);
+
+  const SEVERITIES = [
+    { value: 'LOW' as Severity,    label: tr.low,    color: '#10b981', desc: tr.lowDesc },
+    { value: 'MEDIUM' as Severity, label: tr.medium, color: '#f59e0b', desc: tr.mediumDesc },
+    { value: 'HIGH' as Severity,   label: tr.high,   color: '#ef4444', desc: tr.highDesc },
+  ];
+
   const [description, setDescription] = useState('');
   const [severity, setSeverity] = useState<Severity>('MEDIUM');
   const [photo, setPhoto] = useState<{ uri: string; type: string } | null>(null);
@@ -28,7 +32,7 @@ export default function ReportIssueScreen() {
   async function requestPermission() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission required', 'Please allow access to media library in Settings.');
+      Alert.alert(tr.permissionRequired, tr.allowMediaAccess);
       return false;
     }
     return true;
@@ -50,7 +54,7 @@ export default function ReportIssueScreen() {
   async function recordVideo() {
     const camPerm = await ImagePicker.requestCameraPermissionsAsync();
     if (camPerm.status !== 'granted') {
-      Alert.alert('Permission required', 'Please allow camera access in Settings.');
+      Alert.alert(tr.permissionRequired, tr.allowCameraAccess);
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
@@ -78,7 +82,7 @@ export default function ReportIssueScreen() {
 
   async function handleSubmit() {
     if (!description.trim()) {
-      Alert.alert('Required', 'Please describe the issue.');
+      Alert.alert(tr.required, tr.describeIssue);
       return;
     }
     setLoading(true);
@@ -105,12 +109,12 @@ export default function ReportIssueScreen() {
         videoUrl,
       });
 
-      Alert.alert('Issue Reported', 'The host has been notified.', [
-        { text: 'OK', onPress: () => router.back() },
+      Alert.alert(tr.issueReported, tr.hostNotified, [
+        { text: tr.ok, onPress: () => router.back() },
       ]);
     } catch (err: any) {
       setUploading(false);
-      Alert.alert('Error', err.message);
+      Alert.alert(tr.errorTitle, err.message);
     } finally {
       setLoading(false);
     }
@@ -124,15 +128,15 @@ export default function ReportIssueScreen() {
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backText}>← Back</Text>
+          <Text style={styles.backText}>{tr.back}</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Report Issue</Text>
+        <Text style={styles.headerTitle}>{tr.reportIssueTitle}</Text>
         <View style={{ width: 60 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {/* Severity */}
-        <Text style={styles.label}>Severity</Text>
+        <Text style={styles.label}>{tr.severity}</Text>
         <View style={styles.severityRow}>
           {SEVERITIES.map(s => (
             <TouchableOpacity
@@ -152,12 +156,12 @@ export default function ReportIssueScreen() {
         </View>
 
         {/* Description */}
-        <Text style={styles.label}>Description</Text>
+        <Text style={styles.label}>{tr.description}</Text>
         <TextInput
           style={styles.textarea}
           value={description}
           onChangeText={setDescription}
-          placeholder="Describe the issue in detail..."
+          placeholder={tr.descriptionPlaceholder}
           placeholderTextColor="#475569"
           multiline
           numberOfLines={5}
@@ -165,7 +169,7 @@ export default function ReportIssueScreen() {
         />
 
         {/* Photo */}
-        <Text style={styles.label}>Photo</Text>
+        <Text style={styles.label}>{tr.photo}</Text>
         {photo ? (
           <View style={styles.mediaPreview}>
             <Image source={{ uri: photo.uri }} style={styles.imagePreview} resizeMode="cover" />
@@ -175,18 +179,18 @@ export default function ReportIssueScreen() {
           </View>
         ) : (
           <TouchableOpacity style={styles.mediaButton} onPress={pickPhoto}>
-            <Text style={styles.mediaButtonText}>📷 Take Photo</Text>
+            <Text style={styles.mediaButtonText}>{tr.takePhoto}</Text>
           </TouchableOpacity>
         )}
 
         {/* Video */}
-        <Text style={styles.label}>Video</Text>
+        <Text style={styles.label}>{tr.video}</Text>
         {video ? (
           <View style={styles.videoPreview}>
             <View style={styles.videoThumb}>
               <Text style={styles.videoIcon}>🎥</Text>
               <View>
-                <Text style={styles.videoLabel}>Video recorded</Text>
+                <Text style={styles.videoLabel}>{tr.videoRecorded}</Text>
                 {durationLabel && (
                   <Text style={styles.videoDuration}>{durationLabel}</Text>
                 )}
@@ -199,10 +203,10 @@ export default function ReportIssueScreen() {
         ) : (
           <View style={styles.videoButtons}>
             <TouchableOpacity style={[styles.mediaButton, { flex: 1 }]} onPress={recordVideo}>
-              <Text style={styles.mediaButtonText}>🎥 Record</Text>
+              <Text style={styles.mediaButtonText}>{tr.record}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.mediaButton, { flex: 1 }]} onPress={pickVideoFromLibrary}>
-              <Text style={styles.mediaButtonText}>📁 Library</Text>
+              <Text style={styles.mediaButtonText}>{tr.library}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -210,7 +214,7 @@ export default function ReportIssueScreen() {
         {uploading && (
           <View style={styles.uploadingBanner}>
             <ActivityIndicator color="#3b82f6" size="small" />
-            <Text style={styles.uploadingText}>Uploading video…</Text>
+            <Text style={styles.uploadingText}>{tr.uploadingMedia}</Text>
           </View>
         )}
 
@@ -221,7 +225,7 @@ export default function ReportIssueScreen() {
         >
           {loading || uploading
             ? <ActivityIndicator color="#fff" />
-            : <Text style={styles.submitText}>⚠️  Submit Issue Report</Text>
+            : <Text style={styles.submitText}>{tr.submitIssue}</Text>
           }
         </TouchableOpacity>
       </ScrollView>

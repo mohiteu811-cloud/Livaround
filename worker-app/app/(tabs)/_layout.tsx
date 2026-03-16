@@ -1,11 +1,15 @@
 import { Tabs } from 'expo-router';
-import { Text, Platform, Dimensions } from 'react-native';
+import { Text, Platform } from 'react-native';
+import { useLang, t } from '../../src/lib/i18n';
 
 function Icon({ emoji, focused }: { emoji: string; focused: boolean }) {
   return <Text style={{ fontSize: 22, opacity: focused ? 1 : 0.5 }}>{emoji}</Text>;
 }
 
 export default function TabsLayout() {
+  const [lang] = useLang();
+  const tr = t(lang);
+
   return (
     <Tabs
       screenOptions={{
@@ -25,14 +29,14 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Jobs',
+          title: tr.tabJobs,
           tabBarIcon: ({ focused }) => <Icon emoji="🔧" focused={focused} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
+          title: tr.tabProfile,
           tabBarIcon: ({ focused }) => <Icon emoji="👤" focused={focused} />,
         }}
       />

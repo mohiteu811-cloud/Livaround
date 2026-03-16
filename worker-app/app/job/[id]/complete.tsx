@@ -7,9 +7,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { api } from '../../../src/lib/api';
+import { useLang, t } from '../../../src/lib/i18n';
 
 export default function CompleteJobScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const [lang] = useLang();
+  const tr = t(lang);
   const [photo, setPhoto] = useState<{ uri: string; type: string } | null>(null);
   const [video, setVideo] = useState<{ uri: string; type: string; duration?: number } | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -18,7 +21,7 @@ export default function CompleteJobScreen() {
   async function requestPermission() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission required', 'Please allow access to media library in Settings.');
+      Alert.alert(tr.permissionRequired, tr.allowMediaAccess);
       return false;
     }
     return true;
@@ -40,7 +43,7 @@ export default function CompleteJobScreen() {
   async function recordVideo() {
     const camPerm = await ImagePicker.requestCameraPermissionsAsync();
     if (camPerm.status !== 'granted') {
-      Alert.alert('Permission required', 'Please allow camera access in Settings.');
+      Alert.alert(tr.permissionRequired, tr.allowCameraAccess);
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
@@ -86,12 +89,12 @@ export default function CompleteJobScreen() {
 
       await api.jobs.complete(id, { completionPhotoUrl, completionVideoUrl });
 
-      Alert.alert('✅ Job Complete!', 'Great work! The job has been marked as completed.', [
-        { text: 'Back to Jobs', onPress: () => router.replace('/(tabs)') },
+      Alert.alert(tr.jobComplete, tr.greatWork, [
+        { text: tr.backToJobs, onPress: () => router.replace('/(tabs)') },
       ]);
     } catch (err: any) {
       setUploading(false);
-      Alert.alert('Error', err.message);
+      Alert.alert(tr.errorTitle, err.message);
     } finally {
       setLoading(false);
     }
@@ -103,19 +106,17 @@ export default function CompleteJobScreen() {
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backText}>← Back</Text>
+          <Text style={styles.backText}>{tr.back}</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Complete Job</Text>
+        <Text style={styles.headerTitle}>{tr.completeJob}</Text>
         <View style={{ width: 60 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.hint}>
-          Add photos or videos of the completed work before submitting.
-        </Text>
+        <Text style={styles.hint}>{tr.completionHint}</Text>
 
         {/* Photo */}
-        <Text style={styles.label}>Photo</Text>
+        <Text style={styles.label}>{tr.photo}</Text>
         {photo ? (
           <View style={styles.mediaPreview}>
             <Image source={{ uri: photo.uri }} style={styles.imagePreview} resizeMode="cover" />
@@ -125,18 +126,18 @@ export default function CompleteJobScreen() {
           </View>
         ) : (
           <TouchableOpacity style={styles.mediaButton} onPress={pickPhoto}>
-            <Text style={styles.mediaButtonText}>📷 Take Photo</Text>
+            <Text style={styles.mediaButtonText}>{tr.takePhoto}</Text>
           </TouchableOpacity>
         )}
 
         {/* Video */}
-        <Text style={styles.label}>Video</Text>
+        <Text style={styles.label}>{tr.video}</Text>
         {video ? (
           <View style={styles.videoPreview}>
             <View style={styles.videoThumb}>
               <Text style={styles.videoIcon}>🎥</Text>
               <View>
-                <Text style={styles.videoLabel}>Video recorded</Text>
+                <Text style={styles.videoLabel}>{tr.videoRecorded}</Text>
                 {durationLabel && (
                   <Text style={styles.videoDuration}>{durationLabel}</Text>
                 )}
@@ -149,10 +150,10 @@ export default function CompleteJobScreen() {
         ) : (
           <View style={styles.videoButtons}>
             <TouchableOpacity style={[styles.mediaButton, { flex: 1 }]} onPress={recordVideo}>
-              <Text style={styles.mediaButtonText}>🎥 Record</Text>
+              <Text style={styles.mediaButtonText}>{tr.record}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.mediaButton, { flex: 1 }]} onPress={pickVideoFromLibrary}>
-              <Text style={styles.mediaButtonText}>📁 Library</Text>
+              <Text style={styles.mediaButtonText}>{tr.library}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -160,7 +161,7 @@ export default function CompleteJobScreen() {
         {uploading && (
           <View style={styles.uploadingBanner}>
             <ActivityIndicator color="#3b82f6" size="small" />
-            <Text style={styles.uploadingText}>Uploading media…</Text>
+            <Text style={styles.uploadingText}>{tr.uploadingMedia}</Text>
           </View>
         )}
 
@@ -171,7 +172,7 @@ export default function CompleteJobScreen() {
         >
           {loading || uploading
             ? <ActivityIndicator color="#fff" />
-            : <Text style={styles.submitText}>✅  Mark Complete</Text>
+            : <Text style={styles.submitText}>{tr.markCompleteBtn}</Text>
           }
         </TouchableOpacity>
       </ScrollView>
