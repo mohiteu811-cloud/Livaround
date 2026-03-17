@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Alert,
+  ActivityIndicator, Alert, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 import { api, Job } from '../../src/lib/api';
 
 const STATUS_COLOR: Record<string, string> = {
@@ -35,6 +36,9 @@ export default function JobDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [checklist, setChecklist] = useState<{ item: string; done: boolean }[]>([]);
+  const [completionPhoto, setCompletionPhoto] = useState<{ uri: string; type: string } | null>(null);
+  const [completionVideo, setCompletionVideo] = useState<{ uri: string; type: string; duration?: number } | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     loadJob();
@@ -77,17 +81,84 @@ export default function JobDetailScreen() {
     doAction(action);
   }
 
+  async function takeCompletionPhoto() {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission required', 'Please allow camera access in Settings.');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images'],
+      quality: 0.8,
+      allowsEditing: false,
+    });
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      setCompletionPhoto({ uri: asset.uri, type: asset.mimeType ?? 'image/jpeg' });
+    }
+  }
+
+  async function recordCompletionVideo() {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission required', 'Please allow camera access in Settings.');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['videos'],
+      videoMaxDuration: 60,
+      allowsEditing: false,
+    });
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      setCompletionVideo({ uri: asset.uri, type: asset.mimeType ?? 'video/mp4', duration: asset.duration ?? undefined });
+    }
+  }
+
+  async function pickCompletionVideoFromLibrary() {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission required', 'Please allow access to media library in Settings.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['videos'],
+      allowsEditing: false,
+    });
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      setCompletionVideo({ uri: asset.uri, type: asset.mimeType ?? 'video/mp4', duration: asset.duration ?? undefined });
+    }
+  }
+
   async function doAction(action: 'accept' | 'start' | 'complete') {
     setActionLoading(true);
     try {
-      const updated = await api.jobs[action](id);
-      setJob(updated);
       if (action === 'complete') {
+        let completionPhotoUrl: string | undefined;
+        let completionVideoUrl: string | undefined;
+        if (completionPhoto) {
+          setUploading(true);
+          const res = await api.upload.file(completionPhoto.uri, completionPhoto.type);
+          completionPhotoUrl = res.url;
+        }
+        if (completionVideo) {
+          setUploading(true);
+          const res = await api.upload.file(completionVideo.uri, completionVideo.type);
+          completionVideoUrl = res.url;
+        }
+        setUploading(false);
+        const updated = await api.jobs.complete(id, { completionPhotoUrl, completionVideoUrl });
+        setJob(updated);
         Alert.alert('✅ Job Complete!', 'Great work! The job has been marked as completed.', [
           { text: 'Back to Jobs', onPress: () => router.replace('/(tabs)') },
         ]);
+      } else {
+        const updated = await api.jobs[action](id);
+        setJob(updated);
       }
     } catch (err: any) {
+      setUploading(false);
       Alert.alert('Error', err.message);
     } finally {
       setActionLoading(false);
@@ -219,12 +290,68 @@ export default function JobDetailScreen() {
               />
             )}
             {job.status === 'IN_PROGRESS' && (
-              <ActionButton
-                label="Mark Complete ✅"
-                color="#10b981"
-                loading={actionLoading}
-                onPress={() => handleAction('complete')}
-              />
+              <>
+                {/* Completion Media */}
+                <View style={styles.mediaSection}>
+                  <Text style={styles.mediaSectionTitle}>Completion Evidence</Text>
+                  <Text style={styles.mediaSectionHint}>Take a photo or video before marking complete</Text>
+
+                  {/* Photo */}
+                  {completionPhoto ? (
+                    <View style={styles.mediaPreview}>
+                      <Image source={{ uri: completionPhoto.uri }} style={styles.imagePreview} resizeMode="cover" />
+                      <TouchableOpacity style={styles.removeMedia} onPress={() => setCompletionPhoto(null)}>
+                        <Text style={styles.removeMediaText}>✕</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <TouchableOpacity style={styles.mediaCapture} onPress={takeCompletionPhoto}>
+                      <Text style={styles.mediaCaptureText}>📷 Take Photo</Text>
+                    </TouchableOpacity>
+                  )}
+
+                  {/* Video */}
+                  {completionVideo ? (
+                    <View style={styles.videoInfo}>
+                      <View style={styles.videoInfoLeft}>
+                        <Text style={styles.videoIcon}>🎥</Text>
+                        <View>
+                          <Text style={styles.videoLabel}>Video recorded</Text>
+                          {completionVideo.duration != null && (
+                            <Text style={styles.videoDuration}>{Math.round(completionVideo.duration)}s</Text>
+                          )}
+                        </View>
+                      </View>
+                      <TouchableOpacity style={styles.removeMedia} onPress={() => setCompletionVideo(null)}>
+                        <Text style={styles.removeMediaText}>✕</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View style={styles.videoButtons}>
+                      <TouchableOpacity style={[styles.mediaCapture, { flex: 1 }]} onPress={recordCompletionVideo}>
+                        <Text style={styles.mediaCaptureText}>🎥 Record</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={[styles.mediaCapture, { flex: 1 }]} onPress={pickCompletionVideoFromLibrary}>
+                        <Text style={styles.mediaCaptureText}>📁 Library</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+
+                {uploading && (
+                  <View style={styles.uploadingBanner}>
+                    <ActivityIndicator color="#3b82f6" size="small" />
+                    <Text style={styles.uploadingText}>Uploading media…</Text>
+                  </View>
+                )}
+
+                <ActionButton
+                  label="Mark Complete ✅"
+                  color="#10b981"
+                  loading={actionLoading}
+                  onPress={() => handleAction('complete')}
+                />
+              </>
             )}
             {(job.status === 'ACCEPTED' || job.status === 'IN_PROGRESS') && (
               <TouchableOpacity
@@ -328,4 +455,37 @@ const styles = StyleSheet.create({
     backgroundColor: '#1e293b', borderWidth: 1, borderColor: '#ef4444',
   },
   issueButtonText: { color: '#ef4444', fontSize: 15, fontWeight: '600' },
+  mediaSection: {
+    backgroundColor: '#1e293b', borderRadius: 16, padding: 16,
+    borderWidth: 1, borderColor: '#334155', gap: 10,
+  },
+  mediaSectionTitle: { fontSize: 16, fontWeight: '700', color: '#f8fafc' },
+  mediaSectionHint: { fontSize: 13, color: '#64748b' },
+  mediaCapture: {
+    backgroundColor: '#0f172a', borderWidth: 1.5, borderColor: '#334155',
+    borderStyle: 'dashed', borderRadius: 12, paddingVertical: 18, alignItems: 'center',
+  },
+  mediaCaptureText: { color: '#94a3b8', fontSize: 15, fontWeight: '600' },
+  mediaPreview: { position: 'relative' },
+  imagePreview: { width: '100%', height: 200, borderRadius: 12, backgroundColor: '#0f172a' },
+  removeMedia: {
+    position: 'absolute', top: 8, right: 8, backgroundColor: '#334155',
+    borderRadius: 20, width: 28, height: 28, alignItems: 'center', justifyContent: 'center',
+  },
+  removeMediaText: { color: '#f8fafc', fontSize: 13, fontWeight: '700' },
+  videoButtons: { flexDirection: 'row', gap: 10 },
+  videoInfo: {
+    backgroundColor: '#0f172a', borderWidth: 1, borderColor: '#334155',
+    borderRadius: 12, padding: 14, flexDirection: 'row',
+    alignItems: 'center', justifyContent: 'space-between',
+  },
+  videoInfoLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  videoIcon: { fontSize: 32 },
+  videoLabel: { color: '#f8fafc', fontSize: 14, fontWeight: '600' },
+  videoDuration: { color: '#64748b', fontSize: 12, marginTop: 2 },
+  uploadingBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: '#1e3a5f', borderRadius: 12, padding: 14,
+  },
+  uploadingText: { color: '#93c5fd', fontSize: 14, fontWeight: '600' },
 });

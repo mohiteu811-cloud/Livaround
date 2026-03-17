@@ -315,9 +315,15 @@ router.post('/:id/complete', async (req: AuthRequest, res: Response) => {
       workerId = job.workerId ?? null;
     }
 
+    const { completionPhotoUrl, completionVideoUrl } = req.body ?? {};
     const updated = await prisma.job.update({
       where: { id: req.params.id },
-      data: { status: 'COMPLETED', completedAt: new Date() },
+      data: {
+        status: 'COMPLETED',
+        completedAt: new Date(),
+        completionPhotoUrl: completionPhotoUrl ?? null,
+        completionVideoUrl: completionVideoUrl ?? null,
+      },
       include: JOB_INCLUDE,
     });
 
