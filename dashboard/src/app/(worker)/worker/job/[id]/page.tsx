@@ -48,20 +48,18 @@ export default function WorkerJobDetailPage() {
     setChecklist(prev => prev.map((c, idx) => idx === i ? { ...c, done: !c.done } : c));
   }
 
-  async function doAction(action: 'accept' | 'start' | 'complete') {
-    if (action === 'complete') {
-      const undone = checklist.filter(c => !c.done).length;
-      if (undone > 0 && !confirm(tr.incompleteItems(undone))) return;
-    }
+  function handleComplete() {
+    const undone = checklist.filter(c => !c.done).length;
+    if (undone > 0 && !confirm(tr.incompleteItems(undone))) return;
+    router.push(`/worker/job/${id}/complete`);
+  }
+
+  async function doAction(action: 'accept' | 'start') {
     setActionLoading(true);
     setError('');
     try {
       const updated = await api.jobs[action](id);
       setJob(updated);
-      if (action === 'complete') {
-        alert('✅ ' + (lang === 'hi' ? 'काम पूरा हुआ! शाबाश।' : 'Job marked complete! Great work.'));
-        router.push('/worker/jobs');
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
@@ -171,7 +169,7 @@ export default function WorkerJobDetailPage() {
               <ActionBtn label={tr.startJob} color="bg-purple-600 hover:bg-purple-500" loading={actionLoading} onClick={() => doAction('start')} />
             )}
             {job.status === 'IN_PROGRESS' && (
-              <ActionBtn label={tr.markComplete} color="bg-emerald-600 hover:bg-emerald-500" loading={actionLoading} onClick={() => doAction('complete')} />
+              <ActionBtn label={tr.markComplete} color="bg-emerald-600 hover:bg-emerald-500" loading={false} onClick={handleComplete} />
             )}
             {(job.status === 'ACCEPTED' || job.status === 'IN_PROGRESS') && (
               <button

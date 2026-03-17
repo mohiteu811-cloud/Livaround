@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
+  View, Text, TouchableOpacity, StyleSheet,
   ActivityIndicator, Alert, ScrollView, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,21 +9,10 @@ import * as ImagePicker from 'expo-image-picker';
 import { api } from '../../../src/lib/api';
 import { useLang, t } from '../../../src/lib/i18n';
 
-type Severity = 'LOW' | 'MEDIUM' | 'HIGH';
-
-export default function ReportIssueScreen() {
+export default function CompleteJobScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [lang] = useLang();
   const tr = t(lang);
-
-  const SEVERITIES = [
-    { value: 'LOW' as Severity,    label: tr.low,    color: '#10b981', desc: tr.lowDesc },
-    { value: 'MEDIUM' as Severity, label: tr.medium, color: '#f59e0b', desc: tr.mediumDesc },
-    { value: 'HIGH' as Severity,   label: tr.high,   color: '#ef4444', desc: tr.highDesc },
-  ];
-
-  const [description, setDescription] = useState('');
-  const [severity, setSeverity] = useState<Severity>('MEDIUM');
   const [photo, setPhoto] = useState<{ uri: string; type: string } | null>(null);
   const [video, setVideo] = useState<{ uri: string; type: string; duration?: number } | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -81,36 +70,27 @@ export default function ReportIssueScreen() {
   }
 
   async function handleSubmit() {
-    if (!description.trim()) {
-      Alert.alert(tr.required, tr.describeIssue);
-      return;
-    }
     setLoading(true);
     try {
-      let photoUrl: string | undefined;
-      let videoUrl: string | undefined;
+      let completionPhotoUrl: string | undefined;
+      let completionVideoUrl: string | undefined;
 
       if (photo) {
         setUploading(true);
         const result = await api.upload.file(photo.uri, photo.type);
-        photoUrl = result.url;
+        completionPhotoUrl = result.url;
       }
       if (video) {
         setUploading(true);
         const result = await api.upload.file(video.uri, video.type);
-        videoUrl = result.url;
+        completionVideoUrl = result.url;
       }
       setUploading(false);
 
-      await api.jobs.reportIssue(id, {
-        description: description.trim(),
-        severity,
-        photoUrl,
-        videoUrl,
-      });
+      await api.jobs.complete(id, { completionPhotoUrl, completionVideoUrl });
 
-      Alert.alert(tr.issueReported, tr.hostNotified, [
-        { text: tr.ok, onPress: () => router.back() },
+      Alert.alert(tr.jobComplete, tr.greatWork, [
+        { text: tr.backToJobs, onPress: () => router.replace('/(tabs)') },
       ]);
     } catch (err: any) {
       setUploading(false);
@@ -120,9 +100,7 @@ export default function ReportIssueScreen() {
     }
   }
 
-  const durationLabel = video?.duration
-    ? `${Math.round(video.duration)}s`
-    : null;
+  const durationLabel = video?.duration ? `${Math.round(video.duration)}s` : null;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -130,43 +108,12 @@ export default function ReportIssueScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Text style={styles.backText}>{tr.back}</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{tr.reportIssueTitle}</Text>
+        <Text style={styles.headerTitle}>{tr.completeJob}</Text>
         <View style={{ width: 60 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        {/* Severity */}
-        <Text style={styles.label}>{tr.severity}</Text>
-        <View style={styles.severityRow}>
-          {SEVERITIES.map(s => (
-            <TouchableOpacity
-              key={s.value}
-              style={[
-                styles.severityOption,
-                severity === s.value && { borderColor: s.color, backgroundColor: s.color + '18' },
-              ]}
-              onPress={() => setSeverity(s.value)}
-            >
-              <Text style={[styles.severityLabel, severity === s.value && { color: s.color }]}>
-                {s.label}
-              </Text>
-              <Text style={styles.severityDesc}>{s.desc}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Description */}
-        <Text style={styles.label}>{tr.description}</Text>
-        <TextInput
-          style={styles.textarea}
-          value={description}
-          onChangeText={setDescription}
-          placeholder={tr.descriptionPlaceholder}
-          placeholderTextColor="#475569"
-          multiline
-          numberOfLines={5}
-          textAlignVertical="top"
-        />
+        <Text style={styles.hint}>{tr.completionHint}</Text>
 
         {/* Photo */}
         <Text style={styles.label}>{tr.photo}</Text>
@@ -225,7 +172,7 @@ export default function ReportIssueScreen() {
         >
           {loading || uploading
             ? <ActivityIndicator color="#fff" />
-            : <Text style={styles.submitText}>{tr.submitIssue}</Text>
+            : <Text style={styles.submitText}>{tr.markCompleteBtn}</Text>
           }
         </TouchableOpacity>
       </ScrollView>
@@ -236,35 +183,21 @@ export default function ReportIssueScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0f172a' },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 20, paddingVertical: 12,
   },
   backButton: { paddingVertical: 8 },
   backText: { color: '#3b82f6', fontSize: 16, fontWeight: '600' },
   headerTitle: { fontSize: 18, fontWeight: '700', color: '#f8fafc' },
   content: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 40, gap: 12 },
+  hint: { fontSize: 14, color: '#94a3b8', lineHeight: 20 },
   label: {
     fontSize: 13, color: '#94a3b8', fontWeight: '600',
     textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 8,
   },
-  severityRow: { gap: 10 },
-  severityOption: {
-    borderWidth: 1.5, borderColor: '#334155',
-    borderRadius: 12, padding: 14, backgroundColor: '#1e293b',
-  },
-  severityLabel: { fontSize: 15, fontWeight: '700', color: '#94a3b8' },
-  severityDesc: { fontSize: 12, color: '#64748b', marginTop: 2 },
-  textarea: {
-    backgroundColor: '#1e293b', borderWidth: 1, borderColor: '#334155',
-    borderRadius: 12, padding: 14, color: '#f8fafc', fontSize: 15, minHeight: 130,
-  },
   mediaButton: {
     backgroundColor: '#1e293b', borderWidth: 1.5, borderColor: '#334155',
-    borderStyle: 'dashed', borderRadius: 12, paddingVertical: 18,
-    alignItems: 'center',
+    borderStyle: 'dashed', borderRadius: 12, paddingVertical: 18, alignItems: 'center',
   },
   mediaButtonText: { color: '#94a3b8', fontSize: 15, fontWeight: '600' },
   mediaPreview: { position: 'relative' },
@@ -290,7 +223,7 @@ const styles = StyleSheet.create({
   },
   uploadingText: { color: '#93c5fd', fontSize: 14, fontWeight: '600' },
   submitButton: {
-    backgroundColor: '#ef4444', borderRadius: 14,
+    backgroundColor: '#10b981', borderRadius: 14,
     paddingVertical: 16, alignItems: 'center', marginTop: 12,
   },
   submitDisabled: { opacity: 0.6 },

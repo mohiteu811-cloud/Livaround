@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Alert, Image,
+  ActivityIndicator, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
-import * as ImagePicker from 'expo-image-picker';
 import { api, Job } from '../../src/lib/api';
+import { useLang, t } from '../../src/lib/i18n';
 
 const STATUS_COLOR: Record<string, string> = {
   DISPATCHED: '#f59e0b',
@@ -32,14 +32,12 @@ function formatDate(iso: string) {
 
 export default function JobDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const [lang] = useLang();
+  const tr = t(lang);
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [checklist, setChecklist] = useState<{ item: string; done: boolean }[]>([]);
-  const [completionPhoto, setCompletionPhoto] = useState<{ uri: string; type: string } | null>(null);
-  const [completionVideo, setCompletionVideo] = useState<{ uri: string; type: string; duration?: number } | null>(null);
-  const [uploading, setUploading] = useState(false);
-
   useEffect(() => {
     loadJob();
   }, [id]);
@@ -50,7 +48,7 @@ export default function JobDetailScreen() {
       setJob(data);
       setChecklist(data.checklist ?? []);
     } catch (err: any) {
-      Alert.alert('Error', err.message);
+      Alert.alert(tr.errorTitle, err.message);
       router.back();
     } finally {
       setLoading(false);
@@ -63,103 +61,29 @@ export default function JobDetailScreen() {
     );
   }
 
-  async function handleAction(action: 'accept' | 'start' | 'complete') {
-    if (action === 'complete') {
-      const undone = checklist.filter(c => !c.done);
-      if (undone.length > 0) {
-        Alert.alert(
-          'Incomplete Checklist',
-          `${undone.length} item(s) not checked off. Complete anyway?`,
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Complete', style: 'destructive', onPress: () => doAction(action) },
-          ]
-        );
-        return;
-      }
-    }
-    doAction(action);
-  }
-
-  async function takeCompletionPhoto() {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission required', 'Please allow camera access in Settings.');
+  function handleComplete() {
+    const undone = checklist.filter(c => !c.done);
+    if (undone.length > 0) {
+      Alert.alert(
+        tr.incompleteChecklist,
+        tr.incompleteItems(undone.length),
+        [
+          { text: tr.cancel, style: 'cancel' },
+          { text: tr.complete, style: 'destructive', onPress: () => router.push(`/job/${id}/complete`) },
+        ]
+      );
       return;
     }
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ['images'],
-      quality: 0.8,
-      allowsEditing: false,
-    });
-    if (!result.canceled && result.assets[0]) {
-      const asset = result.assets[0];
-      setCompletionPhoto({ uri: asset.uri, type: asset.mimeType ?? 'image/jpeg' });
-    }
+    router.push(`/job/${id}/complete`);
   }
 
-  async function recordCompletionVideo() {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission required', 'Please allow camera access in Settings.');
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ['videos'],
-      videoMaxDuration: 60,
-      allowsEditing: false,
-    });
-    if (!result.canceled && result.assets[0]) {
-      const asset = result.assets[0];
-      setCompletionVideo({ uri: asset.uri, type: asset.mimeType ?? 'video/mp4', duration: asset.duration ?? undefined });
-    }
-  }
-
-  async function pickCompletionVideoFromLibrary() {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission required', 'Please allow access to media library in Settings.');
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['videos'],
-      allowsEditing: false,
-    });
-    if (!result.canceled && result.assets[0]) {
-      const asset = result.assets[0];
-      setCompletionVideo({ uri: asset.uri, type: asset.mimeType ?? 'video/mp4', duration: asset.duration ?? undefined });
-    }
-  }
-
-  async function doAction(action: 'accept' | 'start' | 'complete') {
+  async function doAction(action: 'accept' | 'start') {
     setActionLoading(true);
     try {
-      if (action === 'complete') {
-        let completionPhotoUrl: string | undefined;
-        let completionVideoUrl: string | undefined;
-        if (completionPhoto) {
-          setUploading(true);
-          const res = await api.upload.file(completionPhoto.uri, completionPhoto.type);
-          completionPhotoUrl = res.url;
-        }
-        if (completionVideo) {
-          setUploading(true);
-          const res = await api.upload.file(completionVideo.uri, completionVideo.type);
-          completionVideoUrl = res.url;
-        }
-        setUploading(false);
-        const updated = await api.jobs.complete(id, { completionPhotoUrl, completionVideoUrl });
-        setJob(updated);
-        Alert.alert('✅ Job Complete!', 'Great work! The job has been marked as completed.', [
-          { text: 'Back to Jobs', onPress: () => router.replace('/(tabs)') },
-        ]);
-      } else {
-        const updated = await api.jobs[action](id);
-        setJob(updated);
-      }
+      const updated = await api.jobs[action](id);
+      setJob(updated);
     } catch (err: any) {
-      setUploading(false);
-      Alert.alert('Error', err.message);
+      Alert.alert(tr.errorTitle, err.message);
     } finally {
       setActionLoading(false);
     }
@@ -183,7 +107,7 @@ export default function JobDetailScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backText}>← Back</Text>
+          <Text style={styles.backText}>{tr.back}</Text>
         </TouchableOpacity>
         <View style={[styles.statusBadge, { backgroundColor: color + '22', borderColor: color }]}>
           <Text style={[styles.statusText, { color }]}>{job.status.replace('_', ' ')}</Text>
@@ -203,33 +127,33 @@ export default function JobDetailScreen() {
 
         {/* Details */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Details</Text>
-          <InfoRow icon="📅" label="Scheduled" value={formatDate(job.scheduledAt)} />
+          <Text style={styles.sectionTitle}>{tr.details}</Text>
+          <InfoRow icon="📅" label={tr.scheduled} value={formatDate(job.scheduledAt)} />
           {job.booking && (
             <>
-              <InfoRow icon="👤" label="Guest" value={job.booking.guestName} />
-              <InfoRow icon="🗓" label="Check-in" value={formatDate(job.booking.checkIn)} />
-              <InfoRow icon="🗓" label="Check-out" value={formatDate(job.booking.checkOut)} />
+              <InfoRow icon="👤" label={tr.guest} value={job.booking.guestName} />
+              <InfoRow icon="🗓" label={tr.checkIn} value={formatDate(job.booking.checkIn)} />
+              <InfoRow icon="🗓" label={tr.checkOut} value={formatDate(job.booking.checkOut)} />
             </>
           )}
-          {job.notes && <InfoRow icon="📝" label="Notes" value={job.notes} />}
+          {job.notes && <InfoRow icon="📝" label={tr.notes} value={job.notes} />}
         </View>
 
         {/* Property Briefing — shown once accepted */}
         {job.property && ['ACCEPTED', 'IN_PROGRESS', 'COMPLETED'].includes(job.status) && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Property Briefing</Text>
+            <Text style={styles.sectionTitle}>{tr.propertyBriefing}</Text>
             {job.property.address && (
-              <InfoRow icon="📍" label="Address" value={job.property.address} />
+              <InfoRow icon="📍" label={tr.address} value={job.property.address} />
             )}
             {job.property.wifiName && (
-              <InfoRow icon="📶" label="Wi-Fi Network" value={job.property.wifiName} />
+              <InfoRow icon="📶" label={tr.wifiNetwork} value={job.property.wifiName} />
             )}
             {job.property.wifiPassword && (
-              <InfoRow icon="🔑" label="Wi-Fi Password" value={job.property.wifiPassword} />
+              <InfoRow icon="🔑" label={tr.wifiPassword} value={job.property.wifiPassword} />
             )}
             {job.property.lockCode && (
-              <InfoRow icon="🚪" label="Door Code" value={job.property.lockCode} />
+              <InfoRow icon="🚪" label={tr.doorCode} value={job.property.lockCode} />
             )}
           </View>
         )}
@@ -238,7 +162,7 @@ export default function JobDetailScreen() {
         {checklist.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Checklist</Text>
+              <Text style={styles.sectionTitle}>{tr.checklist}</Text>
               <Text style={styles.checklistProgress}>
                 {checklistDone}/{checklist.length}
               </Text>
@@ -275,90 +199,34 @@ export default function JobDetailScreen() {
           <View style={styles.actionsSection}>
             {job.status === 'DISPATCHED' && (
               <ActionButton
-                label="Accept Job"
+                label={tr.acceptJob}
                 color="#3b82f6"
                 loading={actionLoading}
-                onPress={() => handleAction('accept')}
+                onPress={() => doAction('accept')}
               />
             )}
             {job.status === 'ACCEPTED' && (
               <ActionButton
-                label="Start Job"
+                label={tr.startJob}
                 color="#8b5cf6"
                 loading={actionLoading}
-                onPress={() => handleAction('start')}
+                onPress={() => doAction('start')}
               />
             )}
             {job.status === 'IN_PROGRESS' && (
-              <>
-                {/* Completion Media */}
-                <View style={styles.mediaSection}>
-                  <Text style={styles.mediaSectionTitle}>Completion Evidence</Text>
-                  <Text style={styles.mediaSectionHint}>Take a photo or video before marking complete</Text>
-
-                  {/* Photo */}
-                  {completionPhoto ? (
-                    <View style={styles.mediaPreview}>
-                      <Image source={{ uri: completionPhoto.uri }} style={styles.imagePreview} resizeMode="cover" />
-                      <TouchableOpacity style={styles.removeMedia} onPress={() => setCompletionPhoto(null)}>
-                        <Text style={styles.removeMediaText}>✕</Text>
-                      </TouchableOpacity>
-                    </View>
-                  ) : (
-                    <TouchableOpacity style={styles.mediaCapture} onPress={takeCompletionPhoto}>
-                      <Text style={styles.mediaCaptureText}>📷 Take Photo</Text>
-                    </TouchableOpacity>
-                  )}
-
-                  {/* Video */}
-                  {completionVideo ? (
-                    <View style={styles.videoInfo}>
-                      <View style={styles.videoInfoLeft}>
-                        <Text style={styles.videoIcon}>🎥</Text>
-                        <View>
-                          <Text style={styles.videoLabel}>Video recorded</Text>
-                          {completionVideo.duration != null && (
-                            <Text style={styles.videoDuration}>{Math.round(completionVideo.duration)}s</Text>
-                          )}
-                        </View>
-                      </View>
-                      <TouchableOpacity style={styles.removeMedia} onPress={() => setCompletionVideo(null)}>
-                        <Text style={styles.removeMediaText}>✕</Text>
-                      </TouchableOpacity>
-                    </View>
-                  ) : (
-                    <View style={styles.videoButtons}>
-                      <TouchableOpacity style={[styles.mediaCapture, { flex: 1 }]} onPress={recordCompletionVideo}>
-                        <Text style={styles.mediaCaptureText}>🎥 Record</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={[styles.mediaCapture, { flex: 1 }]} onPress={pickCompletionVideoFromLibrary}>
-                        <Text style={styles.mediaCaptureText}>📁 Library</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-                </View>
-
-                {uploading && (
-                  <View style={styles.uploadingBanner}>
-                    <ActivityIndicator color="#3b82f6" size="small" />
-                    <Text style={styles.uploadingText}>Uploading media…</Text>
-                  </View>
-                )}
-
-                <ActionButton
-                  label="Mark Complete ✅"
-                  color="#10b981"
-                  loading={actionLoading}
-                  onPress={() => handleAction('complete')}
-                />
-              </>
+              <ActionButton
+                label={tr.markComplete}
+                color="#10b981"
+                loading={false}
+                onPress={handleComplete}
+              />
             )}
             {(job.status === 'ACCEPTED' || job.status === 'IN_PROGRESS') && (
               <TouchableOpacity
                 style={styles.issueButton}
                 onPress={() => router.push(`/job/${id}/issue`)}
               >
-                <Text style={styles.issueButtonText}>⚠️ Report an Issue</Text>
+                <Text style={styles.issueButtonText}>{tr.reportIssue}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -455,37 +323,4 @@ const styles = StyleSheet.create({
     backgroundColor: '#1e293b', borderWidth: 1, borderColor: '#ef4444',
   },
   issueButtonText: { color: '#ef4444', fontSize: 15, fontWeight: '600' },
-  mediaSection: {
-    backgroundColor: '#1e293b', borderRadius: 16, padding: 16,
-    borderWidth: 1, borderColor: '#334155', gap: 10,
-  },
-  mediaSectionTitle: { fontSize: 16, fontWeight: '700', color: '#f8fafc' },
-  mediaSectionHint: { fontSize: 13, color: '#64748b' },
-  mediaCapture: {
-    backgroundColor: '#0f172a', borderWidth: 1.5, borderColor: '#334155',
-    borderStyle: 'dashed', borderRadius: 12, paddingVertical: 18, alignItems: 'center',
-  },
-  mediaCaptureText: { color: '#94a3b8', fontSize: 15, fontWeight: '600' },
-  mediaPreview: { position: 'relative' },
-  imagePreview: { width: '100%', height: 200, borderRadius: 12, backgroundColor: '#0f172a' },
-  removeMedia: {
-    position: 'absolute', top: 8, right: 8, backgroundColor: '#334155',
-    borderRadius: 20, width: 28, height: 28, alignItems: 'center', justifyContent: 'center',
-  },
-  removeMediaText: { color: '#f8fafc', fontSize: 13, fontWeight: '700' },
-  videoButtons: { flexDirection: 'row', gap: 10 },
-  videoInfo: {
-    backgroundColor: '#0f172a', borderWidth: 1, borderColor: '#334155',
-    borderRadius: 12, padding: 14, flexDirection: 'row',
-    alignItems: 'center', justifyContent: 'space-between',
-  },
-  videoInfoLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  videoIcon: { fontSize: 32 },
-  videoLabel: { color: '#f8fafc', fontSize: 14, fontWeight: '600' },
-  videoDuration: { color: '#64748b', fontSize: 12, marginTop: 2 },
-  uploadingBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: '#1e3a5f', borderRadius: 12, padding: 14,
-  },
-  uploadingText: { color: '#93c5fd', fontSize: 14, fontWeight: '600' },
 });
