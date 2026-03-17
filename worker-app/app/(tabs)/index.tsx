@@ -4,7 +4,7 @@ import {
   RefreshControl, ActivityIndicator, Platform, StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { api, User, Job } from '../../src/lib/api';
 
 const TABS = ['My Jobs', 'Available'] as const;
@@ -72,6 +72,12 @@ export default function JobsScreen() {
   useEffect(() => {
     if (user) loadJobs();
   }, [user, activeTab]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (user) loadJobs();
+    }, [user, activeTab])
+  );
 
   async function loadUser() {
     try {
