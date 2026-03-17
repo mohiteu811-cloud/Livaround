@@ -38,7 +38,6 @@ export default function JobDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [checklist, setChecklist] = useState<{ item: string; done: boolean }[]>([]);
-
   useEffect(() => {
     loadJob();
   }, [id]);

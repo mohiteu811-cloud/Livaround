@@ -65,6 +65,8 @@ export interface Job {
   status: 'PENDING' | 'DISPATCHED' | 'ACCEPTED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
   scheduledAt: string;
   completedAt?: string;
+  completionPhotoUrl?: string;
+  completionVideoUrl?: string;
   notes?: string;
   checklist?: { item: string; done: boolean }[];
   createdAt: string;
