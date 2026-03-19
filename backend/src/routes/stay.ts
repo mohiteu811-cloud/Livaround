@@ -336,7 +336,7 @@ router.get('/:code/cleaner-slots', async (req: Request, res: Response) => {
 // ── POST /api/stay/:code/service-request ─────────────────────────────────────
 
 const serviceRequestSchema = z.object({
-  type: z.enum(['HOUSEKEEPING', 'COOK', 'DRIVER', 'CAR_RENTAL', 'ARRIVAL_TIME', 'DEPARTURE_TIME', 'OTHER']),
+  type: z.enum(['HOUSEKEEPING', 'COOK', 'DRIVER', 'CAR_RENTAL', 'ARRIVAL_TIME', 'EARLY_CHECK_IN', 'DEPARTURE_TIME', 'OTHER']),
   requestedDate: z.string().optional(),   // "YYYY-MM-DD"
   requestedTime: z.string().optional(),   // "HH:MM"
   notes: z.string().optional(),

@@ -24,7 +24,9 @@ export default function ReportIssuePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const photoGalleryRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
+  const videoGalleryRef = useRef<HTMLInputElement>(null);
 
   const appendTranscript = useCallback((text: string) => {
     setDescription(prev => prev ? `${prev} ${text}` : text);
@@ -52,6 +54,7 @@ export default function ReportIssuePage() {
     if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl);
     setVideoPreviewUrl(null);
     if (videoInputRef.current) videoInputRef.current.value = '';
+    if (videoGalleryRef.current) videoGalleryRef.current.value = '';
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -152,26 +155,28 @@ export default function ReportIssuePage() {
         <div>
           <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{tr.photo}</label>
           <input ref={photoInputRef} type="file" accept="image/*" capture="environment" onChange={handlePhoto} className="hidden" />
+          <input ref={photoGalleryRef} type="file" accept="image/*" onChange={handlePhoto} className="hidden" />
           {photoDataUrl ? (
             <div className="relative">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={photoDataUrl} alt="Issue photo" className="w-full rounded-xl border border-slate-700 object-cover max-h-56" />
               <button
                 type="button"
-                onClick={() => { setPhotoDataUrl(null); if (photoInputRef.current) photoInputRef.current.value = ''; }}
+                onClick={() => { setPhotoDataUrl(null); if (photoInputRef.current) photoInputRef.current.value = ''; if (photoGalleryRef.current) photoGalleryRef.current.value = ''; }}
                 className="absolute top-2 right-2 bg-slate-900/80 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold"
-              >
-                ✕
-              </button>
+              >✕</button>
             </div>
           ) : (
-            <button
-              type="button"
-              onClick={() => photoInputRef.current?.click()}
-              className="w-full py-4 bg-slate-800 border-2 border-dashed border-slate-600 rounded-xl text-slate-400 font-semibold text-sm flex items-center justify-center gap-2"
-            >
-              {tr.takePhoto}
-            </button>
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" onClick={() => photoInputRef.current?.click()}
+                className="py-4 bg-slate-800 border-2 border-dashed border-slate-600 rounded-xl text-slate-400 font-semibold text-sm flex items-center justify-center gap-2">
+                📷 {lang === 'hi' ? 'फोटो लें' : 'Take photo'}
+              </button>
+              <button type="button" onClick={() => photoGalleryRef.current?.click()}
+                className="py-4 bg-slate-800 border-2 border-dashed border-slate-600 rounded-xl text-slate-400 font-semibold text-sm flex items-center justify-center gap-2">
+                📁 {lang === 'hi' ? 'अपलोड' : 'Upload'}
+              </button>
+            </div>
           )}
         </div>
 
@@ -180,41 +185,25 @@ export default function ReportIssuePage() {
           <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
             🎥 {lang === 'hi' ? 'वीडियो' : 'Video'}
           </label>
-          <input
-            ref={videoInputRef}
-            type="file"
-            accept="video/*"
-            capture="environment"
-            onChange={handleVideo}
-            className="hidden"
-          />
+          <input ref={videoInputRef} type="file" accept="video/*" capture="environment" onChange={handleVideo} className="hidden" />
+          <input ref={videoGalleryRef} type="file" accept="video/*" onChange={handleVideo} className="hidden" />
           {videoPreviewUrl ? (
             <div className="relative">
-              <video
-                src={videoPreviewUrl}
-                controls
-                playsInline
-                className="w-full rounded-xl border border-slate-700 max-h-56 bg-black"
-              />
-              <button
-                type="button"
-                onClick={clearVideo}
-                className="absolute top-2 right-2 bg-slate-900/80 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold"
-              >
-                ✕
-              </button>
-              <p className="text-xs text-slate-500 mt-1">
-                {videoFile ? `${(videoFile.size / 1024 / 1024).toFixed(1)} MB` : ''}
-              </p>
+              <video src={videoPreviewUrl} controls playsInline className="w-full rounded-xl border border-slate-700 max-h-56 bg-black" />
+              <button type="button" onClick={clearVideo} className="absolute top-2 right-2 bg-slate-900/80 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold">✕</button>
+              <p className="text-xs text-slate-500 mt-1">{videoFile ? `${(videoFile.size / 1024 / 1024).toFixed(1)} MB` : ''}</p>
             </div>
           ) : (
-            <button
-              type="button"
-              onClick={() => videoInputRef.current?.click()}
-              className="w-full py-4 bg-slate-800 border-2 border-dashed border-slate-600 rounded-xl text-slate-400 font-semibold text-sm flex items-center justify-center gap-2"
-            >
-              🎥 {lang === 'hi' ? 'वीडियो रिकॉर्ड करें' : 'Record / Upload Video'}
-            </button>
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" onClick={() => videoInputRef.current?.click()}
+                className="py-4 bg-slate-800 border-2 border-dashed border-slate-600 rounded-xl text-slate-400 font-semibold text-sm flex items-center justify-center gap-2">
+                🎥 {lang === 'hi' ? 'रिकॉर्ड करें' : 'Record'}
+              </button>
+              <button type="button" onClick={() => videoGalleryRef.current?.click()}
+                className="py-4 bg-slate-800 border-2 border-dashed border-slate-600 rounded-xl text-slate-400 font-semibold text-sm flex items-center justify-center gap-2">
+                📁 {lang === 'hi' ? 'अपलोड' : 'Upload'}
+              </button>
+            </div>
           )}
         </div>
 

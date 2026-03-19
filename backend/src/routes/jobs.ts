@@ -323,6 +323,11 @@ router.post('/:id/dispatch', validate(dispatchSchema), async (req: AuthRequest, 
     const worker = await prisma.worker.findUnique({ where: { id: req.body.workerId } });
     if (!worker) return res.status(404).json({ error: 'Worker not found' });
 
+    const staffAssignment = await prisma.propertyStaff.findFirst({
+      where: { propertyId: job.propertyId, workerId: req.body.workerId },
+    });
+    if (!staffAssignment) return res.status(400).json({ error: 'Worker is not assigned to this property' });
+
     const updated = await prisma.job.update({
       where: { id: req.params.id },
       data: { workerId: req.body.workerId, status: 'DISPATCHED' },
@@ -515,6 +520,12 @@ router.post('/:id/issues', validate(issueSchema), async (req: AuthRequest, res: 
 
 router.get('/:id/issues', async (req: AuthRequest, res: Response) => {
   try {
+    const where = isWorker(req)
+      ? { id: req.params.id, worker: { userId: req.user!.id } }
+      : { id: req.params.id, property: { host: { userId: req.user!.id } } };
+    const job = await prisma.job.findFirst({ where, select: { id: true } });
+    if (!job) return res.status(404).json({ error: 'Job not found' });
+
     const issues = await prisma.issue.findMany({
       where: { jobId: req.params.id },
       orderBy: { createdAt: 'desc' },

@@ -228,15 +228,15 @@ const styles = StyleSheet.create({
   skillText: { fontSize: 13, fontWeight: '600', color: '#94a3b8' },
   langRow: { flexDirection: 'row', gap: 10 },
   langOption: {
-    flex: 1, paddingVertical: 12, alignItems: 'center',
-    borderRadius: 10, borderWidth: 1.5, borderColor: '#334155',
+    flex: 1, paddingVertical: 14, alignItems: 'center',
+    borderRadius: 10, borderWidth: 1.5, borderColor: '#475569',
     backgroundColor: '#0f172a',
   },
   langOptionActive: {
-    borderColor: '#3b82f6', backgroundColor: '#3b82f6' + '18',
+    borderColor: '#3b82f6', backgroundColor: '#1e3a5f',
   },
-  langOptionText: { fontSize: 15, fontWeight: '600', color: '#64748b' },
-  langOptionTextActive: { color: '#3b82f6' },
+  langOptionText: { fontSize: 15, fontWeight: '600', color: '#cbd5e1' },
+  langOptionTextActive: { color: '#93c5fd' },
   logoutButton: {
     borderRadius: 14, paddingVertical: 16, alignItems: 'center',
     borderWidth: 1, borderColor: '#ef4444',

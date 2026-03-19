@@ -90,13 +90,12 @@ export default function ReportIssueScreen() {
       let photoUrl: string | undefined;
       let videoUrl: string | undefined;
 
+      if (photo || video) setUploading(true);
       if (photo) {
-        setUploading(true);
         const result = await api.upload.file(photo.uri, photo.type);
         photoUrl = result.url;
       }
       if (video) {
-        setUploading(true);
         const result = await api.upload.file(video.uri, video.type);
         videoUrl = result.url;
       }

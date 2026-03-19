@@ -321,6 +321,56 @@ router.post('/:id/checkout', async (req: AuthRequest, res: Response) => {
   }
 });
 
+// ── GET /api/bookings/:id/guest-requests ──────────────────────────────────────
+
+router.get('/:id/guest-requests', async (req: AuthRequest, res: Response) => {
+  try {
+    const booking = await prisma.booking.findFirst({
+      where: { id: req.params.id, property: { host: { userId: req.user!.id } } },
+      select: { id: true },
+    });
+    if (!booking) return res.status(404).json({ error: 'Booking not found' });
+
+    const requests = await prisma.guestServiceRequest.findMany({
+      where: { bookingId: booking.id },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return res.json(requests);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ── PATCH /api/bookings/:id/guest-requests/:reqId ─────────────────────────────
+
+router.patch('/:id/guest-requests/:reqId', async (req: AuthRequest, res: Response) => {
+  try {
+    const booking = await prisma.booking.findFirst({
+      where: { id: req.params.id, property: { host: { userId: req.user!.id } } },
+      select: { id: true },
+    });
+    if (!booking) return res.status(404).json({ error: 'Booking not found' });
+
+    const { status } = req.body as { status: 'CONFIRMED' | 'DECLINED' };
+    if (!['CONFIRMED', 'DECLINED'].includes(status)) {
+      return res.status(400).json({ error: 'status must be CONFIRMED or DECLINED' });
+    }
+
+    const updated = await prisma.guestServiceRequest.updateMany({
+      where: { id: req.params.reqId, bookingId: booking.id },
+      data: { status },
+    });
+
+    if (updated.count === 0) return res.status(404).json({ error: 'Request not found' });
+    return res.json({ id: req.params.reqId, status });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const existing = await prisma.booking.findFirst({

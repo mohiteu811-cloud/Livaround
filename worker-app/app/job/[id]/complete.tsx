@@ -75,13 +75,12 @@ export default function CompleteJobScreen() {
       let completionPhotoUrl: string | undefined;
       let completionVideoUrl: string | undefined;
 
+      if (photo || video) setUploading(true);
       if (photo) {
-        setUploading(true);
         const result = await api.upload.file(photo.uri, photo.type);
         completionPhotoUrl = result.url;
       }
       if (video) {
-        setUploading(true);
         const result = await api.upload.file(video.uri, video.type);
         completionVideoUrl = result.url;
       }
