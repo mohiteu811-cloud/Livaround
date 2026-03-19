@@ -254,8 +254,13 @@ function GuestLinkButton({ guestCode }: { guestCode?: string }) {
     navigator.clipboard.writeText(url).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
   }
   return (
-    <button onClick={copy} title="Copy guest stay link" className="p-1.5 rounded hover:bg-slate-800 text-slate-500 hover:text-brand-400 transition-colors">
-      {copied ? <Check size={14} className="text-emerald-400" /> : <Link2 size={14} />}
+    <button
+      onClick={copy}
+      title="Copy guest stay link"
+      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-700 text-slate-400 hover:text-brand-400 hover:border-brand-500/50 hover:bg-slate-800 transition-colors"
+    >
+      {copied ? <Check size={12} className="text-emerald-400" /> : <Link2 size={12} />}
+      {copied ? 'Copied!' : 'Guest link'}
     </button>
   );
 }
@@ -356,13 +361,9 @@ export default function BookingsPage() {
               {filtered.map((b) => (
                 <tr key={b.id} className="hover:bg-slate-800/30 transition-colors">
                   <td className="px-6 py-4">
-                    <div className="flex items-center gap-1.5">
-                      <div>
-                        <p className="font-medium text-slate-200">{b.guestName}</p>
-                        <p className="text-xs text-slate-500">{b.guestEmail}</p>
-                      </div>
-                      <GuestLinkButton guestCode={b.guestCode} />
-                    </div>
+                    <p className="font-medium text-slate-200">{b.guestName}</p>
+                    <p className="text-xs text-slate-500 mb-1.5">{b.guestEmail}</p>
+                    <GuestLinkButton guestCode={b.guestCode} />
                   </td>
                   <td className="px-6 py-4 text-slate-300">{b.property?.name}</td>
                   <td className="px-6 py-4 text-slate-400 text-xs">
