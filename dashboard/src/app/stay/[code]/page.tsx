@@ -693,6 +693,7 @@ function ServicesTab({ data, guestCode, onRequestsUpdate, onRefresh }: {
   const [visitorError, setVisitorError] = useState('');
   const [visitorSuccess, setVisitorSuccess] = useState(false);
   const visitorIdRef = useRef<HTMLInputElement>(null);
+  const visitorIdGalleryRef = useRef<HTMLInputElement>(null);
 
   function handleVisitorId(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -736,6 +737,7 @@ function ServicesTab({ data, guestCode, onRequestsUpdate, onRefresh }: {
       setVisitorIdFile(null);
       setVisitorIdPreview(null);
       if (visitorIdRef.current) visitorIdRef.current.value = '';
+      if (visitorIdGalleryRef.current) visitorIdGalleryRef.current.value = '';
       onRefresh();
       setTimeout(() => setVisitorSuccess(false), 4000);
     } catch {
@@ -1143,19 +1145,26 @@ function ServicesTab({ data, guestCode, onRequestsUpdate, onRefresh }: {
 
             {/* Visitor ID upload */}
             <input ref={visitorIdRef} type="file" accept="image/*" capture="environment" onChange={handleVisitorId} className="hidden" />
+            <input ref={visitorIdGalleryRef} type="file" accept="image/*" onChange={handleVisitorId} className="hidden" />
             {visitorIdPreview ? (
               <div className="relative">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={visitorIdPreview} alt="Visitor ID" className="w-full rounded-xl border border-slate-200 object-cover max-h-32" />
                 <button type="button"
-                  onClick={() => { setVisitorIdFile(null); setVisitorIdPreview(null); if (visitorIdRef.current) visitorIdRef.current.value = ''; }}
+                  onClick={() => { setVisitorIdFile(null); setVisitorIdPreview(null); if (visitorIdRef.current) visitorIdRef.current.value = ''; if (visitorIdGalleryRef.current) visitorIdGalleryRef.current.value = ''; }}
                   className="absolute top-2 right-2 bg-white/90 text-slate-700 rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold shadow">✕</button>
               </div>
             ) : (
-              <button type="button" onClick={() => visitorIdRef.current?.click()}
-                className="w-full py-2.5 bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl text-slate-500 text-sm font-medium flex items-center justify-center gap-2 hover:bg-slate-100 transition-colors">
-                <Upload size={14} /> Upload visitor ID (optional)
-              </button>
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => visitorIdRef.current?.click()}
+                  className="py-2.5 bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl text-slate-500 text-sm font-medium flex items-center justify-center gap-2 hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-600 transition-colors">
+                  📷 Take photo
+                </button>
+                <button type="button" onClick={() => visitorIdGalleryRef.current?.click()}
+                  className="py-2.5 bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl text-slate-500 text-sm font-medium flex items-center justify-center gap-2 hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-600 transition-colors">
+                  <Upload size={14} /> Upload
+                </button>
+              </div>
             )}
 
             <div className="flex gap-2">
@@ -1245,7 +1254,9 @@ function HelpTab({ data, guestCode }: { data: StayData; guestCode: string }) {
   const [submitError, setSubmitError] = useState('');
 
   const photoRef = useRef<HTMLInputElement>(null);
+  const photoGalleryRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLInputElement>(null);
+  const videoGalleryRef = useRef<HTMLInputElement>(null);
 
   const appendTranscript = useCallback((t: string) => setIssueDesc((p) => p ? `${p} ${t}` : t), []);
   const { listening, supported: voiceOk, start: startVoice, stop: stopVoice } = useVoiceInput(appendTranscript);
@@ -1270,6 +1281,7 @@ function HelpTab({ data, guestCode }: { data: StayData; guestCode: string }) {
     if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl);
     setVideoPreviewUrl(null);
     if (videoRef.current) videoRef.current.value = '';
+    if (videoGalleryRef.current) videoGalleryRef.current.value = '';
   }
 
   async function submitIssue() {
@@ -1412,23 +1424,31 @@ function HelpTab({ data, guestCode }: { data: StayData; guestCode: string }) {
 
             {/* Photo */}
             <input ref={photoRef} type="file" accept="image/*" capture="environment" onChange={handlePhoto} className="hidden" />
+            <input ref={photoGalleryRef} type="file" accept="image/*" onChange={handlePhoto} className="hidden" />
             {photoDataUrl ? (
               <div className="relative">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={photoDataUrl} alt="Issue photo" className="w-full rounded-xl border border-slate-200 object-cover max-h-48" />
                 <button type="button"
-                  onClick={() => { setPhotoDataUrl(null); if (photoRef.current) photoRef.current.value = ''; }}
+                  onClick={() => { setPhotoDataUrl(null); if (photoRef.current) photoRef.current.value = ''; if (photoGalleryRef.current) photoGalleryRef.current.value = ''; }}
                   className="absolute top-2 right-2 bg-white/90 text-slate-700 rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold shadow">✕</button>
               </div>
             ) : (
-              <button type="button" onClick={() => photoRef.current?.click()}
-                className="w-full py-3 bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl text-slate-500 text-sm font-medium flex items-center justify-center gap-2">
-                📷 Take / upload photo
-              </button>
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => photoRef.current?.click()}
+                  className="py-3 bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl text-slate-500 text-sm font-medium flex items-center justify-center gap-2 hover:bg-red-50 hover:border-red-300 hover:text-red-600 transition-colors">
+                  📷 Take photo
+                </button>
+                <button type="button" onClick={() => photoGalleryRef.current?.click()}
+                  className="py-3 bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl text-slate-500 text-sm font-medium flex items-center justify-center gap-2 hover:bg-red-50 hover:border-red-300 hover:text-red-600 transition-colors">
+                  <Upload size={14} /> Upload
+                </button>
+              </div>
             )}
 
             {/* Video */}
             <input ref={videoRef} type="file" accept="video/*" capture="environment" onChange={handleVideo} className="hidden" />
+            <input ref={videoGalleryRef} type="file" accept="video/*" onChange={handleVideo} className="hidden" />
             {videoPreviewUrl ? (
               <div className="relative">
                 <video src={videoPreviewUrl} controls playsInline className="w-full rounded-xl border border-slate-200 max-h-48 bg-black" />
@@ -1437,10 +1457,16 @@ function HelpTab({ data, guestCode }: { data: StayData; guestCode: string }) {
                 {videoFile && <p className="text-xs text-slate-400 mt-1">{(videoFile.size / 1024 / 1024).toFixed(1)} MB</p>}
               </div>
             ) : (
-              <button type="button" onClick={() => videoRef.current?.click()}
-                className="w-full py-3 bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl text-slate-500 text-sm font-medium flex items-center justify-center gap-2">
-                🎥 Record / upload video
-              </button>
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => videoRef.current?.click()}
+                  className="py-3 bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl text-slate-500 text-sm font-medium flex items-center justify-center gap-2 hover:bg-red-50 hover:border-red-300 hover:text-red-600 transition-colors">
+                  🎥 Record
+                </button>
+                <button type="button" onClick={() => videoGalleryRef.current?.click()}
+                  className="py-3 bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl text-slate-500 text-sm font-medium flex items-center justify-center gap-2 hover:bg-red-50 hover:border-red-300 hover:text-red-600 transition-colors">
+                  <Upload size={14} /> Upload
+                </button>
+              </div>
             )}
 
             {uploading && (
