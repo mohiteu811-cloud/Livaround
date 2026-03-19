@@ -121,6 +121,12 @@ export const api = {
     checkIn: (id: string) => request<Booking>(`/api/bookings/${id}/checkin`, { method: 'POST' }),
     checkOut: (id: string) => request<Booking>(`/api/bookings/${id}/checkout`, { method: 'POST' }),
     cancel: (id: string) => request<void>(`/api/bookings/${id}`, { method: 'DELETE' }),
+    guestRequests: (id: string) => request<GuestServiceRequest[]>(`/api/bookings/${id}/guest-requests`),
+    respondToGuestRequest: (bookingId: string, reqId: string, status: 'CONFIRMED' | 'DECLINED') =>
+      request<{ id: string; status: string }>(`/api/bookings/${bookingId}/guest-requests/${reqId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status }),
+      }),
   },
 
   workers: {
@@ -405,6 +411,18 @@ export interface Booking {
   lockCode?: string;
   createdAt: string;
   _count?: { jobs: number };
+}
+
+export interface GuestServiceRequest {
+  id: string;
+  bookingId: string;
+  propertyId: string;
+  type: 'HOUSEKEEPING' | 'COOK' | 'DRIVER' | 'CAR_RENTAL' | 'ARRIVAL_TIME' | 'EARLY_CHECK_IN' | 'DEPARTURE_TIME' | 'OTHER';
+  requestedDate?: string;
+  requestedTime?: string;
+  notes?: string;
+  status: 'PENDING' | 'CONFIRMED' | 'DECLINED';
+  createdAt: string;
 }
 
 export interface Worker {
