@@ -310,6 +310,7 @@ function AccessTab({ data, guestCode, onRefresh }: { data: StayData; guestCode: 
   const [idUploading, setIdUploading] = useState(false);
   const [idError, setIdError] = useState('');
   const idFileRef = useRef<HTMLInputElement>(null);
+  const idGalleryRef = useRef<HTMLInputElement>(null);
 
   function handleIdFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -423,19 +424,26 @@ function AccessTab({ data, guestCode, onRefresh }: { data: StayData; guestCode: 
               </select>
 
               <input ref={idFileRef} type="file" accept="image/*" capture="environment" onChange={handleIdFile} className="hidden" />
+              <input ref={idGalleryRef} type="file" accept="image/*" onChange={handleIdFile} className="hidden" />
               {idPreview ? (
                 <div className="relative">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={idPreview} alt="ID preview" className="w-full rounded-xl border border-slate-200 object-cover max-h-36" />
                   <button type="button"
-                    onClick={() => { setIdFile(null); setIdPreview(null); if (idFileRef.current) idFileRef.current.value = ''; }}
+                    onClick={() => { setIdFile(null); setIdPreview(null); if (idFileRef.current) idFileRef.current.value = ''; if (idGalleryRef.current) idGalleryRef.current.value = ''; }}
                     className="absolute top-2 right-2 bg-white/90 text-slate-700 rounded-full w-7 h-7 flex items-center justify-center text-sm font-bold shadow">✕</button>
                 </div>
               ) : (
-                <button type="button" onClick={() => idFileRef.current?.click()}
-                  className="w-full py-3 bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl text-slate-500 text-sm font-medium flex items-center justify-center gap-2 hover:bg-slate-100 transition-colors">
-                  <Upload size={15} /> Take / upload photo of ID
-                </button>
+                <div className="grid grid-cols-2 gap-2">
+                  <button type="button" onClick={() => idFileRef.current?.click()}
+                    className="py-3 bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl text-slate-500 text-sm font-medium flex items-center justify-center gap-2 hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-600 transition-colors">
+                    📷 Take photo
+                  </button>
+                  <button type="button" onClick={() => idGalleryRef.current?.click()}
+                    className="py-3 bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl text-slate-500 text-sm font-medium flex items-center justify-center gap-2 hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-600 transition-colors">
+                    <Upload size={15} /> Upload
+                  </button>
+                </div>
               )}
 
               <button
