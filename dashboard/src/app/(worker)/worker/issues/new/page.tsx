@@ -131,7 +131,7 @@ export default function SupervisorReportIssuePage() {
     <WorkerShell>
       <div className="px-5 pt-12 pb-2 flex items-center gap-4">
         <button onClick={() => router.back()} className="text-blue-400 font-semibold text-sm">← Back</button>
-        <h1 className="text-lg font-bold text-white">Report Issue</h1>
+        <h1 className="text-lg font-bold text-slate-100">Report Issue</h1>
       </div>
 
       <form onSubmit={handleSubmit} className="px-5 pt-4 pb-8 space-y-6">
@@ -159,7 +159,7 @@ export default function SupervisorReportIssuePage() {
                       : 'border-slate-700 bg-slate-800'
                   }`}
                 >
-                  <p className="font-bold text-white text-sm">{p.name}</p>
+                  <p className="font-bold text-slate-100 text-sm">{p.name}</p>
                   <p className="text-xs text-slate-400 mt-0.5">{p.city} · {p._count.issues} issue{p._count.issues !== 1 ? 's' : ''} reported</p>
                 </button>
               ))}
@@ -182,7 +182,7 @@ export default function SupervisorReportIssuePage() {
               <select
                 value={selectedJobId}
                 onChange={e => setSelectedJobId(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 text-sm"
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-slate-100 focus:outline-none focus:border-blue-500 text-sm"
               >
                 <option value="">— No job linked —</option>
                 {jobs.map(j => (
@@ -238,7 +238,7 @@ export default function SupervisorReportIssuePage() {
             onChange={e => setDescription(e.target.value)}
             placeholder="Describe the issue in detail…"
             rows={4}
-            className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 text-base resize-none"
+            className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 text-base resize-none"
           />
         </div>
 

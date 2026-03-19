@@ -59,7 +59,7 @@ export default function WorkerJobsPage() {
     <WorkerShell>
       {/* Header */}
       <div className="px-5 pt-12 pb-4 flex items-baseline justify-between">
-        <h1 className="text-2xl font-bold text-white">{tr.jobs}</h1>
+        <h1 className="text-2xl font-bold text-slate-100">{tr.jobs}</h1>
         {user && <span className="text-slate-400 text-sm">{tr.hey}, {user.name.split(' ')[0]} 👋</span>}
       </div>
 
@@ -100,7 +100,7 @@ export default function WorkerJobsPage() {
         ) : jobs.length === 0 ? (
           <div className="text-center pt-16 space-y-2">
             <div className="text-5xl">{tab === 'my' ? '✅' : tab === 'history' ? '📋' : '🎉'}</div>
-            <p className="text-white font-semibold text-lg">
+            <p className="text-slate-100 font-semibold text-lg">
               {tab === 'my' ? tr.noActiveJobs : tab === 'history' ? tr.noHistory : tr.noAvailableJobs}
             </p>
             {tab !== 'history' && <p className="text-slate-500 text-sm">{tr.tapRefresh}</p>}
@@ -119,7 +119,7 @@ export default function WorkerJobsPage() {
                   <span className="text-3xl">{JOB_ICON[job.type] ?? '🔧'}</span>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2 mb-1">
-                      <span className="text-white font-bold">{job.type}</span>
+                      <span className="text-slate-100 font-bold">{job.type}</span>
                       <span className={`text-xs font-bold px-2 py-0.5 rounded-md border ${STATUS_COLOR[job.status] ?? ''}`}>
                         {job.status.replace('_', ' ')}
                       </span>

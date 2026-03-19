@@ -37,7 +37,7 @@ function WorkerDocCard({ doc }: { doc: PropertyDoc }) {
       <div className="flex items-start gap-3">
         <span className="text-2xl">{meta.emoji}</span>
         <div className="flex-1 min-w-0">
-          <p className="text-white font-semibold text-base leading-tight">{doc.title}</p>
+          <p className="text-slate-100 font-semibold text-base leading-tight">{doc.title}</p>
           <span className="text-xs text-slate-400 bg-slate-700 px-2 py-0.5 rounded mt-1 inline-block">{meta.label}</span>
         </div>
       </div>
@@ -73,7 +73,7 @@ function WorkerAreaSection({ area }: { area: PropertyArea }) {
         className="w-full flex items-center justify-between bg-slate-700 rounded-2xl px-4 py-3 text-left"
       >
         <div>
-          <p className="text-white font-semibold">{area.name}</p>
+          <p className="text-slate-100 font-semibold">{area.name}</p>
           {area.floor && <p className="text-xs text-slate-400">{area.floor}</p>}
         </div>
         <div className="flex items-center gap-2">
@@ -100,7 +100,7 @@ function WorkerContactCard({ contact }: { contact: PropertyContact }) {
     <div className="bg-slate-700/50 border border-slate-600 rounded-2xl p-4">
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <p className="text-white font-semibold text-sm">{contact.agency}</p>
+          <p className="text-slate-100 font-semibold text-sm">{contact.agency}</p>
           {contact.company && <p className="text-xs text-slate-400 mt-0.5">{contact.company}</p>}
           {contact.name && <p className="text-xs text-slate-300 mt-1">{contact.name}</p>}
           {contact.notes && <p className="text-xs text-slate-500 mt-1 italic">{contact.notes}</p>}

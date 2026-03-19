@@ -74,7 +74,7 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="flex items-center justify-center gap-3 mb-8">
           <div className="w-10 h-10 rounded-xl bg-brand-600 flex items-center justify-center text-white font-bold text-lg">L</div>
-          <span className="text-2xl font-bold text-white">LivAround</span>
+          <span className="text-2xl font-bold text-slate-100">LivAround</span>
         </div>
 
         <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">

@@ -97,7 +97,7 @@ export default function ReportIssuePage() {
     <WorkerShell>
       <div className="px-5 pt-12 pb-2 flex items-center gap-4">
         <button onClick={() => router.back()} className="text-blue-400 font-semibold text-sm">{tr.back}</button>
-        <h1 className="text-lg font-bold text-white">{tr.reportIssueTitle}</h1>
+        <h1 className="text-lg font-bold text-slate-100">{tr.reportIssueTitle}</h1>
       </div>
 
       <form onSubmit={handleSubmit} className="px-5 pt-4 pb-8 space-y-5">
@@ -144,7 +144,7 @@ export default function ReportIssuePage() {
             onChange={e => setDescription(e.target.value)}
             placeholder={tr.descriptionPlaceholder}
             rows={4}
-            className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 text-base resize-none"
+            className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 text-base resize-none"
           />
           {listening && (
             <p className="text-xs text-red-400 mt-1 animate-pulse">● {lang === 'hi' ? 'हिंदी में बोलें…' : 'Speak now…'}</p>

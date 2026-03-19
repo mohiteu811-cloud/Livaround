@@ -463,7 +463,7 @@ export default function JobsPage() {
             <button onClick={() => setWeekStart(addDays(weekStart, -7))} className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-slate-200"><ChevronLeft size={18} /></button>
             <button
               onClick={() => setWeekStart(getMonday(new Date()))}
-              className="text-sm text-slate-300 font-medium hover:text-white px-2 py-1 rounded hover:bg-slate-800"
+              className="text-sm text-slate-300 font-medium hover:text-slate-100 px-2 py-1 rounded hover:bg-slate-800"
             >
               {format(weekStart, 'dd MMM')} – {format(addDays(weekStart, 6), 'dd MMM yyyy')}
             </button>

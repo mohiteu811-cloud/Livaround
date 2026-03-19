@@ -59,14 +59,14 @@ export default function WorkerProfilePage() {
   return (
     <WorkerShell>
       <div className="px-5 pt-12 pb-8 space-y-5">
-        <h1 className="text-2xl font-bold text-white">{tr.profile}</h1>
+        <h1 className="text-2xl font-bold text-slate-100">{tr.profile}</h1>
 
         {/* Avatar */}
         <div className="flex flex-col items-center py-6 gap-2">
           <div className="w-20 h-20 rounded-full bg-blue-600 flex items-center justify-center text-white text-3xl font-bold">
             {user.name.charAt(0).toUpperCase()}
           </div>
-          <h2 className="text-xl font-bold text-white">{user.name}</h2>
+          <h2 className="text-xl font-bold text-slate-100">{user.name}</h2>
           <p className="text-slate-400 text-sm">{user.email}</p>
           {user.phone && <p className="text-slate-400 text-sm">📱 {user.phone}</p>}
         </div>
@@ -74,11 +74,11 @@ export default function WorkerProfilePage() {
         {/* Stats */}
         <div className="grid grid-cols-2 gap-3">
           <div className="bg-slate-800 border border-slate-700 rounded-2xl p-4 text-center">
-            <p className="text-2xl font-bold text-white">{jobsDone}</p>
+            <p className="text-2xl font-bold text-slate-100">{jobsDone}</p>
             <p className="text-slate-400 text-xs mt-1 font-semibold uppercase tracking-wide">{tr.jobsDone}</p>
           </div>
           <div className="bg-slate-800 border border-slate-700 rounded-2xl p-4 text-center">
-            <p className="text-2xl font-bold text-white">{rating ? rating.toFixed(1) : '—'}</p>
+            <p className="text-2xl font-bold text-slate-100">{rating ? rating.toFixed(1) : '—'}</p>
             <p className="text-slate-400 text-xs mt-1 font-semibold uppercase tracking-wide">{tr.rating}</p>
           </div>
         </div>
@@ -86,7 +86,7 @@ export default function WorkerProfilePage() {
         {/* Availability toggle */}
         <div className="bg-slate-800 border border-slate-700 rounded-2xl p-4 flex items-center justify-between">
           <div>
-            <p className="text-white font-semibold">
+            <p className="text-slate-100 font-semibold">
               {available ? tr.available2 : tr.notAvailable}
             </p>
             <p className="text-slate-500 text-xs mt-0.5">
@@ -109,7 +109,7 @@ export default function WorkerProfilePage() {
         {/* Skills */}
         {skills.length > 0 && (
           <div className="bg-slate-800 border border-slate-700 rounded-2xl p-4 space-y-3">
-            <h3 className="text-sm font-semibold text-white uppercase tracking-wider">{tr.skills}</h3>
+            <h3 className="text-sm font-semibold text-slate-100 uppercase tracking-wider">{tr.skills}</h3>
             <div className="flex flex-wrap gap-2">
               {skills.map((skill: string) => (
                 <span key={skill} className="flex items-center gap-1.5 bg-slate-700 rounded-xl px-3 py-2 text-sm text-slate-300 font-medium">

@@ -94,7 +94,7 @@ export default function WorkerJobDetailPage() {
         <div className="flex items-center gap-4">
           <span className="text-5xl">{JOB_ICON[job.type] ?? '🔧'}</span>
           <div>
-            <h1 className="text-2xl font-bold text-white">{job.type}</h1>
+            <h1 className="text-2xl font-bold text-slate-100">{job.type}</h1>
             <p className="text-slate-400">{job.property?.name}</p>
             <p className="text-slate-500 text-sm">{job.property?.city}</p>
           </div>
@@ -102,7 +102,7 @@ export default function WorkerJobDetailPage() {
 
         {/* Details */}
         <div className="bg-slate-800 border border-slate-700 rounded-2xl p-4 space-y-3">
-          <h2 className="text-sm font-semibold text-white uppercase tracking-wider">{tr.details}</h2>
+          <h2 className="text-sm font-semibold text-slate-100 uppercase tracking-wider">{tr.details}</h2>
           <InfoRow icon="📅" label={tr.scheduled} value={fmt(job.scheduledAt)} />
           {job.booking && <>
             <InfoRow icon="👤" label={tr.guest} value={job.booking.guestName} />
@@ -116,7 +116,7 @@ export default function WorkerJobDetailPage() {
         {checklist.length > 0 && (
           <div className="bg-slate-800 border border-slate-700 rounded-2xl p-4 space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-white uppercase tracking-wider">{tr.checklist}</h2>
+              <h2 className="text-sm font-semibold text-slate-100 uppercase tracking-wider">{tr.checklist}</h2>
               <span className="text-blue-400 text-sm font-semibold">{done}/{checklist.length}</span>
             </div>
             <div className="h-1.5 bg-slate-700 rounded-full">

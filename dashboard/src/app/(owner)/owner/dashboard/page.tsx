@@ -99,7 +99,7 @@ export default function OwnerDashboardPage() {
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-violet-600 flex items-center justify-center text-white font-bold text-sm">L</div>
           <div>
-            <span className="font-bold text-white">LivAround</span>
+            <span className="font-bold text-slate-100">LivAround</span>
             <span className="ml-2 text-xs text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded">Owner portal</span>
           </div>
         </div>
