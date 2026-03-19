@@ -101,8 +101,14 @@ router.post('/login', validate(loginSchema), async (req: Request, res: Response)
     return res.json({
       token,
       user: {
-        id: user.id, name: user.name, email: user.email, role: user.role,
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        host: user.host ? { id: user.host.id } : undefined,
         worker: user.worker ? { id: user.worker.id } : undefined,
+        owner: user.owner ? { id: user.owner.id } : undefined,
+        client: user.client ? { id: user.client.id } : undefined,
       },
     });
   } catch (err) {
