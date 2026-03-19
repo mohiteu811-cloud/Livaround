@@ -157,7 +157,7 @@ export default function JobsScreen() {
                   onPress={async () => {
                     try {
                       await api.jobs.claim(item.id);
-                      loadJobs();
+                      await loadJobs();
                     } catch (err) {
                       console.error(err);
                     }
