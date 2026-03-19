@@ -95,9 +95,13 @@ const SERVICE_LABELS: Record<string, string> = {
   DRIVER: 'Driver',
   CAR_RENTAL: 'Car rental',
   ARRIVAL_TIME: 'Arrival time',
+  EARLY_CHECK_IN: 'Early check-in request',
   DEPARTURE_TIME: 'Departure time',
   OTHER: 'Other request',
 };
+
+// Standard check-in time is 15:00 (3 PM). Anything before this is "early".
+const STANDARD_CHECKIN_HOUR = 15;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -778,8 +782,14 @@ function ServicesTab({ data, guestCode, onRequestsUpdate, onRefresh }: {
     }
   }
 
-  const hasArrivalReq = requests.some((r) => r.type === 'ARRIVAL_TIME');
+  const hasArrivalReq = requests.some((r) => r.type === 'ARRIVAL_TIME' || r.type === 'EARLY_CHECK_IN');
   const hasDepartureReq = requests.some((r) => r.type === 'DEPARTURE_TIME');
+
+  function isEarlyCheckin(time: string) {
+    if (!time) return false;
+    const [h] = time.split(':').map(Number);
+    return h < STANDARD_CHECKIN_HOUR;
+  }
 
   const bookedHkDates = new Set(
     requests.filter((r) => r.type === 'HOUSEKEEPING').map((r) => r.requestedDate)
@@ -811,13 +821,24 @@ function ServicesTab({ data, guestCode, onRequestsUpdate, onRefresh }: {
                 className="flex-1 text-sm text-slate-800 border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-indigo-400"
               />
               <button
-                disabled={!arrivalTime || submitting === 'ARRIVAL_TIME'}
-                onClick={() => submit('ARRIVAL_TIME', { requestedTime: arrivalTime, requestedDate: isoDate(new Date(booking.checkIn)), notes: `Estimated arrival: ${arrivalTime}` })}
+                disabled={!arrivalTime || submitting === 'ARRIVAL_TIME' || submitting === 'EARLY_CHECK_IN'}
+                onClick={() => {
+                  const type = isEarlyCheckin(arrivalTime) ? 'EARLY_CHECK_IN' : 'ARRIVAL_TIME';
+                  submit(type, { requestedTime: arrivalTime, requestedDate: isoDate(new Date(booking.checkIn)), notes: `Estimated arrival: ${arrivalTime}` });
+                }}
                 className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 disabled:opacity-40"
               >
-                {submitting === 'ARRIVAL_TIME' ? '...' : 'Notify'}
+                {(submitting === 'ARRIVAL_TIME' || submitting === 'EARLY_CHECK_IN') ? '...' : 'Notify'}
               </button>
             </div>
+            {arrivalTime && isEarlyCheckin(arrivalTime) && (
+              <div className="flex items-start gap-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
+                <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" />
+                <span>
+                  <strong>Early check-in requested.</strong> Standard check-in is at 3:00 PM. Early check-in is not guaranteed and an additional charge may apply — your host will confirm with you.
+                </span>
+              </div>
+            )}
           </div>
         ) : (
           <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 rounded-xl px-3 py-2">

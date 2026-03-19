@@ -2,12 +2,121 @@
 
 import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
-import { Plus, Search, LogIn, LogOut, X, Link2, Check, Trash2 } from 'lucide-react';
-import { api, Booking, Property } from '@/lib/api';
+import { Plus, Search, LogIn, LogOut, X, Link2, Check, Trash2, Bell, Clock, AlertTriangle } from 'lucide-react';
+import { api, Booking, GuestServiceRequest, Property } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Input, Select, Textarea, FormField } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { statusBadge } from '@/components/ui/Badge';
+
+const GUEST_REQUEST_LABELS: Record<string, string> = {
+  HOUSEKEEPING: 'Housekeeping',
+  COOK: 'Cook / Meal service',
+  DRIVER: 'Driver',
+  CAR_RENTAL: 'Car rental',
+  ARRIVAL_TIME: 'Arrival time',
+  EARLY_CHECK_IN: 'Early check-in request',
+  DEPARTURE_TIME: 'Departure time',
+  OTHER: 'Other request',
+};
+
+function requestStatusBadge(status: string) {
+  const map: Record<string, string> = {
+    PENDING: 'bg-amber-100 text-amber-700',
+    CONFIRMED: 'bg-emerald-100 text-emerald-700',
+    DECLINED: 'bg-red-100 text-red-700',
+  };
+  return (
+    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${map[status] ?? 'bg-slate-100 text-slate-500'}`}>
+      {status.charAt(0) + status.slice(1).toLowerCase()}
+    </span>
+  );
+}
+
+function GuestRequestsModal({ booking, onClose }: { booking: Booking; onClose: () => void }) {
+  const [requests, setRequests] = useState<GuestServiceRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [responding, setResponding] = useState<string | null>(null);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const reqs = await api.bookings.guestRequests(booking.id);
+      setRequests(reqs);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { load(); }, [booking.id]);
+
+  async function respond(reqId: string, status: 'CONFIRMED' | 'DECLINED') {
+    setResponding(reqId);
+    try {
+      await api.bookings.respondToGuestRequest(booking.id, reqId, status);
+      setRequests((prev) => prev.map((r) => r.id === reqId ? { ...r, status } : r));
+    } finally {
+      setResponding(null);
+    }
+  }
+
+  return (
+    <Modal open onClose={onClose} title={`Guest requests · ${booking.guestName}`} size="lg">
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : requests.length === 0 ? (
+        <div className="text-center py-12 text-slate-500 text-sm">No requests from this guest yet.</div>
+      ) : (
+        <div className="space-y-3">
+          {requests.map((r) => (
+            <div key={r.id} className={`rounded-xl border p-4 space-y-2 ${r.type === 'EARLY_CHECK_IN' ? 'border-amber-300 bg-amber-50/40' : 'border-slate-700 bg-slate-800/40'}`}>
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <div className="flex items-center gap-2">
+                    {r.type === 'EARLY_CHECK_IN' && <AlertTriangle size={14} className="text-amber-500 flex-shrink-0" />}
+                    <p className="text-sm font-medium text-slate-200">{GUEST_REQUEST_LABELS[r.type] ?? r.type}</p>
+                  </div>
+                  {r.type === 'EARLY_CHECK_IN' && (
+                    <p className="text-xs text-amber-600 mt-0.5">Early check-in — confirm only if available. Additional charge may apply.</p>
+                  )}
+                  {(r.requestedDate || r.requestedTime) && (
+                    <p className="text-xs text-slate-400 flex items-center gap-1 mt-1">
+                      <Clock size={11} />
+                      {r.requestedDate && new Date(r.requestedDate + 'T12:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                      {r.requestedTime && ` · ${r.requestedTime}`}
+                    </p>
+                  )}
+                  {r.notes && <p className="text-xs text-slate-400 mt-1">{r.notes}</p>}
+                </div>
+                {requestStatusBadge(r.status)}
+              </div>
+              {r.status === 'PENDING' && (
+                <div className="flex gap-2 pt-1">
+                  <button
+                    disabled={responding === r.id}
+                    onClick={() => respond(r.id, 'CONFIRMED')}
+                    className="flex-1 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg disabled:opacity-40 transition-colors"
+                  >
+                    {responding === r.id ? '...' : 'Confirm'}
+                  </button>
+                  <button
+                    disabled={responding === r.id}
+                    onClick={() => respond(r.id, 'DECLINED')}
+                    className="flex-1 py-1.5 text-xs font-medium text-red-400 border border-red-500/40 hover:bg-red-500/10 rounded-lg disabled:opacity-40 transition-colors"
+                  >
+                    Decline
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </Modal>
+  );
+}
 
 const SOURCE_ICONS: Record<string, string> = {
   AIRBNB: '🏠',
@@ -158,6 +267,7 @@ export default function BookingsPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [modal, setModal] = useState<{ open: boolean; booking?: Booking }>({ open: false });
+  const [requestsModal, setRequestsModal] = useState<Booking | null>(null);
 
   useEffect(() => {
     Promise.all([api.bookings.list(), api.properties.list()]).then(([b, p]) => {
@@ -233,6 +343,7 @@ export default function BookingsPage() {
                 <th className="text-left px-6 py-3">Source</th>
                 <th className="text-right px-6 py-3">Amount</th>
                 <th className="text-left px-6 py-3">Status</th>
+                <th className="text-left px-6 py-3">Requests</th>
                 <th className="px-6 py-3" />
               </tr>
             </thead>
@@ -267,6 +378,15 @@ export default function BookingsPage() {
                   </td>
                   <td className="px-6 py-4">{statusBadge(b.status)}</td>
                   <td className="px-6 py-4">
+                    <button
+                      onClick={() => setRequestsModal(b)}
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-brand-400 hover:bg-slate-800 transition-colors"
+                      title="View guest requests"
+                    >
+                      <Bell size={13} /> View
+                    </button>
+                  </td>
+                  <td className="px-6 py-4">
                     <div className="flex items-center gap-1 justify-end">
                       {b.status === 'CONFIRMED' && (
                         <button onClick={() => handleCheckIn(b.id)} className="p-1.5 rounded hover:bg-slate-800 text-emerald-400 hover:text-emerald-300" title="Check in">
@@ -293,6 +413,10 @@ export default function BookingsPage() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {requestsModal && (
+        <GuestRequestsModal booking={requestsModal} onClose={() => setRequestsModal(null)} />
       )}
 
       <Modal open={modal.open} onClose={() => setModal({ open: false })} title="Add booking" size="lg">
