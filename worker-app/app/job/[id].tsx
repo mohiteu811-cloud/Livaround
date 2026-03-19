@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { api, Job } from '../../src/lib/api';
+import { useLang, t } from '../../src/lib/i18n';
 
 const STATUS_COLOR: Record<string, string> = {
   DISPATCHED: '#f59e0b',
@@ -31,11 +32,12 @@ function formatDate(iso: string) {
 
 export default function JobDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const [lang] = useLang();
+  const tr = t(lang);
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [checklist, setChecklist] = useState<{ item: string; done: boolean }[]>([]);
-
   useEffect(() => {
     loadJob();
   }, [id]);
@@ -46,7 +48,7 @@ export default function JobDetailScreen() {
       setJob(data);
       setChecklist(data.checklist ?? []);
     } catch (err: any) {
-      Alert.alert('Error', err.message);
+      Alert.alert(tr.errorTitle, err.message);
       router.back();
     } finally {
       setLoading(false);
@@ -59,36 +61,29 @@ export default function JobDetailScreen() {
     );
   }
 
-  async function handleAction(action: 'accept' | 'start' | 'complete') {
-    if (action === 'complete') {
-      const undone = checklist.filter(c => !c.done);
-      if (undone.length > 0) {
-        Alert.alert(
-          'Incomplete Checklist',
-          `${undone.length} item(s) not checked off. Complete anyway?`,
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Complete', style: 'destructive', onPress: () => doAction(action) },
-          ]
-        );
-        return;
-      }
+  function handleComplete() {
+    const undone = checklist.filter(c => !c.done);
+    if (undone.length > 0) {
+      Alert.alert(
+        tr.incompleteChecklist,
+        tr.incompleteItems(undone.length),
+        [
+          { text: tr.cancel, style: 'cancel' },
+          { text: tr.complete, style: 'destructive', onPress: () => router.push(`/job/${id}/complete`) },
+        ]
+      );
+      return;
     }
-    doAction(action);
+    router.push(`/job/${id}/complete`);
   }
 
-  async function doAction(action: 'accept' | 'start' | 'complete') {
+  async function doAction(action: 'accept' | 'start') {
     setActionLoading(true);
     try {
       const updated = await api.jobs[action](id);
       setJob(updated);
-      if (action === 'complete') {
-        Alert.alert('✅ Job Complete!', 'Great work! The job has been marked as completed.', [
-          { text: 'Back to Jobs', onPress: () => router.replace('/(tabs)') },
-        ]);
-      }
     } catch (err: any) {
-      Alert.alert('Error', err.message);
+      Alert.alert(tr.errorTitle, err.message);
     } finally {
       setActionLoading(false);
     }
@@ -112,7 +107,7 @@ export default function JobDetailScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backText}>← Back</Text>
+          <Text style={styles.backText}>{tr.back}</Text>
         </TouchableOpacity>
         <View style={[styles.statusBadge, { backgroundColor: color + '22', borderColor: color }]}>
           <Text style={[styles.statusText, { color }]}>{job.status.replace('_', ' ')}</Text>
@@ -132,33 +127,33 @@ export default function JobDetailScreen() {
 
         {/* Details */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Details</Text>
-          <InfoRow icon="📅" label="Scheduled" value={formatDate(job.scheduledAt)} />
+          <Text style={styles.sectionTitle}>{tr.details}</Text>
+          <InfoRow icon="📅" label={tr.scheduled} value={formatDate(job.scheduledAt)} />
           {job.booking && (
             <>
-              <InfoRow icon="👤" label="Guest" value={job.booking.guestName} />
-              <InfoRow icon="🗓" label="Check-in" value={formatDate(job.booking.checkIn)} />
-              <InfoRow icon="🗓" label="Check-out" value={formatDate(job.booking.checkOut)} />
+              <InfoRow icon="👤" label={tr.guest} value={job.booking.guestName} />
+              <InfoRow icon="🗓" label={tr.checkIn} value={formatDate(job.booking.checkIn)} />
+              <InfoRow icon="🗓" label={tr.checkOut} value={formatDate(job.booking.checkOut)} />
             </>
           )}
-          {job.notes && <InfoRow icon="📝" label="Notes" value={job.notes} />}
+          {job.notes && <InfoRow icon="📝" label={tr.notes} value={job.notes} />}
         </View>
 
         {/* Property Briefing — shown once accepted */}
         {job.property && ['ACCEPTED', 'IN_PROGRESS', 'COMPLETED'].includes(job.status) && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Property Briefing</Text>
+            <Text style={styles.sectionTitle}>{tr.propertyBriefing}</Text>
             {job.property.address && (
-              <InfoRow icon="📍" label="Address" value={job.property.address} />
+              <InfoRow icon="📍" label={tr.address} value={job.property.address} />
             )}
             {job.property.wifiName && (
-              <InfoRow icon="📶" label="Wi-Fi Network" value={job.property.wifiName} />
+              <InfoRow icon="📶" label={tr.wifiNetwork} value={job.property.wifiName} />
             )}
             {job.property.wifiPassword && (
-              <InfoRow icon="🔑" label="Wi-Fi Password" value={job.property.wifiPassword} />
+              <InfoRow icon="🔑" label={tr.wifiPassword} value={job.property.wifiPassword} />
             )}
             {job.property.lockCode && (
-              <InfoRow icon="🚪" label="Door Code" value={job.property.lockCode} />
+              <InfoRow icon="🚪" label={tr.doorCode} value={job.property.lockCode} />
             )}
           </View>
         )}
@@ -167,7 +162,7 @@ export default function JobDetailScreen() {
         {checklist.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Checklist</Text>
+              <Text style={styles.sectionTitle}>{tr.checklist}</Text>
               <Text style={styles.checklistProgress}>
                 {checklistDone}/{checklist.length}
               </Text>
@@ -204,26 +199,26 @@ export default function JobDetailScreen() {
           <View style={styles.actionsSection}>
             {job.status === 'DISPATCHED' && (
               <ActionButton
-                label="Accept Job"
+                label={tr.acceptJob}
                 color="#3b82f6"
                 loading={actionLoading}
-                onPress={() => handleAction('accept')}
+                onPress={() => doAction('accept')}
               />
             )}
             {job.status === 'ACCEPTED' && (
               <ActionButton
-                label="Start Job"
+                label={tr.startJob}
                 color="#8b5cf6"
                 loading={actionLoading}
-                onPress={() => handleAction('start')}
+                onPress={() => doAction('start')}
               />
             )}
             {job.status === 'IN_PROGRESS' && (
               <ActionButton
-                label="Mark Complete ✅"
+                label={tr.markComplete}
                 color="#10b981"
-                loading={actionLoading}
-                onPress={() => handleAction('complete')}
+                loading={false}
+                onPress={handleComplete}
               />
             )}
             {(job.status === 'ACCEPTED' || job.status === 'IN_PROGRESS') && (
@@ -231,7 +226,7 @@ export default function JobDetailScreen() {
                 style={styles.issueButton}
                 onPress={() => router.push(`/job/${id}/issue`)}
               >
-                <Text style={styles.issueButtonText}>⚠️ Report an Issue</Text>
+                <Text style={styles.issueButtonText}>{tr.reportIssue}</Text>
               </TouchableOpacity>
             )}
           </View>

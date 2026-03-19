@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { api, clearToken, User } from '../../src/lib/api';
+import { useLang, t } from '../../src/lib/i18n';
 
 const SKILL_ICON: Record<string, string> = {
   CLEANING: '🧹',
@@ -17,6 +18,8 @@ const SKILL_ICON: Record<string, string> = {
 const STATUS_BAR_HEIGHT = Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 0;
 
 export default function ProfileScreen() {
+  const [lang, setLangVal] = useLang();
+  const tr = t(lang);
   const [user, setUser] = useState<User | null>(null);
   const [available, setAvailable] = useState(false);
   const [toggling, setToggling] = useState(false);
@@ -45,17 +48,17 @@ export default function ProfileScreen() {
       await api.workers.updateAvailability(user.worker.id, value);
       setAvailable(value);
     } catch (err: any) {
-      Alert.alert('Error', err.message);
+      Alert.alert(tr.errorTitle, err.message);
     } finally {
       setToggling(false);
     }
   }
 
   async function handleLogout() {
-    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(tr.signOut, tr.signOutConfirm, [
+      { text: tr.cancel, style: 'cancel' },
       {
-        text: 'Sign Out',
+        text: tr.signOut,
         style: 'destructive',
         onPress: async () => {
           await clearToken();
@@ -82,7 +85,7 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.headerTitle}>Profile</Text>
+        <Text style={styles.headerTitle}>{tr.profile}</Text>
 
         {/* Avatar */}
         <View style={styles.avatarSection}>
@@ -96,22 +99,20 @@ export default function ProfileScreen() {
 
         {/* Stats */}
         <View style={styles.statsRow}>
-          <StatCard label="Jobs Done" value={String(jobsCompleted)} icon="✅" />
-          <StatCard label="Rating" value={rating ? `${rating.toFixed(1)} ⭐` : 'N/A'} icon="⭐" />
+          <StatCard label={tr.jobsDone} value={String(jobsCompleted)} icon="✅" />
+          <StatCard label={tr.rating} value={rating ? `${rating.toFixed(1)} ⭐` : 'N/A'} icon="⭐" />
         </View>
 
         {/* Availability */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Availability</Text>
+          <Text style={styles.sectionTitle}>{tr.availability}</Text>
           <View style={styles.availabilityRow}>
             <View style={styles.availabilityInfo}>
               <Text style={styles.availabilityLabel}>
-                {available ? '🟢 Available for jobs' : '🔴 Not available'}
+                {available ? tr.availableForJobs : tr.notAvailable}
               </Text>
               <Text style={styles.availabilityDesc}>
-                {available
-                  ? 'You can receive new job assignments'
-                  : 'You won\'t receive new assignments'}
+                {available ? tr.availableDesc : tr.notAvailableDesc}
               </Text>
             </View>
             {toggling
@@ -131,7 +132,7 @@ export default function ProfileScreen() {
         {/* Skills */}
         {skills.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Skills</Text>
+            <Text style={styles.sectionTitle}>{tr.skills}</Text>
             <View style={styles.skillsRow}>
               {skills.map((skill: string) => (
                 <View key={skill} style={styles.skillBadge}>
@@ -143,9 +144,32 @@ export default function ProfileScreen() {
           </View>
         )}
 
+        {/* Language */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{tr.language}</Text>
+          <View style={styles.langRow}>
+            <TouchableOpacity
+              style={[styles.langOption, lang === 'en' && styles.langOptionActive]}
+              onPress={() => setLangVal('en')}
+            >
+              <Text style={[styles.langOptionText, lang === 'en' && styles.langOptionTextActive]}>
+                {tr.english}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.langOption, lang === 'hi' && styles.langOptionActive]}
+              onPress={() => setLangVal('hi')}
+            >
+              <Text style={[styles.langOptionText, lang === 'hi' && styles.langOptionTextActive]}>
+                {tr.hindi}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* Sign Out */}
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Text style={styles.logoutText}>Sign Out</Text>
+          <Text style={styles.logoutText}>{tr.signOut}</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -202,6 +226,17 @@ const styles = StyleSheet.create({
   },
   skillIcon: { fontSize: 16 },
   skillText: { fontSize: 13, fontWeight: '600', color: '#94a3b8' },
+  langRow: { flexDirection: 'row', gap: 10 },
+  langOption: {
+    flex: 1, paddingVertical: 12, alignItems: 'center',
+    borderRadius: 10, borderWidth: 1.5, borderColor: '#334155',
+    backgroundColor: '#0f172a',
+  },
+  langOptionActive: {
+    borderColor: '#3b82f6', backgroundColor: '#3b82f6' + '18',
+  },
+  langOptionText: { fontSize: 15, fontWeight: '600', color: '#64748b' },
+  langOptionTextActive: { color: '#3b82f6' },
   logoutButton: {
     borderRadius: 14, paddingVertical: 16, alignItems: 'center',
     borderWidth: 1, borderColor: '#ef4444',

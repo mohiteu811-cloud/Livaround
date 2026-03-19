@@ -31,6 +31,7 @@ const createJobSchema = z.object({
   scheduledAt: z.string().datetime(),
   notes: z.string().optional(),
   checklist: z.array(z.object({ item: z.string(), done: z.boolean().default(false) })).optional(),
+  workerId: z.string().optional(), // if provided, job is created and immediately dispatched
 });
 
 const dispatchSchema = z.object({
@@ -68,9 +69,10 @@ router.get('/available', async (req: AuthRequest, res: Response) => {
 });
 
 // GET /api/jobs — hosts see their property jobs, workers see their own
+// Query params: propertyId, status, type, workerId, archived ('true'|'only'), weekStart (ISO date)
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
-    const { propertyId, status, type, workerId } = req.query;
+    const { propertyId, status, type, workerId, archived, weekStart } = req.query;
 
     let baseWhere: Record<string, unknown>;
     if (isWorker(req)) {
@@ -81,9 +83,28 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       baseWhere = { property: { host: { userId: req.user!.id } } };
     }
 
+    // Archive filtering: default excludes archived, 'true' includes all, 'only' shows archived only
+    let archiveWhere: Record<string, unknown> = {};
+    if (archived === 'only') {
+      archiveWhere = { archivedAt: { not: null } };
+    } else if (archived !== 'true') {
+      archiveWhere = { archivedAt: null };
+    }
+
+    // Weekly view: filter by scheduledAt within the week starting at weekStart
+    let weekWhere: Record<string, unknown> = {};
+    if (weekStart) {
+      const start = new Date(weekStart as string);
+      const end = new Date(start);
+      end.setDate(end.getDate() + 7);
+      weekWhere = { scheduledAt: { gte: start, lt: end } };
+    }
+
     const jobs = await prisma.job.findMany({
       where: {
         ...baseWhere,
+        ...archiveWhere,
+        ...weekWhere,
         ...(propertyId ? { propertyId: propertyId as string } : {}),
         ...(status ? { status: status as string } : {}),
         ...(type ? { type: type as string } : {}),
@@ -111,13 +132,43 @@ router.post('/', validate(createJobSchema), async (req: AuthRequest, res: Respon
       where: { id: req.body.propertyId, host: { userId: req.user!.id } },
     });
     if (!prop) return res.status(403).json({ error: 'Property not found or access denied' });
-    const { checklist, ...rest } = req.body;
+
+    const { checklist, workerId, ...rest } = req.body;
+
+    // If dispatching immediately, verify the worker is assigned to this property
+    if (workerId) {
+      const staffAssignment = await prisma.propertyStaff.findFirst({
+        where: { propertyId: req.body.propertyId, workerId },
+      });
+      if (!staffAssignment) {
+        return res.status(400).json({ error: 'Worker is not assigned to this property' });
+      }
+    }
+
     const job = await prisma.job.create({
       data: {
         ...rest,
         ...(checklist ? { checklist: JSON.stringify(checklist) } : {}),
+        ...(workerId ? { workerId, status: 'DISPATCHED' } : {}),
       },
+      include: JOB_INCLUDE,
     });
+
+    // Send push notification if dispatching immediately
+    if (workerId) {
+      const worker = await prisma.worker.findUnique({ where: { id: workerId } });
+      if (worker?.pushToken) {
+        await sendPushNotification(worker.pushToken, {
+          title: `New ${job.type} Job 🔔`,
+          body: `You've been assigned a job at ${prop.name}`,
+          data: { jobId: job.id },
+          sound: 'default',
+          priority: 'high',
+          channelId: 'jobs',
+        });
+      }
+    }
+
     return res.status(201).json(parseJob(job));
   } catch (err) {
     console.error(err);
@@ -198,6 +249,39 @@ router.post('/:id/claim', async (req: AuthRequest, res: Response) => {
       include: JOB_INCLUDE,
     });
     return res.json(parseJob(updated));
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/jobs/dispatch-workers?propertyId=xxx
+// Returns cleaners/caretakers assigned to a property so the frontend can determine:
+//   - 0 workers → only "Create job" available
+//   - 1 worker  → "Create and dispatch" auto-selects them (no picker needed)
+//   - 2+ workers → "Create and dispatch" shows a worker selector
+router.get('/dispatch-workers', async (req: AuthRequest, res: Response) => {
+  try {
+    if (!isHost(req)) return res.status(403).json({ error: 'Hosts only' });
+    const { propertyId } = req.query;
+    if (!propertyId) return res.status(400).json({ error: 'propertyId is required' });
+
+    const prop = await prisma.property.findFirst({
+      where: { id: propertyId as string, host: { userId: req.user!.id } },
+    });
+    if (!prop) return res.status(403).json({ error: 'Property not found or access denied' });
+
+    const staff = await prisma.propertyStaff.findMany({
+      where: { propertyId: propertyId as string, role: { in: ['CLEANER', 'CARETAKER'] } },
+      include: {
+        worker: {
+          include: { user: { select: { id: true, name: true, email: true, phone: true } } },
+        },
+      },
+      orderBy: { role: 'asc' }, // CLEANERs first
+    });
+
+    return res.json(staff.map((s) => ({ workerId: s.workerId, role: s.role, worker: s.worker })));
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Internal server error' });
@@ -315,9 +399,15 @@ router.post('/:id/complete', async (req: AuthRequest, res: Response) => {
       workerId = job.workerId ?? null;
     }
 
+    const { completionPhotoUrl, completionVideoUrl } = req.body ?? {};
     const updated = await prisma.job.update({
       where: { id: req.params.id },
-      data: { status: 'COMPLETED', completedAt: new Date() },
+      data: {
+        status: 'COMPLETED',
+        completedAt: new Date(),
+        ...(req.body?.completionPhotoUrl ? { completionPhotoUrl: req.body.completionPhotoUrl } : {}),
+        ...(req.body?.completionVideoUrl ? { completionVideoUrl: req.body.completionVideoUrl } : {}),
+      },
       include: JOB_INCLUDE,
     });
 
@@ -344,6 +434,44 @@ router.post('/:id/cancel', async (req: AuthRequest, res: Response) => {
     if (!job) return res.status(404).json({ error: 'Job not found' });
     const updated = await prisma.job.update({ where: { id: req.params.id }, data: { status: 'CANCELLED' } });
     return res.json(updated);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/:id/archive', async (req: AuthRequest, res: Response) => {
+  try {
+    if (!isHost(req)) return res.status(403).json({ error: 'Hosts only' });
+    const job = await prisma.job.findFirst({
+      where: { id: req.params.id, property: { host: { userId: req.user!.id } } },
+    });
+    if (!job) return res.status(404).json({ error: 'Job not found' });
+    const updated = await prisma.job.update({
+      where: { id: req.params.id },
+      data: { archivedAt: new Date() },
+      include: JOB_INCLUDE,
+    });
+    return res.json(parseJob(updated));
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/:id/unarchive', async (req: AuthRequest, res: Response) => {
+  try {
+    if (!isHost(req)) return res.status(403).json({ error: 'Hosts only' });
+    const job = await prisma.job.findFirst({
+      where: { id: req.params.id, property: { host: { userId: req.user!.id } } },
+    });
+    if (!job) return res.status(404).json({ error: 'Job not found' });
+    const updated = await prisma.job.update({
+      where: { id: req.params.id },
+      data: { archivedAt: null },
+      include: JOB_INCLUDE,
+    });
+    return res.json(parseJob(updated));
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Internal server error' });

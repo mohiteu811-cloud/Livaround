@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>LivAround Host Guide</title>
+<style>
+@page { size: A4; margin: 18mm 16mm; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Arial, sans-serif; font-size: 13px; color: #1e293b; background: #fff; }
+
+/* ── Cover ── */
+.cover { background: #0f172a; color: #fff; min-height: 260mm; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 40px; page-break-after: always; }
+.cover-emoji { font-size: 72px; margin-bottom: 24px; }
+.cover-title { font-size: 52px; font-weight: 900; color: #fff; letter-spacing: -1px; }
+.cover-sub { font-size: 22px; color: #93c5fd; margin-top: 12px; font-weight: 600; }
+.cover-tag { font-size: 14px; color: #cbd5e1; margin-top: 16px; max-width: 360px; line-height: 1.6; }
+.cover-version { font-size: 12px; color: #475569; margin-top: 60px; }
+
+/* ── TOC ── */
+.toc-page { page-break-after: always; padding: 32px 0; }
+.toc-title { font-size: 28px; font-weight: 800; color: #0f172a; margin-bottom: 32px; padding-bottom: 12px; border-bottom: 3px solid #3b82f6; }
+.toc-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px dashed #e2e8f0; font-size: 14px; }
+.toc-num { color: #3b82f6; font-weight: 700; min-width: 30px; }
+.toc-label { flex: 1; color: #334155; font-weight: 500; padding-left: 10px; }
+.toc-pg { color: #94a3b8; font-size: 12px; }
+
+/* ── Section header ── */
+.section { page-break-before: always; }
+.sec-header { background: #0f172a; color: #fff; padding: 18px 22px; border-radius: 10px; margin-bottom: 20px; display: flex; align-items: center; }
+.sec-num { background: #3b82f6; color: #fff; font-size: 13px; font-weight: 800; padding: 4px 10px; border-radius: 20px; margin-right: 14px; }
+.sec-icon { font-size: 24px; margin-right: 12px; }
+.sec-title { font-size: 20px; font-weight: 800; color: #fff; }
+
+/* ── Body text ── */
+.intro { font-size: 13px; color: #475569; line-height: 1.7; margin-bottom: 18px; }
+.steps { margin: 0 0 20px 0; padding-left: 22px; }
+.steps li { margin-bottom: 8px; color: #334155; line-height: 1.6; }
+.steps li strong { color: #0f172a; }
+
+/* ── Tips box ── */
+.tip { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 18px 0; font-size: 12px; color: #1e40af; line-height: 1.6; }
+.tip strong { display: block; margin-bottom: 4px; font-size: 12px; }
+
+/* ── Browser frame ── */
+.browser { border: 1px solid #d1d5db; border-radius: 10px; overflow: hidden; margin: 18px 0; }
+.browser-bar { background: #f1f5f9; padding: 8px 14px; display: flex; align-items: center; }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }
+.dot-r { background: #ef4444; }
+.dot-a { background: #f59e0b; }
+.dot-g { background: #10b981; }
+.url-bar { background: #e2e8f0; border-radius: 20px; padding: 3px 14px; font-size: 11px; color: #64748b; margin-left: 12px; flex: 1; }
+.browser-body { background: #0f172a; padding: 16px; }
+
+/* ── Dark UI components ── */
+.ui-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.ui-title { font-size: 18px; font-weight: 800; color: #f8fafc; }
+.ui-sub { font-size: 12px; color: #94a3b8; }
+
+.btn { display: inline-block; padding: 6px 14px; border-radius: 7px; font-size: 11px; font-weight: 700; color: #fff; }
+.btn-blue { background: #3b82f6; }
+.btn-green { background: #10b981; }
+.btn-amber { background: #f59e0b; }
+.btn-red { background: #ef4444; }
+.btn-outline-red { background: transparent; border: 1px solid #ef4444; color: #ef4444; }
+.btn-sm { padding: 3px 9px; font-size: 10px; }
+
+.badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 10px; font-weight: 700; }
+.badge-blue { background: #1e3a5f; color: #60a5fa; }
+.badge-green { background: #064e3b; color: #34d399; }
+.badge-amber { background: #451a03; color: #fbbf24; }
+.badge-red { background: #450a0a; color: #f87171; }
+.badge-purple { background: #2e1065; color: #c084fc; }
+.badge-gray { background: #1e293b; color: #94a3b8; border: 1px solid #334155; }
+
+.card { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+.card-row { display: table; width: 100%; }
+.card-cell { display: table-cell; vertical-align: middle; padding: 4px 8px; }
+
+/* ── KPI grid ── */
+.kpi-grid { display: table; width: 100%; margin-bottom: 12px; }
+.kpi-row { display: table-row; }
+.kpi-cell { display: table-cell; width: 25%; padding: 4px; }
+.kpi { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 12px; }
+.kpi-icon { font-size: 20px; margin-bottom: 6px; }
+.kpi-val { font-size: 20px; font-weight: 800; color: #f8fafc; }
+.kpi-label { font-size: 10px; color: #64748b; font-weight: 600; text-transform: uppercase; margin-top: 2px; }
+.kpi-sub { font-size: 10px; color: #94a3b8; margin-top: 2px; }
+.kpi-trend { font-size: 10px; color: #34d399; font-weight: 700; margin-top: 3px; }
+
+/* ── Table ── */
+.ui-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.ui-table th { background: #0f172a; color: #64748b; padding: 8px 10px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+.ui-table td { padding: 9px 10px; border-bottom: 1px solid #334155; color: #e2e8f0; vertical-align: middle; }
+.ui-table tr:last-child td { border-bottom: none; }
+
+/* ── Bar chart ── */
+.chart-wrap { margin: 10px 0; }
+.chart-label { font-size: 10px; color: #64748b; margin-bottom: 6px; }
+.bars { display: table; width: 100%; }
+.bar-col { display: table-cell; width: 16.66%; text-align: center; padding: 0 3px; vertical-align: bottom; }
+.bar-fill { background: #3b82f6; border-radius: 4px 4px 0 0; display: block; margin: 0 auto; width: 70%; }
+.bar-month { font-size: 9px; color: #475569; margin-top: 4px; }
+
+/* ── Worker card ── */
+.worker-card { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 14px; display: table; width: 100%; }
+.worker-avatar { display: table-cell; vertical-align: top; width: 48px; }
+.worker-av-circle { width: 44px; height: 44px; border-radius: 50%; background: #3b82f6; color: #fff; font-size: 18px; font-weight: 800; text-align: center; line-height: 44px; }
+.worker-info { display: table-cell; vertical-align: top; padding-left: 12px; }
+.worker-name { font-size: 14px; font-weight: 700; color: #f8fafc; }
+.worker-email { font-size: 11px; color: #64748b; margin-top: 2px; }
+
+/* ── Skill badge ── */
+.skill { display: inline-block; background: #0f172a; border: 1px solid #334155; color: #94a3b8; padding: 3px 9px; border-radius: 8px; font-size: 10px; font-weight: 600; margin-right: 4px; margin-top: 5px; }
+
+/* ── Stock bar ── */
+.stock-wrap { background: #334155; border-radius: 4px; height: 6px; width: 100px; display: inline-block; vertical-align: middle; }
+.stock-fill { height: 6px; border-radius: 4px; display: block; }
+
+/* ── Map mock ── */
+.map-box { background: #e8edf2; border-radius: 8px; height: 140px; position: relative; overflow: hidden; }
+.map-grid-h { position: absolute; left: 0; right: 0; height: 1px; background: #d1d5db; }
+.map-grid-v { position: absolute; top: 0; bottom: 0; width: 1px; background: #d1d5db; }
+.map-pin { position: absolute; width: 14px; height: 14px; border-radius: 50%; border: 2px solid #fff; font-size: 8px; text-align: center; line-height: 10px; }
+
+/* ── Toggle ── */
+.toggle { display: inline-block; width: 34px; height: 18px; background: #3b82f6; border-radius: 9px; position: relative; vertical-align: middle; }
+.toggle-dot { position: absolute; right: 3px; top: 3px; width: 12px; height: 12px; background: #fff; border-radius: 50%; }
+.toggle-off { background: #334155; }
+.toggle-off .toggle-dot { right: auto; left: 3px; }
+
+/* ── Form fields ── */
+.form-field { margin-bottom: 10px; }
+.form-label { font-size: 10px; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+.form-input { background: #0f172a; border: 1px solid #475569; border-radius: 7px; padding: 7px 10px; color: #f8fafc; font-size: 12px; width: 100%; }
+.form-check { display: inline-block; width: 14px; height: 14px; border-radius: 3px; border: 2px solid #475569; vertical-align: middle; margin-right: 6px; background: #3b82f6; border-color: #3b82f6; }
+.form-check-empty { background: #0f172a; border-color: #475569; }
+
+/* ── Two-col layout ── */
+.two-col { display: table; width: 100%; }
+.col-left { display: table-cell; width: 58%; vertical-align: top; padding-right: 10px; }
+.col-right { display: table-cell; width: 42%; vertical-align: top; padding-left: 10px; }
+.col-half { display: table-cell; width: 50%; vertical-align: top; padding: 0 5px; }
+
+/* ── Clearfix ── */
+.cf::after { content: ""; display: table; clear: both; }
+
+/* ── Tabs ── */
+.tabs { display: flex; margin-bottom: 12px; }
+.tab { padding: 7px 16px; border-radius: 8px; font-size: 11px; font-weight: 700; color: #64748b; margin-right: 4px; background: #1e293b; }
+.tab-active { background: #3b82f6; color: #fff; }
+
+/* ── Section divider ── */
+.cat-header { background: #0f172a; color: #94a3b8; padding: 6px 10px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+
+<!-- ══════════ COVER ══════════ -->
+<div class="cover">
+  <div class="cover-emoji">&#127968;</div>
+  <div class="cover-title">LivAround</div>
+  <div class="cover-sub">Host &amp; Property Manager Guide</div>
+  <div class="cover-tag">Manage properties, bookings, workers and revenue &mdash; all in one place.</div>
+  <div class="cover-version">Version 1.0 &middot; March 2026</div>
+</div>
+
+<!-- ══════════ TABLE OF CONTENTS ══════════ -->
+<div class="toc-page">
+  <div class="toc-title">Table of Contents</div>
+  <div class="toc-item"><span class="toc-num">1</span><span class="toc-label">Dashboard Overview</span><span class="toc-pg">3</span></div>
+  <div class="toc-item"><span class="toc-num">2</span><span class="toc-label">Properties</span><span class="toc-pg">4</span></div>
+  <div class="toc-item"><span class="toc-num">3</span><span class="toc-label">Bookings</span><span class="toc-pg">5</span></div>
+  <div class="toc-item"><span class="toc-num">4</span><span class="toc-label">Jobs &amp; Dispatch</span><span class="toc-pg">6</span></div>
+  <div class="toc-item"><span class="toc-num">5</span><span class="toc-label">Workers</span><span class="toc-pg">7</span></div>
+  <div class="toc-item"><span class="toc-num">6</span><span class="toc-label">Inventory</span><span class="toc-pg">8</span></div>
+  <div class="toc-item"><span class="toc-num">7</span><span class="toc-label">Issues</span><span class="toc-pg">9</span></div>
+  <div class="toc-item"><span class="toc-num">8</span><span class="toc-label">Maintenance Requests</span><span class="toc-pg">10</span></div>
+  <div class="toc-item"><span class="toc-num">9</span><span class="toc-label">Revenue Reports</span><span class="toc-pg">11</span></div>
+  <div class="toc-item"><span class="toc-num">10</span><span class="toc-label">Operations Guide &amp; Tradesmen</span><span class="toc-pg">12</span></div>
+  <div class="toc-item"><span class="toc-num">11</span><span class="toc-label">Live Worker Tracking</span><span class="toc-pg">13</span></div>
+</div>
+
+<!-- ══════════ 1. DASHBOARD ══════════ -->
+<div class="section">
+  <div class="sec-header">
+    <span class="sec-num">01</span>
+    <span class="sec-icon">&#128202;</span>
+    <span class="sec-title">Dashboard Overview</span>
+  </div>
+  <p class="intro">The Dashboard is the first screen you see after logging in. It gives you a real-time overview of your entire operation — properties, bookings, pending jobs, worker activity, revenue, and stock alerts — all without navigating away.</p>
+  <ol class="steps">
+    <li>Log in at <strong>app.livaround.com</strong> with your host credentials.</li>
+    <li>Review the <strong>8 KPI cards</strong> at the top for an instant health check.</li>
+    <li>Check the <strong>Revenue Trend</strong> chart to spot month-on-month growth.</li>
+    <li>Act on <strong>Low Stock Alerts</strong> and <strong>Pending Jobs</strong> before they become problems.</li>
+    <li>Click any row in the Recent Bookings or Upcoming Jobs tables to jump straight to that record.</li>
+  </ol>
+  <div class="browser">
+    <div class="browser-bar">
+      <span class="dot dot-r"></span><span class="dot dot-a"></span><span class="dot dot-g"></span>
+      <span class="url-bar">app.livaround.com/dashboard</span>
+    </div>
+    <div class="browser-body">
+      <div class="ui-header">
+        <div><div class="ui-title">Overview</div><div class="ui-sub">Monday, 16 March 2026</div></div>
+      </div>
+      <!-- KPI row 1 -->
+      <div class="kpi-grid">
+        <div class="kpi-row">
+          <div class="kpi-cell"><div class="kpi"><div class="kpi-icon">&#127968;</div><div class="kpi-val">6</div><div class="kpi-label">Properties</div><div class="kpi-sub">Active listings</div></div></div>
+          <div class="kpi-cell"><div class="kpi"><div class="kpi-icon">&#128197;</div><div class="kpi-val" style="color:#34d399">12</div><div class="kpi-label">Active Bookings</div><div class="kpi-sub">Current &amp; upcoming</div></div></div>
+          <div class="kpi-cell"><div class="kpi"><div class="kpi-icon">&#128188;</div><div class="kpi-val" style="color:#fbbf24">3</div><div class="kpi-label">Pending Jobs</div><div class="kpi-sub">Awaiting dispatch</div></div></div>
+          <div class="kpi-cell"><div class="kpi"><div class="kpi-icon">&#128101;</div><div class="kpi-val" style="color:#c084fc">8</div><div class="kpi-label">Workers</div><div class="kpi-sub">On platform</div></div></div>
+        </div>
+        <div class="kpi-row">
+          <div class="kpi-cell"><div class="kpi"><div class="kpi-icon">&#128178;</div><div class="kpi-val" style="color:#34d399;font-size:15px">&#8377;1,24,500</div><div class="kpi-label">Revenue (month)</div><div class="kpi-trend">&#8679; +12% vs last month</div></div></div>
+          <div class="kpi-cell"><div class="kpi"><div class="kpi-icon">&#9989;</div><div class="kpi-val">47</div><div class="kpi-label">Jobs Completed</div><div class="kpi-sub">This month</div></div></div>
+          <div class="kpi-cell"><div class="kpi"><div class="kpi-icon">&#9888;</div><div class="kpi-val" style="color:#f87171">2</div><div class="kpi-label">Low Stock Alerts</div><div class="kpi-sub">Needs restocking</div></div></div>
+          <div class="kpi-cell"><div class="kpi"><div class="kpi-icon">&#9989;</div><div class="kpi-val" style="color:#c084fc">5</div><div class="kpi-label">Active Workers</div><div class="kpi-sub">Available now</div></div></div>
+        </div>
+      </div>
+      <!-- Charts row -->
+      <div class="two-col">
+        <div class="col-left">
+          <div class="card">
+            <div style="font-size:11px;color:#94a3b8;font-weight:700;margin-bottom:10px;">Revenue Trend (6 months)</div>
+            <div class="bars">
+              <div class="bar-col"><span class="bar-fill" style="height:50px;"></span><div class="bar-month">Oct</div></div>
+              <div class="bar-col"><span class="bar-fill" style="height:65px;"></span><div class="bar-month">Nov</div></div>
+              <div class="bar-col"><span class="bar-fill" style="height:55px;"></span><div class="bar-month">Dec</div></div>
+              <div class="bar-col"><span class="bar-fill" style="height:80px;"></span><div class="bar-month">Jan</div></div>
+              <div class="bar-col"><span class="bar-fill" style="height:70px;"></span><div class="bar-month">Feb</div></div>
+              <div class="bar-col"><span class="bar-fill" style="height:90px;background:#60a5fa"></span><div class="bar-month">Mar</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-right">
+          <div class="card" style="height:100%">
+            <div style="font-size:11px;color:#94a3b8;font-weight:700;margin-bottom:10px;">Booking Sources</div>
+            <div style="font-size:11px;color:#e2e8f0;line-height:2;">
+              <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#0ea5e9;margin-right:6px;vertical-align:middle;"></span>Airbnb &nbsp; 45%<br>
+              <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#10b981;margin-right:6px;vertical-align:middle;"></span>Direct &nbsp; 30%<br>
+              <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#f59e0b;margin-right:6px;vertical-align:middle;"></span>Booking.com &nbsp; 15%<br>
+              <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#8b5cf6;margin-right:6px;vertical-align:middle;"></span>VRBO &nbsp; 10%
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Recent Bookings -->
+      <div class="card" style="margin-top:10px;">
+        <div style="font-size:11px;color:#94a3b8;font-weight:700;margin-bottom:8px;">Recent Bookings</div>
+        <table class="ui-table">
+          <tr><th>Guest</th><th>Property</th><th>Dates</th><th>Amount</th><th>Status</th></tr>
+          <tr><td>Ravi Sharma</td><td>Villa Serenidade</td><td>15–20 Mar</td><td>&#8377;45,000</td><td><span class="badge badge-blue">Confirmed</span></td></tr>
+          <tr><td>Priya Mehta</td><td>Sunset Apartment</td><td>18–22 Mar</td><td>&#8377;28,000</td><td><span class="badge badge-green">Checked In</span></td></tr>
+          <tr><td>John Smith</td><td>Villa Serenidade</td><td>25–30 Mar</td><td>&#8377;52,000</td><td><span class="badge badge-blue">Confirmed</span></td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="tip"><strong>&#128161; Tip</strong>The Dashboard auto-loads fresh data each time you open it. Bookmark it as your daily starting point. Click any KPI card to jump directly to that section.</div>
+</div>
+
+<!-- ══════════ 2. PROPERTIES ══════════ -->
+<div class="section">
+  <div class="sec-header">
+    <span class="sec-num">02</span>
+    <span class="sec-icon">&#127968;</span>
+    <span class="sec-title">Properties</span>
+  </div>
+  <p class="intro">Properties are the foundation of LivAround. Every booking, job, worker assignment, inventory item and revenue report is linked to a property. Set them up once with full details — including WiFi, door codes and house rules — and the platform uses that information everywhere.</p>
+  <ol class="steps">
+    <li>Go to <strong>Properties</strong> in the sidebar and click <strong>+ Add Property</strong>.</li>
+    <li>Fill in name, type, address, bedrooms, bathrooms and amenities.</li>
+    <li>Enter <strong>Guest Experience</strong> details: WiFi credentials, check-in instructions, house rules.</li>
+    <li>Optionally link or create a <strong>Property Owner</strong> with an involvement level.</li>
+    <li>Click <strong>Save Property</strong>. Use the <strong>Guide</strong> and <strong>Staff</strong> quick-links on the card to continue setup.</li>
+  </ol>
+  <div class="browser">
+    <div class="browser-bar">
+      <span class="dot dot-r"></span><span class="dot dot-a"></span><span class="dot dot-g"></span>
+      <span class="url-bar">app.livaround.com/properties</span>
+    </div>
+    <div class="browser-body">
+      <div class="ui-header">
+        <div class="ui-title">Properties</div>
+        <span class="btn btn-blue">+ Add Property</span>
+      </div>
+      <div class="two-col">
+        <div class="col-half">
+          <div class="card">
+            <div style="font-size:22px;margin-bottom:8px;">&#127969;</div>
+            <div style="font-size:14px;font-weight:800;color:#f8fafc;">Villa Serenidade</div>
+            <div style="font-size:11px;color:#64748b;margin-top:2px;">&#128205; Goa, India</div>
+            <div style="font-size:11px;color:#94a3b8;margin-top:6px;">&#127beds; 4 beds &nbsp; &#128704; 3 baths &nbsp; &#128101; 8 guests</div>
+            <div style="margin-top:8px;"><span class="skill">&#127968; Airbnb</span><span class="skill">&#129529; Cleaning</span><span class="skill">&#127944; Pool</span></div>
+            <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;">
+              <span class="badge badge-green">Active</span>
+              <span style="font-size:10px;color:#64748b;margin-left:4px;">8 bookings &middot; 12 jobs</span>
+            </div>
+            <div style="margin-top:10px;">
+              <span class="btn btn-blue btn-sm">Guide</span>&nbsp;
+              <span class="btn btn-blue btn-sm">Staff</span>&nbsp;
+              <span class="btn btn-sm" style="background:#1e293b;border:1px solid #475569;color:#94a3b8;">Edit</span>
+            </div>
+          </div>
+        </div>
+        <div class="col-half">
+          <div class="card">
+            <div style="font-size:22px;margin-bottom:8px;">&#127968;</div>
+            <div style="font-size:14px;font-weight:800;color:#f8fafc;">Sunset Apartment</div>
+            <div style="font-size:11px;color:#64748b;margin-top:2px;">&#128205; Mumbai, India</div>
+            <div style="font-size:11px;color:#94a3b8;margin-top:6px;">&#127beds; 2 beds &nbsp; &#128704; 1 bath &nbsp; &#128101; 4 guests</div>
+            <div style="margin-top:8px;"><span class="skill">&#128246; WiFi</span><span class="skill">&#127859; Kitchen</span></div>
+            <div style="margin-top:10px;"><span class="badge badge-green">Active</span><span style="font-size:10px;color:#64748b;margin-left:4px;">3 bookings &middot; 5 jobs</span></div>
+            <div style="margin-top:10px;">
+              <span class="btn btn-blue btn-sm">Guide</span>&nbsp;
+              <span class="btn btn-blue btn-sm">Staff</span>&nbsp;
+              <span class="btn btn-sm" style="background:#1e293b;border:1px solid #475569;color:#94a3b8;">Edit</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="tip"><strong>&#128161; Tip</strong>Enter WiFi credentials and the door lock code in the property settings. These are automatically revealed to workers only <em>after</em> they accept a job — keeping access details secure.</div>
+</div>
+
+<!-- ══════════ 3. BOOKINGS ══════════ -->
+<div class="section">
+  <div class="sec-header">
+    <span class="sec-num">03</span>
+    <span class="sec-icon">&#128197;</span>
+    <span class="sec-title">Bookings</span>
+  </div>
+  <p class="intro">The Bookings section tracks every guest stay across all your properties. Log bookings from Airbnb, Booking.com, direct and other channels in one place. Each booking generates a unique guest stay link with WiFi details, house rules and check-in instructions.</p>
+  <ol class="steps">
+    <li>Go to <strong>Bookings</strong> and click <strong>+ Add Booking</strong>.</li>
+    <li>Select the property and booking source (Airbnb, Direct, Booking.com, VRBO, LivAround).</li>
+    <li>Enter guest name, email, phone and the check-in / check-out dates.</li>
+    <li>Set the total amount, currency and optionally a lock code.</li>
+    <li>When the guest arrives, click the <strong>Check In</strong> icon. On departure, click <strong>Check Out</strong>.</li>
+  </ol>
+  <div class="browser">
+    <div class="browser-bar">
+      <span class="dot dot-r"></span><span class="dot dot-a"></span><span class="dot dot-g"></span>
+      <span class="url-bar">app.livaround.com/bookings</span>
+    </div>
+    <div class="browser-body">
+      <div class="ui-header">
+        <div class="ui-title">Bookings</div>
+        <div>
+          <span style="background:#1e293b;border:1px solid #334155;color:#94a3b8;padding:5px 12px;border-radius:7px;font-size:11px;margin-right:6px;">&#128269; Search guests...</span>
+          <span style="background:#1e293b;border:1px solid #334155;color:#94a3b8;padding:5px 12px;border-radius:7px;font-size:11px;margin-right:6px;">All Statuses &#9660;</span>
+          <span class="btn btn-blue">+ Add Booking</span>
+        </div>
+      </div>
+      <table class="ui-table">
+        <tr><th>Guest</th><th>Property</th><th>Dates</th><th>Source</th><th>Amount</th><th>Status</th><th>Actions</th></tr>
+        <tr>
+          <td><strong>Ravi Sharma</strong><br><span style="color:#64748b;font-size:10px;">ravi@email.com</span></td>
+          <td>Villa Serenidade</td>
+          <td>15 Mar – 20 Mar</td>
+          <td><span style="color:#ff5a5f;font-weight:700;">Airbnb</span></td>
+          <td>&#8377;45,000</td>
+          <td><span class="badge badge-blue">Confirmed</span></td>
+          <td><span class="btn btn-green btn-sm">&#10146; Check In</span></td>
+        </tr>
+        <tr>
+          <td><strong>Priya Mehta</strong><br><span style="color:#64748b;font-size:10px;">priya@email.com</span></td>
+          <td>Sunset Apartment</td>
+          <td>18 Mar – 22 Mar</td>
+          <td>Direct</td>
+          <td>&#8377;28,000</td>
+          <td><span class="badge badge-green">Checked In</span></td>
+          <td><span class="btn btn-amber btn-sm">&#10145; Check Out</span></td>
+        </tr>
+        <tr>
+          <td><strong>John Smith</strong><br><span style="color:#64748b;font-size:10px;">john@email.com</span></td>
+          <td>Villa Serenidade</td>
+          <td>25 Mar – 30 Mar</td>
+          <td><span style="color:#0052cc;font-weight:700;">Booking.com</span></td>
+          <td>&#8377;52,000</td>
+          <td><span class="badge badge-blue">Confirmed</span></td>
+          <td><span class="btn btn-green btn-sm">&#10146; Check In</span></td>
+        </tr>
+      </table>
+    </div>
+  </div>
+  <div class="tip"><strong>&#128161; Tip</strong>When you create a booking, LivAround generates a unique guest stay link. Send this to the guest in your welcome message — it shows WiFi, check-in instructions and house rules without them needing an account.</div>
+</div>
+
+<!-- ══════════ 4. JOBS & DISPATCH ══════════ -->
+<div class="section">
+  <div class="sec-header">
+    <span class="sec-num">04</span>
+    <span class="sec-icon">&#128188;</span>
+    <span class="sec-title">Jobs &amp; Dispatch</span>
+  </div>
+  <p class="intro">Jobs are tasks you assign to workers — cleaning, cooking, driving or maintenance. Create a job, customise its checklist, and dispatch it to an available worker. Workers receive a push notification on the mobile app and can accept, start and complete jobs in real time.</p>
+  <ol class="steps">
+    <li>Go to <strong>Jobs</strong> and click <strong>+ Create Job</strong>.</li>
+    <li>Select a property, job type and scheduled date/time. Optionally link to a booking.</li>
+    <li>Review and customise the default <strong>checklist</strong> for that job type.</li>
+    <li>Click <strong>Dispatch</strong> — select an available worker with the matching skill.</li>
+    <li>Monitor status updates (Dispatched &#8594; Accepted &#8594; In Progress &#8594; Completed) in real time.</li>
+    <li>Archive completed jobs to keep your active list clean.</li>
+  </ol>
+  <div class="browser">
+    <div class="browser-bar">
+      <span class="dot dot-r"></span><span class="dot dot-a"></span><span class="dot dot-g"></span>
+      <span class="url-bar">app.livaround.com/jobs</span>
+    </div>
+    <div class="browser-body">
+      <div class="ui-header"><div class="ui-title">Jobs</div><span class="btn btn-blue">+ Create Job</span></div>
+      <div style="margin-bottom:12px;">
+        <span class="tab tab-active">Active</span>
+        <span class="tab">Weekly</span>
+        <span class="tab">Archived</span>
+      </div>
+      <table class="ui-table">
+        <tr><th>Type</th><th>Property</th><th>Scheduled</th><th>Worker</th><th>Status</th><th>Actions</th></tr>
+        <tr>
+          <td>&#129529; Cleaning</td>
+          <td>Villa Serenidade</td>
+          <td>16 Mar 10:00</td>
+          <td>Meena D.</td>
+          <td><span class="badge badge-amber">DISPATCHED</span></td>
+          <td><span class="btn btn-blue btn-sm">Dispatch</span> <span class="btn btn-green btn-sm">&#10003;</span></td>
+        </tr>
+        <tr>
+          <td>&#128296; Maintenance</td>
+          <td>Sunset Apartment</td>
+          <td>17 Mar 14:00</td>
+          <td>Raj Kumar</td>
+          <td><span class="badge badge-purple">IN PROGRESS</span></td>
+          <td><span class="btn btn-green btn-sm">&#10003;</span> <span class="btn btn-sm" style="background:#450a0a;color:#f87171;">&#10005;</span></td>
+        </tr>
+        <tr>
+          <td>&#127859; Cooking</td>
+          <td>Villa Serenidade</td>
+          <td>18 Mar 08:00</td>
+          <td style="color:#475569;">—</td>
+          <td><span class="badge badge-gray">PENDING</span></td>
+          <td><span class="btn btn-blue btn-sm">Dispatch</span></td>
+        </tr>
+      </table>
+      <!-- Create job form snippet -->
+      <div style="margin-top:12px;background:#0f172a;border:1px solid #334155;border-radius:10px;padding:14px;">
+        <div style="font-size:12px;color:#94a3b8;font-weight:700;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px;">Create Job</div>
+        <div class="two-col">
+          <div class="col-left">
+            <div class="form-field"><div class="form-label">Property</div><div class="form-input">Villa Serenidade &#9660;</div></div>
+            <div class="form-field"><div class="form-label">Job Type</div>
+              <div>
+                <span style="background:#3b82f6;color:#fff;padding:5px 12px;border-radius:7px;font-size:11px;font-weight:700;margin-right:6px;">&#129529; Cleaning</span>
+                <span style="background:#1e293b;color:#64748b;padding:5px 12px;border-radius:7px;font-size:11px;margin-right:6px;border:1px solid #334155;">&#127859; Cooking</span>
+                <span style="background:#1e293b;color:#64748b;padding:5px 12px;border-radius:7px;font-size:11px;margin-right:6px;border:1px solid #334155;">&#128664; Driving</span>
+                <span style="background:#1e293b;color:#64748b;padding:5px 12px;border-radius:7px;font-size:11px;border:1px solid #334155;">&#128296; Maintenance</span>
+              </div>
+            </div>
+            <div class="form-field"><div class="form-label">Scheduled</div><div class="form-input">2026-03-17 10:00</div></div>
+          </div>
+          <div class="col-right">
+            <div class="form-field"><div class="form-label">Checklist</div>
+              <div style="font-size:11px;color:#e2e8f0;line-height:2;">
+                <span class="form-check"></span> Vacuum all rooms<br>
+                <span class="form-check"></span> Change bed linens<br>
+                <span class="form-check"></span> Clean bathrooms<br>
+                <span class="form-check"></span> Restock toiletries<br>
+                <span class="form-check form-check-empty"></span> Clean kitchen<br>
+                <span class="form-check form-check-empty"></span> Empty bins
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:10px;"><div style="font-size:10px;color:#94a3b8;font-weight:700;text-transform:uppercase;margin-bottom:8px;">Dispatch to Worker</div>
+          <div class="two-col">
+            <div class="col-half"><div class="card" style="border:2px solid #3b82f6;"><div style="font-size:12px;font-weight:700;color:#f8fafc;">Meena Desai</div><div style="font-size:10px;color:#64748b;">47 jobs &middot; &#11088; 4.8</div></div></div>
+            <div class="col-half"><div class="card"><div style="font-size:12px;font-weight:700;color:#f8fafc;">Raj Kumar</div><div style="font-size:10px;color:#64748b;">32 jobs &middot; &#11088; 4.6</div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="tip"><strong>&#128161; Tip</strong>Use the <strong>Weekly view</strong> to see all jobs plotted on a Mon–Sun grid. Today is highlighted. This is the fastest way to spot scheduling gaps or double-bookings.</div>
+</div>
+
+<!-- ══════════ 5. WORKERS ══════════ -->
+<div class="section">
+  <div class="sec-header">
+    <span class="sec-num">05</span>
+    <span class="sec-icon">&#128101;</span>
+    <span class="sec-title">Workers</span>
+  </div>
+  <p class="intro">Workers are the people who carry out your jobs — cleaners, cooks, drivers and maintenance staff. Add them to the platform, assign them to properties, and manage their availability and skills from one screen. Workers log in via the mobile app or web portal.</p>
+  <ol class="steps">
+    <li>Go to <strong>Workers</strong> and click <strong>+ Add Worker</strong>.</li>
+    <li>Enter their name, email, phone, location and select at least one skill.</li>
+    <li>Click <strong>Create Worker</strong> — a temporary password is shown. Share it with the worker.</li>
+    <li>Use the <strong>availability toggle</strong> to control whether they receive new dispatch notifications.</li>
+    <li>Click the property assign button to link them to one or more properties and set their role (Cleaner, Caretaker, Supervisor).</li>
+  </ol>
+  <div class="browser">
+    <div class="browser-bar">
+      <span class="dot dot-r"></span><span class="dot dot-a"></span><span class="dot dot-g"></span>
+      <span class="url-bar">app.livaround.com/workers</span>
+    </div>
+    <div class="browser-body">
+      <div class="ui-header"><div class="ui-title">Workers</div><span class="btn btn-blue">+ Add Worker</span></div>
+      <div class="two-col">
+        <div class="col-half">
+          <div class="worker-card">
+            <div class="worker-avatar"><div class="worker-av-circle">M</div></div>
+            <div class="worker-info">
+              <div class="worker-name">Meena Desai</div>
+              <div class="worker-email">meena@livaround.com</div>
+              <div><span class="skill">&#129529; Cleaning</span><span class="skill">&#127859; Cooking</span></div>
+              <div style="font-size:11px;color:#64748b;margin-top:6px;">&#128205; Goa &nbsp; &middot; &nbsp; 47 jobs &nbsp; &middot; &nbsp; &#11088; 4.8</div>
+              <div style="margin-top:8px;">
+                Available &nbsp;
+                <span class="toggle"><span class="toggle-dot"></span></span>
+              </div>
+              <div style="margin-top:8px;">
+                <span class="btn btn-sm" style="background:#1e293b;border:1px solid #475569;color:#94a3b8;">Reset Password</span>&nbsp;
+                <span class="btn btn-sm btn-outline-red">Delete</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-half">
+          <div class="worker-card">
+            <div class="worker-avatar"><div class="worker-av-circle" style="background:#8b5cf6;">R</div></div>
+            <div class="worker-info">
+              <div class="worker-name">Raj Kumar</div>
+              <div class="worker-email">raj@livaround.com</div>
+              <div><span class="skill">&#128296; Maintenance</span></div>
+              <div style="font-size:11px;color:#64748b;margin-top:6px;">&#128205; Goa &nbsp; &middot; &nbsp; 32 jobs &nbsp; &middot; &nbsp; &#11088; 4.6</div>
+              <div style="margin-top:8px;">
+                Available &nbsp;
+                <span class="toggle"><span class="toggle-dot"></span></span>
+              </div>
+              <div style="margin-top:8px;">
+                <span class="btn btn-sm" style="background:#1e293b;border:1px solid #475569;color:#94a3b8;">Reset Password</span>&nbsp;
+                <span class="btn btn-sm btn-outline-red">Delete</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="tip"><strong>&#128161; Tip</strong>Only workers with the matching skill <em>and</em> availability set to On appear in the dispatch panel. If a worker is not showing up for dispatch, check both their skill list and availability toggle.</div>
+</div>
+
+<!-- ══════════ 6. INVENTORY ══════════ -->
+<div class="section">
+  <div class="sec-header">
+    <span class="sec-num">06</span>
+    <span class="sec-icon">&#128230;</span>
+    <span class="sec-title">Inventory</span>
+  </div>
+  <p class="intro">Track consumable stock across all your properties — cleaning supplies, toiletries, kitchen items and linens. Set minimum thresholds and LivAround will alert you (and show on the Dashboard) when stock falls below the safe level, so you never run out between guest stays.</p>
+  <ol class="steps">
+    <li>Go to <strong>Inventory</strong> and click <strong>+ Add Item</strong>.</li>
+    <li>Select the property, category, item name, current stock, minimum threshold and unit.</li>
+    <li>Optionally upload photos and enter the storage location.</li>
+    <li>When stock is replenished, click the <strong>Restock</strong> icon and enter the new quantity.</li>
+    <li>Use the <strong>Low Stock Only</strong> toggle to filter and action alerts quickly.</li>
+  </ol>
+  <div class="browser">
+    <div class="browser-bar">
+      <span class="dot dot-r"></span><span class="dot dot-a"></span><span class="dot dot-g"></span>
+      <span class="url-bar">app.livaround.com/inventory</span>
+    </div>
+    <div class="browser-body">
+      <div class="ui-header"><div class="ui-title">Inventory</div><span class="btn btn-blue">+ Add Item</span></div>
+      <div style="margin-bottom:12px;display:flex;">
+        <span style="background:#1e293b;border:1px solid #334155;color:#94a3b8;padding:5px 12px;border-radius:7px;font-size:11px;margin-right:8px;">All Properties &#9660;</span>
+        <span style="background:#1e293b;border:1px solid #334155;color:#94a3b8;padding:5px 12px;border-radius:7px;font-size:11px;margin-right:8px;">All Categories &#9660;</span>
+        <span style="background:#1e293b;border:1px solid #334155;color:#94a3b8;padding:5px 12px;border-radius:7px;font-size:11px;">Low Stock Only</span>
+      </div>
+      <div class="cat-header">&#129518; Cleaning Supplies</div>
+      <table class="ui-table">
+        <tr><th>Item</th><th>Property</th><th>Location</th><th>Stock Level</th><th>Qty</th><th>Status</th><th></th></tr>
+        <tr>
+          <td><strong style="color:#f8fafc;">Floor Cleaner</strong></td>
+          <td>Villa Serenidade</td>
+          <td>Utility Room</td>
+          <td>
+            <div class="stock-wrap"><span class="stock-fill" style="background:#10b981;width:85px;"></span></div>
+          </td>
+          <td style="color:#94a3b8;">17 / 20 L</td>
+          <td><span class="badge badge-green">OK</span></td>
+          <td><span class="btn btn-sm" style="background:#1e293b;border:1px solid #334155;color:#94a3b8;">&#8635; Restock</span></td>
+        </tr>
+        <tr>
+          <td><strong style="color:#f8fafc;">Toilet Rolls</strong></td>
+          <td>Sunset Apartment</td>
+          <td>Bathroom Cupboard</td>
+          <td>
+            <div class="stock-wrap"><span class="stock-fill" style="background:#ef4444;width:30px;"></span></div>
+          </td>
+          <td style="color:#f87171;">3 / 10 rolls</td>
+          <td><span class="badge badge-red">LOW</span></td>
+          <td><span class="btn btn-amber btn-sm">&#8635; Restock</span></td>
+        </tr>
+        <tr>
+          <td><strong style="color:#f8fafc;">Dish Soap</strong></td>
+          <td>Villa Serenidade</td>
+          <td>Kitchen Under-sink</td>
+          <td>
+            <div class="stock-wrap"><span class="stock-fill" style="background:#10b981;width:60px;"></span></div>
+          </td>
+          <td style="color:#94a3b8;">6 / 10 bottles</td>
+          <td><span class="badge badge-green">OK</span></td>
+          <td><span class="btn btn-sm" style="background:#1e293b;border:1px solid #334155;color:#94a3b8;">&#8635; Restock</span></td>
+        </tr>
+      </table>
+    </div>
+  </div>
+  <div class="tip"><strong>&#128161; Tip</strong>Set minimum thresholds slightly above your true minimum (e.g. if you need 4 rolls, set the threshold to 6). This gives you a buffer before the item actually runs out.</div>
+</div>
+
+<!-- ══════════ 7. ISSUES ══════════ -->
+<div class="section">
+  <div class="sec-header">
+    <span class="sec-num">07</span>
+    <span class="sec-icon">&#9888;</span>
+    <span class="sec-title">Issues</span>
+  </div>
+  <p class="intro">Issues are problems reported by workers during or after a job — a broken appliance, missing supplies, damage, or a safety concern. Workers submit them directly from the mobile app with photos and a severity level. You review and resolve them from this screen.</p>
+  <ol class="steps">
+    <li>Go to <strong>Issues</strong> to see all worker-reported problems.</li>
+    <li>Filter by <strong>status</strong> (Open, In Review, Resolved) or <strong>severity</strong> (Low, Medium, High).</li>
+    <li>Click any issue card to open the detail panel — read the full description and view attached photos or video.</li>
+    <li>Click <strong>Mark In Review</strong> to acknowledge it, or <strong>Resolve</strong> once actioned.</li>
+    <li>For high-severity issues, consider creating a <strong>Maintenance Request</strong> to assign a tradesperson.</li>
+  </ol>
+  <div class="browser">
+    <div class="browser-bar">
+      <span class="dot dot-r"></span><span class="dot dot-a"></span><span class="dot dot-g"></span>
+      <span class="url-bar">app.livaround.com/issues</span>
+    </div>
+    <div class="browser-body">
+      <div class="ui-header"><div class="ui-title">Issues</div></div>
+      <div style="margin-bottom:12px;">
+        <span class="tab tab-active">Open (2)</span>
+        <span class="tab">In Review</span>
+        <span class="tab">Resolved</span>
+      </div>
+      <div class="two-col">
+        <div class="col-left">
+          <div class="card" style="border-left:3px solid #ef4444;">
+            <div style="margin-bottom:6px;"><span class="badge badge-red">HIGH</span>&nbsp;<span style="font-size:10px;color:#64748b;">&#128296; Maintenance &middot; Villa Serenidade</span></div>
+            <div style="font-size:12px;color:#f8fafc;font-weight:600;margin-bottom:4px;">Broken AC unit in master bedroom</div>
+            <div style="font-size:11px;color:#94a3b8;">Needs urgent repair before next check-in.</div>
+            <div style="margin-top:8px;font-size:10px;color:#475569;">Raj Kumar &middot; 2 hours ago &nbsp; &#128247;</div>
+          </div>
+          <div class="card" style="border-left:3px solid #f59e0b;">
+            <div style="margin-bottom:6px;"><span class="badge badge-amber">MEDIUM</span>&nbsp;<span style="font-size:10px;color:#64748b;">&#129529; Cleaning &middot; Sunset Apartment</span></div>
+            <div style="font-size:12px;color:#f8fafc;font-weight:600;margin-bottom:4px;">Missing toiletries in guest bathroom</div>
+            <div style="font-size:11px;color:#94a3b8;">Guest arriving tomorrow — needs restocking.</div>
+            <div style="margin-top:8px;font-size:10px;color:#475569;">Meena Desai &middot; 1 day ago</div>
+          </div>
+        </div>
+        <div class="col-right">
+          <div style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:14px;height:100%;">
+            <div style="font-size:11px;color:#94a3b8;font-weight:700;margin-bottom:10px;">ISSUE DETAIL</div>
+            <div><span class="badge badge-red">HIGH</span></div>
+            <div style="font-size:12px;color:#f8fafc;font-weight:700;margin:8px 0 4px;">Broken AC unit in master bedroom</div>
+            <div style="font-size:11px;color:#94a3b8;line-height:1.6;">The AC unit is making a loud noise and not cooling. Guest checks in on 18 Mar at 3 PM. Needs repair urgently.</div>
+            <div style="background:#334155;border-radius:8px;height:60px;margin:10px 0;display:flex;align-items:center;justify-content:center;color:#64748b;font-size:11px;">&#128247; Photo attached</div>
+            <div style="margin-top:8px;">
+              <span class="btn btn-amber btn-sm">Mark In Review</span>&nbsp;
+              <span class="btn btn-green btn-sm">&#10003; Resolve</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="tip"><strong>&#128161; Tip</strong>High-severity issues reported less than 24 hours before a check-in should be your top priority. After resolving, create a linked Maintenance Request to track the fix and assign a tradesperson.</div>
+</div>
+
+<!-- ══════════ 8. MAINTENANCE ══════════ -->
+<div class="section">
+  <div class="sec-header">
+    <span class="sec-num">08</span>
+    <span class="sec-icon">&#128296;</span>
+    <span class="sec-title">Maintenance Requests</span>
+  </div>
+  <p class="intro">Maintenance Requests are raised by on-site caretakers or cleaners when something needs repair. Each request includes a description, priority level, trade role required and an optional photo. You review and approve (or reject) before a tradesperson is assigned.</p>
+  <ol class="steps">
+    <li>On-site staff submits a request via the worker portal — you receive a notification.</li>
+    <li>Go to <strong>Maintenance</strong> and find the new <strong>Pending</strong> request.</li>
+    <li>Click <strong>Review</strong> — read the description, trade role and priority.</li>
+    <li>Click <strong>Approve</strong>: optionally assign a worker, set a scheduled date and add notes.</li>
+    <li>Or click <strong>Reject</strong> with a reason note sent back to the caretaker.</li>
+    <li>Track the request through to <strong>Completed</strong> status.</li>
+  </ol>
+  <div class="browser">
+    <div class="browser-bar">
+      <span class="dot dot-r"></span><span class="dot dot-a"></span><span class="dot dot-g"></span>
+      <span class="url-bar">app.livaround.com/maintenance</span>
+    </div>
+    <div class="browser-body">
+      <div class="ui-header"><div class="ui-title">Maintenance Requests</div></div>
+      <div class="card" style="border-left:3px solid #f59e0b;">
+        <div class="two-col">
+          <div class="col-left">
+            <div style="margin-bottom:6px;"><span class="badge badge-amber">PENDING</span>&nbsp;<span class="badge badge-red" style="font-size:9px;">HIGH</span>&nbsp;<span style="font-size:10px;color:#64748b;">&#128296; Plumber</span></div>
+            <div style="font-size:13px;font-weight:700;color:#f8fafc;">Leaking kitchen tap</div>
+            <div style="font-size:11px;color:#94a3b8;margin-top:4px;">Villa Serenidade &middot; Reported by Raj Kumar &middot; 3h ago</div>
+            <div style="font-size:11px;color:#94a3b8;margin-top:6px;line-height:1.6;">The kitchen tap has been dripping continuously since yesterday. Water damage risk if not fixed.</div>
+          </div>
+          <div class="col-right" style="text-align:right;">
+            <span class="btn btn-blue btn-sm">Review</span>
+          </div>
+        </div>
+      </div>
+      <!-- Review modal -->
+      <div style="background:#0f172a;border:1px solid #3b82f6;border-radius:10px;padding:16px;margin-top:10px;">
+        <div style="font-size:12px;color:#94a3b8;font-weight:700;margin-bottom:12px;">REVIEW REQUEST</div>
+        <div style="display:flex;margin-bottom:12px;">
+          <span class="btn btn-green btn-sm">&#10003; Approve</span>&nbsp;
+          <span class="btn btn-sm" style="background:#450a0a;color:#f87171;">&#10005; Reject</span>
+        </div>
+        <div class="form-field"><div class="form-label">Assign to Worker (optional)</div><div class="form-input">Ravi — Plumber &#9660;</div></div>
+        <div class="form-field"><div class="form-label">Scheduled Date</div><div class="form-input">2026-03-17</div></div>
+        <div class="form-field"><div class="form-label">Notes to Caretaker</div><div class="form-input" style="height:40px;">Please keep the tap closed until Ravi arrives.</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="tip"><strong>&#128161; Tip</strong>In Property &#8594; Staff settings you can enable <strong>Auto-assign</strong> for specific trade roles (e.g. Plumber, Electrician). Requests for those trades skip your approval and go straight to the assigned tradesperson — saving time for routine fixes.</div>
+</div>
+
+<!-- ══════════ 9. REVENUE REPORTS ══════════ -->
+<div class="section">
+  <div class="sec-header">
+    <span class="sec-num">09</span>
+    <span class="sec-icon">&#128178;</span>
+    <span class="sec-title">Revenue Reports</span>
+  </div>
+  <p class="intro">Revenue Reports give owners a transparent breakdown of monthly earnings, platform fees, your commission, and expenses — with a clear Net to Owner figure. Import directly from Airbnb CSV or enter figures manually. Published reports appear in the owner's portal.</p>
+  <ol class="steps">
+    <li>Go to <strong>Revenue</strong> and click <strong>+ Add Report</strong>.</li>
+    <li>Select property, month and year. Upload the <strong>Airbnb earnings CSV</strong> to auto-fill the figures.</li>
+    <li>Verify gross revenue, platform fees and net revenue. Set the <strong>commission %</strong>.</li>
+    <li>Add any expenses (cleaning, repairs, etc.) with amounts and optional receipts.</li>
+    <li>Change status from <strong>Draft</strong> to <strong>Published</strong> to share with the owner.</li>
+  </ol>
+  <div class="browser">
+    <div class="browser-bar">
+      <span class="dot dot-r"></span><span class="dot dot-a"></span><span class="dot dot-g"></span>
+      <span class="url-bar">app.livaround.com/revenue</span>
+    </div>
+    <div class="browser-body">
+      <div class="ui-header"><div class="ui-title">Revenue Reports</div><span class="btn btn-blue">+ Add Report</span></div>
+      <!-- Summary stats -->
+      <div class="kpi-grid" style="margin-bottom:14px;">
+        <div class="kpi-row">
+          <div class="kpi-cell"><div class="kpi"><div class="kpi-label">Total Net Revenue</div><div class="kpi-val" style="color:#34d399;font-size:16px;">&#8377;3,24,000</div></div></div>
+          <div class="kpi-cell"><div class="kpi"><div class="kpi-label">Commission Collected</div><div class="kpi-val" style="color:#60a5fa;font-size:16px;">&#8377;48,600</div></div></div>
+          <div class="kpi-cell"><div class="kpi"><div class="kpi-label">Reports</div><div class="kpi-val">8</div></div></div>
+          <div class="kpi-cell"><div class="kpi"><div class="kpi-label">Pending Approvals</div><div class="kpi-val" style="color:#fbbf24;">2</div></div></div>
+        </div>
+      </div>
+      <!-- Report card -->
+      <div class="card">
+        <div class="two-col">
+          <div class="col-left">
+            <div style="font-size:15px;font-weight:800;color:#f8fafc;">March 2026</div>
+            <div style="font-size:11px;color:#64748b;margin-top:2px;">&#127968; Villa Serenidade &middot; Goa</div>
+            <div style="margin-top:10px;font-size:11px;color:#94a3b8;line-height:2;">
+              Gross Revenue: &#8377;1,24,500<br>
+              Commission (15%): &#8377;18,675<br>
+              Expenses: &#8377;7,575
+            </div>
+            <div style="margin-top:8px;font-size:14px;font-weight:800;color:#34d399;">Net to Owner: &#8377;98,250</div>
+          </div>
+          <div class="col-right" style="text-align:right;">
+            <span class="badge badge-green">Published</span><br><br>
+            <!-- CSV upload box -->
+            <div style="border:2px dashed #334155;border-radius:8px;padding:12px;text-align:center;font-size:10px;color:#475569;margin-top:8px;">
+              &#128196; Upload Airbnb<br>Earnings CSV
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="tip"><strong>&#128161; Tip</strong>Always set reports to <strong>Draft</strong> first so you can verify all figures before the owner sees them. Once Published, the owner is notified and can view the breakdown — and approve or reject any expenses you have logged.</div>
+</div>
+
+<!-- ══════════ 10. OPERATIONS GUIDE ══════════ -->
+<div class="section">
+  <div class="sec-header">
+    <span class="sec-num">10</span>
+    <span class="sec-icon">&#128216;</span>
+    <span class="sec-title">Operations Guide &amp; Tradesmen</span>
+  </div>
+  <p class="intro">The Operations Guide is a per-property knowledge base for your on-site staff. Organise documentation by room or area, add instructions with photos, and generate QR code labels to stick near appliances. Workers can access it any time from the app — so they always know where things are and how they work.</p>
+  <ol class="steps">
+    <li>Go to <strong>Properties</strong> &#8594; click <strong>Guide</strong> on the property card.</li>
+    <li>Click <strong>+ Add Area</strong> and name a zone (Master Bedroom, Pool Area, Utility Room...).</li>
+    <li>Inside an area, click <strong>+ Add Doc</strong> — enter title, category, instructions and upload photos.</li>
+    <li>Click <strong>Print QR Label</strong> on any doc to download a QR sticker — attach it near the item.</li>
+    <li>Add <strong>Vendor Contacts</strong> (electrician, plumber, AC tech) in the Contacts tab. Use <strong>Save to Tradesmen</strong> to add them to the central database.</li>
+  </ol>
+  <div class="browser">
+    <div class="browser-bar">
+      <span class="dot dot-r"></span><span class="dot dot-a"></span><span class="dot dot-g"></span>
+      <span class="url-bar">app.livaround.com/properties/1/guide</span>
+    </div>
+    <div class="browser-body">
+      <div class="ui-header"><div class="ui-title">Operations Guide — Villa Serenidade</div><span class="btn btn-blue btn-sm">&#128246; Entry QR</span></div>
+      <div style="margin-bottom:12px;">
+        <span class="tab tab-active">Documentation Areas</span>
+        <span class="tab">Vendor Contacts</span>
+      </div>
+      <div class="card">
+        <div style="font-size:13px;font-weight:700;color:#f8fafc;margin-bottom:10px;">&#127968; Master Bedroom</div>
+        <div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px;margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+            <div>
+              <span class="badge" style="background:#1e3a5f;color:#60a5fa;font-size:9px;">&#128268; APPLIANCE</span>
+              <div style="font-size:12px;font-weight:700;color:#f8fafc;margin-top:4px;">Air Conditioning Unit</div>
+              <div style="font-size:11px;color:#94a3b8;margin-top:3px;line-height:1.5;">Set to 22&deg;C for guests. Remote is in the top drawer of the bedside table. Filter cleaned monthly.</div>
+              <div style="margin-top:6px;font-size:10px;color:#475569;">&#128247; 2 photos</div>
+            </div>
+            <span class="btn btn-sm" style="background:#1e293b;border:1px solid #334155;color:#94a3b8;white-space:nowrap;">&#9641; QR Label</span>
+          </div>
+        </div>
+        <div style="background:#0f172a;border:1px solid #334155;border-radius:8px;padding:10px;">
+          <span class="badge" style="background:#064e3b;color:#34d399;font-size:9px;">&#128273; ACCESS</span>
+          <div style="font-size:12px;font-weight:700;color:#f8fafc;margin-top:4px;">Safe &amp; Lock Box</div>
+          <div style="font-size:11px;color:#94a3b8;margin-top:3px;">Master code: 4729. Reset after every checkout.</div>
+        </div>
+      </div>
+      <!-- Vendor contact -->
+      <div class="card" style="margin-top:4px;">
+        <div style="font-size:11px;color:#94a3b8;font-weight:700;margin-bottom:8px;text-transform:uppercase;">Vendor Contacts</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-size:13px;font-weight:700;color:#f8fafc;">Ravi Electric</div>
+            <div style="font-size:11px;color:#64748b;">Ravi Sharma &middot; Electrician</div>
+            <div style="font-size:11px;color:#3b82f6;margin-top:3px;">&#128222; +91 98765 43210</div>
+          </div>
+          <div>
+            <span class="btn btn-blue btn-sm">Save to Tradesmen</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="tip"><strong>&#128161; Tip</strong>Print the <strong>Entry QR code</strong> (from the Guide page) and stick it by the front door. Workers scan it on arrival and it instantly shows their active job for that property — no manual searching.</div>
+</div>
+
+<!-- ══════════ 11. LIVE TRACKING ══════════ -->
+<div class="section">
+  <div class="sec-header">
+    <span class="sec-num">11</span>
+    <span class="sec-icon">&#128205;</span>
+    <span class="sec-title">Live Worker Tracking</span>
+  </div>
+  <p class="intro">The Tracking screen shows the last known GPS location of all your workers on an interactive map. Locations update every 15 seconds. This lets you confirm a worker has arrived at a property, monitor progress across multiple sites, and respond quickly if someone is delayed.</p>
+  <ol class="steps">
+    <li>Go to <strong>Tracking</strong> in the sidebar.</li>
+    <li>Workers with a <strong>green dot</strong> have shared their location; grey dot means no data.</li>
+    <li>Click a worker in the left sidebar to centre the map on their position.</li>
+    <li>The map refreshes automatically every <strong>15 seconds</strong>. Use the manual refresh button for an instant update.</li>
+    <li>Workers must grant <strong>Always</strong> location permission in the app for continuous tracking.</li>
+  </ol>
+  <div class="browser">
+    <div class="browser-bar">
+      <span class="dot dot-r"></span><span class="dot dot-a"></span><span class="dot dot-g"></span>
+      <span class="url-bar">app.livaround.com/tracking</span>
+    </div>
+    <div class="browser-body">
+      <div class="ui-header"><div class="ui-title">Live Worker Tracking</div><span class="btn btn-sm" style="background:#1e293b;border:1px solid #334155;color:#94a3b8;">&#8635; Refresh</span></div>
+      <div class="two-col">
+        <div class="col-left" style="width:35%;padding-right:12px;">
+          <div style="font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:8px;">Workers</div>
+          <div class="card" style="padding:10px;margin-bottom:6px;">
+            <div style="display:flex;align-items:center;">
+              <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#10b981;margin-right:8px;"></span>
+              <div>
+                <div style="font-size:12px;font-weight:700;color:#f8fafc;">Meena Desai</div>
+                <div style="font-size:10px;color:#64748b;">Last seen 2 min ago</div>
+                <span class="badge badge-green" style="font-size:9px;">Available</span>
+              </div>
+            </div>
+          </div>
+          <div class="card" style="padding:10px;margin-bottom:6px;">
+            <div style="display:flex;align-items:center;">
+              <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#10b981;margin-right:8px;"></span>
+              <div>
+                <div style="font-size:12px;font-weight:700;color:#f8fafc;">Raj Kumar</div>
+                <div style="font-size:10px;color:#64748b;">Last seen 5 min ago</div>
+                <span class="badge badge-amber" style="font-size:9px;">In Job</span>
+              </div>
+            </div>
+          </div>
+          <div class="card" style="padding:10px;">
+            <div style="display:flex;align-items:center;">
+              <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#475569;margin-right:8px;"></span>
+              <div>
+                <div style="font-size:12px;font-weight:700;color:#f8fafc;">Suresh P.</div>
+                <div style="font-size:10px;color:#64748b;">No location</div>
+                <span class="badge badge-gray" style="font-size:9px;">Unavailable</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-right" style="width:65%;padding-left:0;">
+          <div class="map-box">
+            <div class="map-grid-h" style="top:33%;"></div>
+            <div class="map-grid-h" style="top:66%;"></div>
+            <div class="map-grid-v" style="left:33%;"></div>
+            <div class="map-grid-v" style="left:66%;"></div>
+            <div class="map-pin" style="top:35%;left:40%;background:#10b981;color:#fff;">M</div>
+            <div class="map-pin" style="top:55%;left:60%;background:#f59e0b;color:#fff;">R</div>
+            <div style="position:absolute;bottom:8px;right:10px;font-size:9px;color:#94a3b8;">&#128205; Goa, India</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="tip"><strong>&#128161; Tip</strong>Workers must allow <strong>Always On</strong> location access (not just &ldquo;While Using&rdquo;) for background tracking to work. On iOS: Settings &#8594; LivAround &#8594; Location &#8594; Always. On Android: Settings &#8594; Apps &#8594; LivAround &#8594; Permissions &#8594; Allow all the time.</div>
+</div>
+
+</body>
+</html>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
-import { Plus, Send, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { Plus, Send, CheckCircle, XCircle, AlertTriangle, Camera, Archive, ArchiveRestore, ChevronLeft, ChevronRight } from 'lucide-react';
 import { api, Job, Property, Worker, Booking } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Input, Select, Textarea, FormField } from '@/components/ui/Input';
@@ -50,6 +50,8 @@ function JobForm({
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [dispatchWorkers, setDispatchWorkers] = useState<{ workerId: string; role: string; worker: { user: { name: string } } }[]>([]);
+  const [dispatchWorkerId, setDispatchWorkerId] = useState('');
 
   function set(k: string, v: unknown) { setForm((f) => ({ ...f, [k]: v })); }
 
@@ -61,10 +63,17 @@ function JobForm({
     }));
   }
 
+  useEffect(() => {
+    if (!form.propertyId) return;
+    api.jobs.dispatchWorkers(form.propertyId).then((ws) => {
+      setDispatchWorkers(ws);
+      setDispatchWorkerId(ws.length === 1 ? ws[0].workerId : '');
+    }).catch(() => setDispatchWorkers([]));
+  }, [form.propertyId]);
+
   const propertyBookings = bookings.filter((b) => b.propertyId === form.propertyId && ['CONFIRMED', 'CHECKED_IN'].includes(b.status));
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleCreate(withDispatch: boolean) {
     setLoading(true);
     setError('');
     try {
@@ -72,6 +81,7 @@ function JobForm({
         ...form,
         bookingId: form.bookingId || undefined,
         scheduledAt: new Date(form.scheduledAt).toISOString(),
+        ...(withDispatch && dispatchWorkerId ? { workerId: dispatchWorkerId } : {}),
       });
       onClose();
     } catch (err) {
@@ -79,6 +89,11 @@ function JobForm({
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    await handleCreate(false);
   }
 
   return (
@@ -139,9 +154,31 @@ function JobForm({
             className="text-xs text-brand-400 hover:text-brand-300">+ Add item</button>
         </div>
       </div>
+      {dispatchWorkers.length === 1 && (
+        <p className="text-xs text-slate-500">
+          Dispatching will assign to <strong className="text-slate-300">{dispatchWorkers[0].worker.user.name}</strong> automatically.
+        </p>
+      )}
+      {dispatchWorkers.length > 1 && (
+        <FormField label="Dispatch to">
+          <Select value={dispatchWorkerId} onChange={(e) => setDispatchWorkerId(e.target.value)}>
+            <option value="">— Select worker —</option>
+            {dispatchWorkers.map((s) => (
+              <option key={s.workerId} value={s.workerId}>
+                {s.worker.user.name} ({s.role.charAt(0) + s.role.slice(1).toLowerCase()})
+              </option>
+            ))}
+          </Select>
+        </FormField>
+      )}
       <div className="flex gap-3 pt-2">
         <Button type="button" variant="secondary" onClick={onClose} className="flex-1 justify-center">Cancel</Button>
-        <Button type="submit" loading={loading} className="flex-1 justify-center">Create job</Button>
+        <Button type="submit" variant="secondary" loading={loading} className="flex-1 justify-center">Create job</Button>
+        {dispatchWorkers.length > 0 && (
+          <Button type="button" loading={loading} disabled={!dispatchWorkerId} onClick={() => handleCreate(true)} className="flex-1 justify-center">
+            <Send size={14} /> Create & dispatch
+          </Button>
+        )}
       </div>
     </form>
   );
@@ -200,6 +237,134 @@ function DispatchModal({ job, workers, onDispatch, onClose }: {
   );
 }
 
+function CompletionMediaModal({ job, onClose }: { job: Job; onClose: () => void }) {
+  return (
+    <div className="space-y-5">
+      {/* Job info */}
+      <div className="bg-slate-800/60 rounded-lg p-4 text-sm space-y-1.5">
+        <div className="flex items-center gap-2 text-slate-200 font-medium">
+          <span>{JOB_TYPE_ICONS[job.type] ?? '📋'}</span>
+          <span>{job.type.charAt(0) + job.type.slice(1).toLowerCase()} job</span>
+        </div>
+        {job.property && <p className="text-slate-400">📍 {job.property.name}</p>}
+        {job.worker && <p className="text-slate-400">👷 {job.worker.user.name}</p>}
+        {job.completedAt && (
+          <p className="text-slate-500 text-xs">
+            Completed {format(new Date(job.completedAt), 'dd MMM yyyy, HH:mm')}
+          </p>
+        )}
+      </div>
+
+      {/* Photo */}
+      {job.completionPhotoUrl && (
+        <div>
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Photo</p>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={job.completionPhotoUrl}
+            alt="Completion photo"
+            className="w-full rounded-lg border border-slate-700 object-cover max-h-72"
+          />
+        </div>
+      )}
+
+      {/* Video */}
+      {job.completionVideoUrl && (
+        <div>
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Video</p>
+          <video
+            src={job.completionVideoUrl}
+            controls
+            playsInline
+            className="w-full rounded-lg border border-slate-700 max-h-72 bg-black"
+          />
+        </div>
+      )}
+
+      {!job.completionPhotoUrl && !job.completionVideoUrl && (
+        <p className="text-sm text-slate-500 text-center py-4">No completion media attached.</p>
+      )}
+
+      <div className="flex gap-3 pt-1">
+        <Button variant="secondary" onClick={onClose} className="flex-1 justify-center">Close</Button>
+      </div>
+    </div>
+  );
+}
+
+function getMonday(d: Date) {
+  const dt = new Date(d);
+  const day = dt.getDay();
+  dt.setDate(dt.getDate() - ((day + 6) % 7));
+  dt.setHours(0, 0, 0, 0);
+  return dt;
+}
+
+function addDays(d: Date, n: number) {
+  const dt = new Date(d);
+  dt.setDate(dt.getDate() + n);
+  return dt;
+}
+
+function isSameDay(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+function JobRow({ j, onDispatch, onComplete, onCancel, onArchive, onUnarchive, onViewMedia, isArchiveView }: {
+  j: Job;
+  onDispatch: (j: Job) => void;
+  onComplete: (id: string) => void;
+  onCancel: (id: string) => void;
+  onArchive: (id: string) => void;
+  onUnarchive: (id: string) => void;
+  onViewMedia: (j: Job) => void;
+  isArchiveView: boolean;
+}) {
+  return (
+    <tr className="hover:bg-slate-800/30 transition-colors">
+      <td className="px-6 py-4">
+        <div className="flex items-center gap-2">
+          <span className="text-xl">{JOB_TYPE_ICONS[j.type]}</span>
+          <div>
+            <p className="font-medium text-slate-200">{j.type.charAt(0) + j.type.slice(1).toLowerCase()}</p>
+            {j.booking && <p className="text-xs text-slate-500">{j.booking.guestName}</p>}
+          </div>
+        </div>
+      </td>
+      <td className="px-6 py-4 text-slate-300">{j.property?.name}</td>
+      <td className="px-6 py-4 text-slate-400 text-xs">{format(new Date(j.scheduledAt), 'dd MMM, HH:mm')}</td>
+      <td className="px-6 py-4">
+        {j.worker ? <span className="text-slate-300 text-xs">{j.worker.user.name}</span> : <span className="text-slate-600 text-xs italic">Unassigned</span>}
+      </td>
+      <td className="px-6 py-4">{statusBadge(j.status)}</td>
+      <td className="px-6 py-4">
+        <div className="flex items-center gap-1 justify-end">
+          {!isArchiveView && ['PENDING', 'DISPATCHED'].includes(j.status) && (
+            <button onClick={() => onDispatch(j)} className="p-1.5 rounded hover:bg-slate-800 text-sky-400 hover:text-sky-300" title="Dispatch"><Send size={14} /></button>
+          )}
+          {!isArchiveView && ['ACCEPTED', 'IN_PROGRESS', 'DISPATCHED'].includes(j.status) && (
+            <button onClick={() => onComplete(j.id)} className="p-1.5 rounded hover:bg-slate-800 text-emerald-400 hover:text-emerald-300" title="Mark complete"><CheckCircle size={14} /></button>
+          )}
+          {j.status === 'COMPLETED' && (j.completionPhotoUrl || j.completionVideoUrl) && (
+            <button onClick={() => onViewMedia(j)} className="p-1.5 rounded hover:bg-slate-800 text-blue-400 hover:text-blue-300" title="View completion media"><Camera size={14} /></button>
+          )}
+          {!isArchiveView && !['COMPLETED', 'CANCELLED'].includes(j.status) && (
+            <button onClick={() => onCancel(j.id)} className="p-1.5 rounded hover:bg-slate-800 text-red-400 hover:text-red-300" title="Cancel"><XCircle size={14} /></button>
+          )}
+          {!isArchiveView && ['COMPLETED', 'CANCELLED'].includes(j.status) && !j.archivedAt && (
+            <button onClick={() => onArchive(j.id)} className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-slate-300" title="Archive"><Archive size={14} /></button>
+          )}
+          {isArchiveView && j.archivedAt && (
+            <button onClick={() => onUnarchive(j.id)} className="p-1.5 rounded hover:bg-slate-800 text-amber-400 hover:text-amber-300" title="Unarchive"><ArchiveRestore size={14} /></button>
+          )}
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
 export default function JobsPage() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
@@ -208,45 +373,103 @@ export default function JobsPage() {
   const [loading, setLoading] = useState(true);
   const [createModal, setCreateModal] = useState(false);
   const [dispatchModal, setDispatchModal] = useState<Job | null>(null);
+  const [completionModal, setCompletionModal] = useState<Job | null>(null);
   const [statusFilter, setStatusFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
+  const [view, setView] = useState<'active' | 'weekly' | 'archived'>('active');
+  const [weekStart, setWeekStart] = useState(() => getMonday(new Date()));
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [view, weekStart]);
 
   async function load() {
     setLoading(true);
     try {
+      const params: Record<string, string> = {};
+      if (view === 'archived') params.archived = 'only';
+      else if (view === 'weekly') {
+        params.weekStart = weekStart.toISOString();
+        params.archived = 'true';
+      }
       const [j, p, w, b] = await Promise.all([
-        api.jobs.list(), api.properties.list(), api.workers.list(), api.bookings.list(),
+        api.jobs.list(params), api.properties.list(), api.workers.list(), api.bookings.list(),
       ]);
       setJobs(j); setProperties(p); setWorkers(w); setBookings(b);
     } finally { setLoading(false); }
   }
 
-  async function handleComplete(id: string) {
-    await api.jobs.complete(id); load();
-  }
-  async function handleCancel(id: string) {
-    if (!confirm('Cancel this job?')) return;
-    await api.jobs.cancel(id); load();
-  }
+  async function handleComplete(id: string) { await api.jobs.complete(id); load(); }
+  async function handleCancel(id: string) { if (!confirm('Cancel this job?')) return; await api.jobs.cancel(id); load(); }
+  async function handleArchive(id: string) { await api.jobs.archive(id); load(); }
+  async function handleUnarchive(id: string) { await api.jobs.unarchive(id); load(); }
 
   const filtered = jobs.filter((j) =>
     (!statusFilter || j.status === statusFilter) &&
     (!typeFilter || j.type === typeFilter)
   );
 
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const today = new Date();
+
+  const viewTabs = [
+    { key: 'active' as const, label: 'Active' },
+    { key: 'weekly' as const, label: 'Weekly' },
+    { key: 'archived' as const, label: 'Archived' },
+  ];
+
+  const rowProps = {
+    onDispatch: setDispatchModal,
+    onComplete: handleComplete,
+    onCancel: handleCancel,
+    onArchive: handleArchive,
+    onUnarchive: handleUnarchive,
+    onViewMedia: setCompletionModal,
+    isArchiveView: view === 'archived',
+  };
+
   return (
     <div className="p-4 md:p-8 space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-100">Jobs</h1>
-          <p className="text-slate-400 text-sm mt-1">{jobs.filter((j) => j.status === 'PENDING').length} pending dispatch</p>
+          <p className="text-slate-400 text-sm mt-1">
+            {view === 'archived'
+              ? `${jobs.length} archived`
+              : `${jobs.filter((j) => j.status === 'PENDING').length} pending dispatch`}
+          </p>
         </div>
         <Button onClick={() => setCreateModal(true)}><Plus size={16} /> Create job</Button>
       </div>
 
-      <div className="flex gap-3">
+      {/* View tabs */}
+      <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg p-1 w-fit">
+        {viewTabs.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setView(tab.key)}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              view === tab.key ? 'bg-brand-600 text-white' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+            }`}
+          >
+            {tab.key === 'archived' && <Archive size={14} className="inline mr-1.5 -mt-0.5" />}
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Filters + week nav */}
+      <div className="flex flex-wrap items-center gap-3">
+        {view === 'weekly' && (
+          <div className="flex items-center gap-2">
+            <button onClick={() => setWeekStart(addDays(weekStart, -7))} className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-slate-200"><ChevronLeft size={18} /></button>
+            <button
+              onClick={() => setWeekStart(getMonday(new Date()))}
+              className="text-sm text-slate-300 font-medium hover:text-white px-2 py-1 rounded hover:bg-slate-800"
+            >
+              {format(weekStart, 'dd MMM')} – {format(addDays(weekStart, 6), 'dd MMM yyyy')}
+            </button>
+            <button onClick={() => setWeekStart(addDays(weekStart, 7))} className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-slate-200"><ChevronRight size={18} /></button>
+          </div>
+        )}
         <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-44">
           <option value="">All statuses</option>
           {['PENDING', 'DISPATCHED', 'ACCEPTED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'].map((s) => (
@@ -265,7 +488,53 @@ export default function JobsPage() {
         <div className="flex items-center justify-center h-64">
           <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
         </div>
+      ) : view === 'weekly' ? (
+        /* ── Weekly view ─────────────────────────────────────── */
+        <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
+          {weekDays.map((day, i) => {
+            const dayJobs = filtered.filter((j) => isSameDay(new Date(j.scheduledAt), day));
+            const isToday = isSameDay(day, today);
+            return (
+              <div key={i} className={`bg-slate-900 border rounded-xl p-3 min-h-[140px] ${isToday ? 'border-brand-500' : 'border-slate-800'}`}>
+                <p className={`text-xs font-bold uppercase tracking-wider mb-2 ${isToday ? 'text-brand-400' : 'text-slate-500'}`}>
+                  {DAY_NAMES[i]} <span className="font-normal">{format(day, 'dd')}</span>
+                </p>
+                {dayJobs.length === 0 ? (
+                  <p className="text-xs text-slate-700 italic">No jobs</p>
+                ) : (
+                  <div className="space-y-2">
+                    {dayJobs.map((j) => (
+                      <div key={j.id} className="bg-slate-800/60 rounded-lg p-2 space-y-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm">{JOB_TYPE_ICONS[j.type]}</span>
+                          <span className="text-xs font-medium text-slate-200 truncate">{j.property?.name}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] text-slate-500">{format(new Date(j.scheduledAt), 'HH:mm')}</span>
+                          {statusBadge(j.status)}
+                        </div>
+                        {j.worker && <p className="text-[10px] text-slate-500">{j.worker.user.name}</p>}
+                        <div className="flex gap-0.5 pt-0.5">
+                          {['PENDING', 'DISPATCHED'].includes(j.status) && (
+                            <button onClick={() => setDispatchModal(j)} className="p-1 rounded hover:bg-slate-700 text-sky-400" title="Dispatch"><Send size={11} /></button>
+                          )}
+                          {j.status === 'COMPLETED' && (j.completionPhotoUrl || j.completionVideoUrl) && (
+                            <button onClick={() => setCompletionModal(j)} className="p-1 rounded hover:bg-slate-700 text-blue-400" title="View media"><Camera size={11} /></button>
+                          )}
+                          {['COMPLETED', 'CANCELLED'].includes(j.status) && !j.archivedAt && (
+                            <button onClick={() => handleArchive(j.id)} className="p-1 rounded hover:bg-slate-700 text-slate-500" title="Archive"><Archive size={11} /></button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       ) : (
+        /* ── Table view (active + archived) ─────────────────── */
         <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
           <table className="w-full text-sm">
             <thead>
@@ -280,57 +549,11 @@ export default function JobsPage() {
             </thead>
             <tbody className="divide-y divide-slate-800/60">
               {filtered.length === 0 && (
-                <tr><td colSpan={6} className="px-6 py-12 text-center text-slate-500">No jobs found</td></tr>
+                <tr><td colSpan={6} className="px-6 py-12 text-center text-slate-500">
+                  {view === 'archived' ? 'No archived jobs' : 'No jobs found'}
+                </td></tr>
               )}
-              {filtered.map((j) => (
-                <tr key={j.id} className="hover:bg-slate-800/30 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xl">{JOB_TYPE_ICONS[j.type]}</span>
-                      <div>
-                        <p className="font-medium text-slate-200">{j.type.charAt(0) + j.type.slice(1).toLowerCase()}</p>
-                        {j.booking && (
-                          <p className="text-xs text-slate-500">{j.booking.guestName}</p>
-                        )}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-slate-300">{j.property?.name}</td>
-                  <td className="px-6 py-4 text-slate-400 text-xs">
-                    {format(new Date(j.scheduledAt), 'dd MMM, HH:mm')}
-                  </td>
-                  <td className="px-6 py-4">
-                    {j.worker ? (
-                      <span className="text-slate-300 text-xs">{j.worker.user.name}</span>
-                    ) : (
-                      <span className="text-slate-600 text-xs italic">Unassigned</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4">{statusBadge(j.status)}</td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-1 justify-end">
-                      {['PENDING', 'DISPATCHED'].includes(j.status) && (
-                        <button onClick={() => setDispatchModal(j)}
-                          className="p-1.5 rounded hover:bg-slate-800 text-sky-400 hover:text-sky-300" title="Dispatch">
-                          <Send size={14} />
-                        </button>
-                      )}
-                      {['ACCEPTED', 'IN_PROGRESS', 'DISPATCHED'].includes(j.status) && (
-                        <button onClick={() => handleComplete(j.id)}
-                          className="p-1.5 rounded hover:bg-slate-800 text-emerald-400 hover:text-emerald-300" title="Mark complete">
-                          <CheckCircle size={14} />
-                        </button>
-                      )}
-                      {!['COMPLETED', 'CANCELLED'].includes(j.status) && (
-                        <button onClick={() => handleCancel(j.id)}
-                          className="p-1.5 rounded hover:bg-slate-800 text-red-400 hover:text-red-300" title="Cancel">
-                          <XCircle size={14} />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {filtered.map((j) => <JobRow key={j.id} j={j} {...rowProps} />)}
             </tbody>
           </table>
         </div>
@@ -351,6 +574,12 @@ export default function JobsPage() {
             onDispatch={async (wId) => { await api.jobs.dispatch(dispatchModal.id, wId); await load(); }}
             onClose={() => setDispatchModal(null)}
           />
+        </Modal>
+      )}
+
+      {completionModal && (
+        <Modal open={!!completionModal} onClose={() => setCompletionModal(null)} title="Completion media">
+          <CompletionMediaModal job={completionModal} onClose={() => setCompletionModal(null)} />
         </Modal>
       )}
     </div>

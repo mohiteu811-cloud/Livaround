@@ -7,6 +7,7 @@ import * as Notifications from 'expo-notifications';
 import { getToken, api } from '../src/lib/api';
 import { registerForPushNotifications } from '../src/lib/notifications';
 import { startLocationTracking } from '../src/lib/location';
+import { initLang } from '../src/lib/i18n';
 
 interface JobBanner {
   jobId: string;
@@ -21,7 +22,7 @@ export default function RootLayout() {
   const dismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    checkAuth();
+    initLang().then(() => checkAuth());
   }, []);
 
   useEffect(() => {
@@ -76,21 +77,23 @@ export default function RootLayout() {
         router.replace('/(auth)/login');
         return;
       }
-      const pushToken = await registerForPushNotifications();
-      if (pushToken && user.worker?.id) {
-        await api.workers.registerPushToken(user.worker.id, pushToken).catch(() => {});
-      }
-      // Start background location tracking
-      startLocationTracking().catch(() => {});
       router.replace('/(tabs)');
+
+      // Register push token and start location tracking after navigation
+      // (outside auth flow so failures don't redirect to login)
+      try {
+        const pushToken = await registerForPushNotifications();
+        if (pushToken && user.worker?.id) {
+          await api.workers.registerPushToken(user.worker.id, pushToken).catch(() => {});
+        }
+      } catch {}
+      startLocationTracking().catch(() => {});
     } catch {
       router.replace('/(auth)/login');
     } finally {
       setChecked(true);
     }
   }
-
-  if (!checked) return null;
 
   return (
     <SafeAreaProvider>

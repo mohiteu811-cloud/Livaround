@@ -4,11 +4,9 @@ import {
   RefreshControl, ActivityIndicator, Platform, StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { api, User, Job } from '../../src/lib/api';
-
-const TABS = ['My Jobs', 'Available'] as const;
-type TabType = typeof TABS[number];
+import { useLang, t } from '../../src/lib/i18n';
 
 const STATUS_COLOR: Record<string, string> = {
   DISPATCHED: '#f59e0b',
@@ -59,11 +57,21 @@ function JobCard({ job, onPress }: { job: Job; onPress: () => void }) {
 const STATUS_BAR_HEIGHT = Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 0;
 
 export default function JobsScreen() {
-  const [activeTab, setActiveTab] = useState<TabType>('My Jobs');
+  const [lang] = useLang();
+  const tr = t(lang);
+  const TABS = [tr.myJobs, tr.available] as const;
+  type TabType = string;
+
+  const [activeTab, setActiveTab] = useState<TabType>(tr.myJobs);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Reset active tab when language changes
+  useEffect(() => {
+    setActiveTab(tr.myJobs);
+  }, [lang]);
 
   useEffect(() => {
     loadUser();
@@ -72,6 +80,12 @@ export default function JobsScreen() {
   useEffect(() => {
     if (user) loadJobs();
   }, [user, activeTab]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (user) loadJobs();
+    }, [user, activeTab])
+  );
 
   async function loadUser() {
     try {
@@ -82,11 +96,13 @@ export default function JobsScreen() {
     }
   }
 
+  const isMyJobs = activeTab === tr.myJobs;
+
   const loadJobs = useCallback(async () => {
     if (!user?.worker) return;
     try {
       let data: Job[];
-      if (activeTab === 'My Jobs') {
+      if (isMyJobs) {
         data = await api.jobs.list();
         data = data.filter(j => ['DISPATCHED', 'ACCEPTED', 'IN_PROGRESS'].includes(j.status));
       } else {
@@ -99,21 +115,19 @@ export default function JobsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [user, activeTab]);
+  }, [user, activeTab, isMyJobs]);
 
   function onRefresh() {
     setRefreshing(true);
     loadJobs();
   }
 
-  const displayJobs = jobs;
-
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Jobs</Text>
+        <Text style={styles.headerTitle}>{tr.jobs}</Text>
         <Text style={styles.headerSub}>
-          {user ? `Hey, ${user.name.split(' ')[0]} 👋` : ''}
+          {user ? `${tr.hey}, ${user.name.split(' ')[0]} 👋` : ''}
         </Text>
       </View>
 
@@ -135,14 +149,14 @@ export default function JobsScreen() {
         <ActivityIndicator color="#3b82f6" style={{ marginTop: 48 }} />
       ) : (
         <FlatList
-          data={displayJobs}
+          data={jobs}
           keyExtractor={j => j.id}
           contentContainerStyle={styles.list}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#3b82f6" />}
           renderItem={({ item }) => (
             <View>
               <JobCard job={item} onPress={() => router.push(`/job/${item.id}`)} />
-              {activeTab === 'Available' && (
+              {!isMyJobs && (
                 <TouchableOpacity
                   style={styles.claimButton}
                   activeOpacity={0.7}
@@ -155,18 +169,18 @@ export default function JobsScreen() {
                     }
                   }}
                 >
-                  <Text style={styles.claimButtonText}>Claim Job</Text>
+                  <Text style={styles.claimButtonText}>{tr.claimJob}</Text>
                 </TouchableOpacity>
               )}
             </View>
           )}
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Text style={styles.emptyIcon}>{activeTab === 'My Jobs' ? '✅' : '🎉'}</Text>
+              <Text style={styles.emptyIcon}>{isMyJobs ? '✅' : '🎉'}</Text>
               <Text style={styles.emptyText}>
-                {activeTab === 'My Jobs' ? 'No active jobs' : 'No available jobs right now'}
+                {isMyJobs ? tr.noActiveJobs : tr.noAvailableJobs}
               </Text>
-              <Text style={styles.emptySubtext}>Pull to refresh</Text>
+              <Text style={styles.emptySubtext}>{tr.pullToRefresh}</Text>
             </View>
           }
         />

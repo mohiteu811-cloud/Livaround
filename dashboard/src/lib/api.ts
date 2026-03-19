@@ -141,7 +141,7 @@ export const api = {
   },
 
   jobs: {
-    list: (params?: { propertyId?: string; status?: string; type?: string }) => {
+    list: (params?: { propertyId?: string; status?: string; type?: string; archived?: string; weekStart?: string }) => {
       const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
       return request<Job[]>(`/api/jobs${qs}`);
     },
@@ -156,10 +156,14 @@ export const api = {
       request<Job>(`/api/jobs/${id}/accept`, { method: 'POST' }),
     start: (id: string) =>
       request<Job>(`/api/jobs/${id}/start`, { method: 'POST' }),
-    complete: (id: string) =>
-      request<Job>(`/api/jobs/${id}/complete`, { method: 'POST' }),
+    complete: (id: string, data?: { completionPhotoUrl?: string; completionVideoUrl?: string }) =>
+      request<Job>(`/api/jobs/${id}/complete`, { method: 'POST', ...(data ? { body: JSON.stringify(data) } : {}) }),
     cancel: (id: string) =>
       request<Job>(`/api/jobs/${id}/cancel`, { method: 'POST' }),
+    archive: (id: string) =>
+      request<Job>(`/api/jobs/${id}/archive`, { method: 'POST' }),
+    unarchive: (id: string) =>
+      request<Job>(`/api/jobs/${id}/unarchive`, { method: 'POST' }),
     reportIssue: (id: string, data: { description: string; severity: 'LOW' | 'MEDIUM' | 'HIGH'; photoUrl?: string; videoUrl?: string }) =>
       request<{ id: string }>(`/api/jobs/${id}/issues`, { method: 'POST', body: JSON.stringify(data) }),
     listIssues: (params?: { severity?: string; status?: string }) => {
@@ -168,6 +172,10 @@ export const api = {
     },
     resolveIssue: (issueId: string, status: 'OPEN' | 'IN_REVIEW' | 'RESOLVED') =>
       request<JobIssue>(`/api/jobs/issues/${issueId}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+    dispatchWorkers: (propertyId: string) =>
+      request<{ workerId: string; role: string; worker: { user: { name: string } } }[]>(
+        `/api/jobs/dispatch-workers?propertyId=${encodeURIComponent(propertyId)}`
+      ),
   },
 
   issues: {
@@ -434,6 +442,9 @@ export interface Job {
   status: 'PENDING' | 'DISPATCHED' | 'ACCEPTED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
   scheduledAt: string;
   completedAt?: string;
+  completionPhotoUrl?: string;
+  completionVideoUrl?: string;
+  archivedAt?: string;
   notes?: string;
   checklist?: { item: string; done: boolean }[];
   _count?: { issues: number };
