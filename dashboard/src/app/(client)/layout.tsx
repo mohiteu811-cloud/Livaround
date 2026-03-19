@@ -62,7 +62,7 @@ function ClientSidebar() {
       <div className="flex items-center gap-3 px-6 py-5 border-b border-slate-800">
         <div className="w-8 h-8 rounded-lg bg-brand-600 flex items-center justify-center text-white font-bold text-sm">L</div>
         <div>
-          <span className="font-bold text-lg text-white block leading-none">LivAround</span>
+          <span className="font-bold text-lg text-slate-100 block leading-none">LivAround</span>
           <span className="text-xs text-slate-500">Business</span>
         </div>
       </div>
@@ -108,13 +108,13 @@ function MobileClientHeader() {
       <header className="md:hidden flex items-center justify-between px-4 py-3 bg-slate-900 border-b border-slate-800 sticky top-0 z-30">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg bg-brand-600 flex items-center justify-center text-white font-bold text-xs">L</div>
-          <span className="font-bold text-base text-white">LivAround</span>
+          <span className="font-bold text-base text-slate-100">LivAround</span>
         </div>
         <div className="flex items-center gap-2">
           <Link href="/client/shifts/new" className="p-2 text-brand-400 hover:text-brand-300">
             <Plus size={20} />
           </Link>
-          <button onClick={() => setOpen(true)} className="p-2 text-slate-400 hover:text-white">
+          <button onClick={() => setOpen(true)} className="p-2 text-slate-400 hover:text-slate-100">
             <Menu size={22} />
           </button>
         </div>
@@ -127,8 +127,8 @@ function MobileClientHeader() {
         open ? 'translate-x-0' : '-translate-x-full'
       )}>
         <div className="flex items-center justify-between px-6 py-5 border-b border-slate-800">
-          <span className="font-bold text-lg text-white">LivAround</span>
-          <button onClick={() => setOpen(false)} className="text-slate-400 hover:text-white"><X size={20} /></button>
+          <span className="font-bold text-lg text-slate-100">LivAround</span>
+          <button onClick={() => setOpen(false)} className="text-slate-400 hover:text-slate-100"><X size={20} /></button>
         </div>
         <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
           <NavLinks onNavigate={() => setOpen(false)} />

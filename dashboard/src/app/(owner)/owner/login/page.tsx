@@ -44,7 +44,7 @@ export default function OwnerLoginPage() {
           <div className="w-10 h-10 rounded-xl bg-violet-600 flex items-center justify-center text-white font-bold text-lg">
             L
           </div>
-          <span className="text-2xl font-bold text-white">LivAround</span>
+          <span className="text-2xl font-bold text-slate-100">LivAround</span>
         </div>
 
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8">

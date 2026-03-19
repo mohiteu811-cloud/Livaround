@@ -79,7 +79,7 @@ export default function CompleteJobPage() {
     <WorkerShell>
       <div className="px-5 pt-12 pb-2 flex items-center gap-4">
         <button onClick={() => router.back()} className="text-blue-400 font-semibold text-sm">{tr.back}</button>
-        <h1 className="text-lg font-bold text-white">
+        <h1 className="text-lg font-bold text-slate-100">
           {lang === 'hi' ? 'काम पूरा करें' : 'Complete Job'}
         </h1>
       </div>

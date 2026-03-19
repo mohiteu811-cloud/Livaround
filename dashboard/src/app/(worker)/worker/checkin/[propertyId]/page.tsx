@@ -101,7 +101,7 @@ export default function WorkerCheckinPage() {
                   <div className="flex items-center gap-3">
                     <span className="text-3xl">{JOB_ICON[job.type] ?? '🔧'}</span>
                     <div>
-                      <p className="text-white font-semibold">{job.type}</p>
+                      <p className="text-slate-100 font-semibold">{job.type}</p>
                       <p className="text-xs text-slate-500">{fmt(job.scheduledAt)}</p>
                     </div>
                   </div>

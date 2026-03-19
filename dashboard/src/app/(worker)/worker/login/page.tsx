@@ -38,7 +38,7 @@ export default function WorkerLoginPage() {
           <div className="w-16 h-16 rounded-2xl bg-blue-600 flex items-center justify-center text-white text-2xl font-bold mx-auto mb-4">
             L
           </div>
-          <h1 className="text-2xl font-bold text-white">LivAround</h1>
+          <h1 className="text-2xl font-bold text-slate-100">LivAround</h1>
           <p className="text-blue-400 text-sm font-semibold tracking-widest uppercase mt-1">Worker Portal</p>
         </div>
 
@@ -57,7 +57,7 @@ export default function WorkerLoginPage() {
               onChange={e => setEmail(e.target.value)}
               placeholder="your@email.com"
               required
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-4 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 text-base"
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-4 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 text-base"
             />
           </div>
           <div>
@@ -68,7 +68,7 @@ export default function WorkerLoginPage() {
               onChange={e => setPassword(e.target.value)}
               placeholder="••••••••"
               required
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-4 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 text-base"
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-4 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 text-base"
             />
           </div>
           <button
