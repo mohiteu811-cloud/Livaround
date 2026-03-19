@@ -1,7 +1,15 @@
 # LivAround — User Guide & FAQ
 
-> **Platform version:** 1.0
+> **Platform version:** 1.1
+> **Last updated:** March 2026
 > **Portals:** Host Dashboard · Owner Portal · Worker App (mobile) · Worker Portal (web) · Business / Client Portal · Guest Stay Page
+>
+> **What's new in v1.1:** Light/Dark mode toggle · Guest service requests panel · Early check-in flow · Split camera/upload buttons across all media inputs · Guest link copy button in bookings table
+
+---
+
+> 📸 **About screenshots in this guide**
+> Screenshot placeholders are marked with `📸 Screenshot:` callouts throughout this guide. Replace each placeholder with an actual screenshot of the corresponding screen when publishing.
 
 ---
 
@@ -32,6 +40,7 @@
    - [For Owners](#faq-owners)
    - [For Workers](#faq-workers)
    - [For Businesses](#faq-businesses)
+   - [For Guests](#faq-guests)
 
 ---
 
@@ -72,6 +81,11 @@ LivAround is an end-to-end property operations platform. It connects **hosts** (
 2. Enter your name, email and password.
 3. You are taken directly to the **Dashboard** overview.
 
+**Light / Dark mode**
+The dashboard supports both light and dark themes. Click the **Sun / Moon icon** in the bottom-left of the sidebar (or in the mobile navigation drawer) to toggle between modes. Your preference is saved automatically and persists across sessions.
+
+> 📸 **Screenshot:** *Sidebar bottom-left showing the Light mode / Dark mode toggle button with sun and moon icons*
+
 **Dashboard at a glance**
 The dashboard shows your key metrics at the top:
 - Total properties and active bookings
@@ -87,6 +101,8 @@ Below the metrics you will see:
 - A **recent bookings** table
 - An **upcoming jobs** table
 - A **low stock alerts** list
+
+> 📸 **Screenshot:** *Dashboard overview showing KPI cards, revenue chart, booking sources chart, recent bookings table, and low stock alerts panel*
 
 ---
 
@@ -142,6 +158,22 @@ Use the icons in the bookings table row to trigger these transitions.
 
 **Searching and filtering**
 Use the search bar to find bookings by guest name or email. Use the status dropdown to filter by Confirmed / Checked In / Checked Out / Cancelled.
+
+> 📸 **Screenshot:** *Bookings table showing guest name, dates, status badges, the "Guest link" copy button, and the Requests bell icon*
+
+**Sharing the guest stay link**
+Each booking with a confirmed guest generates a unique stay link (`/stay/[code]`). In the bookings table you will see a **"Guest link"** pill button beneath the guest's name. Click it to instantly copy the link to your clipboard — the button briefly shows **"Copied!"** to confirm. Share this link with the guest via your usual welcome message or automated Airbnb/Booking.com template.
+
+**Guest service requests**
+A **bell icon** with a **"View"** button appears in the Requests column of the bookings table whenever a guest has submitted a service request from their stay page.
+
+1. Click **View** to open the Requests modal.
+2. Each request shows the type, date/time submitted, any notes and current status.
+3. **Early check-in requests** are highlighted in amber with a caution icon. The message *"Early check-in — confirm only if available. Additional charge may apply."* is shown as a reminder.
+4. For any **Pending** request, use the inline **Confirm** (green) or **Decline** (red) buttons to respond.
+5. The guest sees the updated status on their stay page immediately.
+
+> 📸 **Screenshot:** *Guest service requests modal showing request types, statuses, the amber early check-in highlight, and Confirm/Decline action buttons*
 
 ---
 
@@ -503,9 +535,16 @@ Your action button changes based on the job status:
 ### Marking a job complete
 
 1. Tap **Mark Complete ✅**.
-2. On the completion screen, optionally take or upload a **photo** and/or **video** of the finished work.
-3. Tap **✅ Mark Complete**.
-4. The host is notified.
+2. On the completion screen you can attach evidence using the split buttons:
+   - **📷 Take photo** — opens your camera directly
+   - **📁 Upload** — opens your photo gallery to pick an existing image
+   - **🎥 Record** — opens your camera in video mode
+   - **📁 Upload** (video) — opens your gallery to pick an existing video
+3. A preview of each selected file appears before you submit. Tap the **✕** on a preview to remove it and choose again.
+4. Tap **✅ Mark Complete**.
+5. The host is notified and can view your media from the archived job.
+
+> 📸 **Screenshot:** *Job completion screen showing the four split buttons (Take photo, Upload, Record, Upload video) with file preview thumbnails*
 
 > If any checklist items are unchecked, the app will warn you and ask whether you want to proceed anyway.
 
@@ -517,8 +556,12 @@ Your action button changes based on the job status:
    - **Medium** — Needs attention soon
    - **High** — Urgent / safety concern
 3. Describe the issue.
-4. Optionally attach a **photo** (camera) and/or **video**.
+4. Attach evidence using the split buttons:
+   - **📷 Take photo** / **📁 Upload** for a photo
+   - **🎥 Record** / **📁 Upload** for a video
 5. Tap **Submit Issue Report**.
+
+> 📸 **Screenshot:** *Issue report screen showing severity selector, description field, and the split Take photo / Upload / Record / Upload video buttons*
 
 The host is notified immediately.
 
@@ -576,6 +619,39 @@ Guests do not need an account. The host automatically includes a unique link in 
 - Operations guide content (areas and docs) if the host has set up the guide
 - Vendor/emergency contact information
 
+> 📸 **Screenshot:** *Guest stay page showing WiFi details, check-in instructions, house rules, and the Services & Requests tab*
+
+**Services & Requests tab**
+Guests can submit service requests directly from their stay page under the **Services & Requests** tab.
+
+Available request types:
+- Housekeeping
+- Cook
+- Driver
+- Car Rental
+- Arrival Time
+- Early Check-In *(see below)*
+- Departure Time
+- Other
+
+**How to submit a request:**
+1. Open the stay link on your phone or browser.
+2. Tap the **Services & Requests** tab.
+3. Select your request type and add any notes.
+4. For an **arrival time** request: enter your expected arrival time.
+   - If the time is **before 3:00 PM** (standard check-in), it is automatically submitted as an **Early Check-In** request. An amber notice will appear: *"Early check-in requested. Standard check-in is at 3:00 PM. Early check-in is not guaranteed and an additional charge may apply — your host will confirm with you."*
+5. Tap **Submit Request**.
+6. Your host will confirm or decline from their dashboard. You will see the updated status on this page.
+
+> 📸 **Screenshot:** *Services & Requests tab with request type selector, notes field, and the amber early check-in warning banner*
+
+**Visitor ID verification**
+If your host requires ID verification, you can upload or photograph your ID directly from the stay page using the split buttons:
+- **📷 Take photo** — opens your camera
+- **📁 Upload** — selects from your gallery
+
+> 📸 **Screenshot:** *ID verification section showing Take photo and Upload buttons with a photo preview*
+
 Guests cannot create accounts, modify bookings or contact workers.
 
 ---
@@ -610,6 +686,21 @@ A: Go to **Maintenance** and make sure you have no status filter applied. New re
 
 **Q: Can I use LivAround without the mobile worker app?**
 A: Yes. Workers can use the web portal at `/worker`. The mobile app provides additional features such as GPS location tracking and push notifications.
+
+**Q: How do I switch the dashboard between light and dark mode?**
+A: Click the **Sun / Moon icon** at the bottom-left of the sidebar (desktop) or inside the mobile navigation drawer. Your preference is remembered automatically.
+
+**Q: A guest submitted an early check-in request. Do I have to charge them?**
+A: That is at your discretion. The request is flagged with an amber warning reminding you an additional charge may apply. Confirm or decline from the Requests modal in the Bookings page and follow up with the guest directly about any fees.
+
+**Q: Where do I see guest service requests (housekeeping, early check-in, etc.)?**
+A: Go to **Bookings**. Any booking that has a guest request shows a bell icon in the **Requests** column. Click **View** to see all requests and respond to them inline.
+
+**Q: The guest stay link is hard to find. Where is it?**
+A: In the Bookings table, look for the **"Guest link"** pill button directly below the guest's name and email. Click it once to copy the URL to your clipboard — it briefly shows "Copied!" to confirm.
+
+**Q: Can I see what service requests a guest has made before they arrive?**
+A: Yes. The Requests column in the Bookings table shows a bell icon as soon as a guest submits any request. Click **View** to review all requests and their statuses at any time.
 
 ---
 
@@ -652,6 +743,12 @@ A: Tap **Profile** → **Language** → select **हिन्दी**. Or tap th
 **Q: I completed a job but forgot to attach a photo. Can I add it afterwards?**
 A: Once a job is marked Complete it cannot be reopened from the app. Contact your manager to add notes or media manually.
 
+**Q: What is the difference between "Take photo" and "Upload" on the completion screen?**
+A: **Take photo** opens your phone camera directly so you can capture a new image on the spot. **Upload** opens your gallery so you can select an existing photo you already took. The same split applies to videos (Record vs Upload).
+
+**Q: The app is showing button labels I don't understand.**
+A: Switch to your preferred language. Tap **Profile → Language** and select **English** or **हिन्दी (Hindi)**. All button labels, job names and messages will update immediately.
+
 **Q: My location is not showing on the host's map.**
 A: Make sure you granted **Always** location permission to the LivAround app in your phone's settings (iOS: Settings → LivAround → Location → Always; Android: Settings → Apps → LivAround → Permissions → Location → Allow all the time).
 
@@ -670,6 +767,25 @@ A: In-platform messaging is on the roadmap. Currently, worker contact details ar
 
 **Q: My shift is showing as "Filled" but I need an extra person.**
 A: Edit the shift and increase the **workers needed** count. The status will update back to Partially Filled and workers can apply again.
+
+---
+
+### FAQ: Guests
+
+**Q: How do I access my stay page?**
+A: Your host will send you a unique link (starting with `/stay/`) in your booking confirmation. Open it in any browser — no login or app required.
+
+**Q: How do I request an early check-in?**
+A: Open your stay link, go to the **Services & Requests** tab, and enter your expected arrival time. If it's before 3:00 PM the system automatically flags it as an early check-in request and your host will confirm or decline. Early check-in is not guaranteed and may carry an additional charge.
+
+**Q: I submitted a service request. How will I know if it's confirmed?**
+A: Reload your stay page and check the Services & Requests tab. The status of each request (Pending / Confirmed / Declined) is shown there. Your host may also contact you directly.
+
+**Q: The stay page is asking me to upload an ID. Is this secure?**
+A: Yes. The ID photo is stored securely and is only accessible to your host. Use **Take photo** to capture it directly or **Upload** to select from your gallery.
+
+**Q: I can't find my WiFi password on the stay page.**
+A: The WiFi details are shown on the main tab of your stay page. If the section is empty, contact your host — they may not have added the network details to your property record yet.
 
 ---
 
