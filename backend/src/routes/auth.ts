@@ -37,7 +37,8 @@ function signToken(payload: object) {
 
 router.post('/register', validate(registerSchema), async (req: Request, res: Response) => {
   try {
-    const { name, email, password, phone } = req.body;
+    const { name, password, phone } = req.body;
+    const email = (req.body.email as string).trim().toLowerCase();
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
@@ -78,9 +79,10 @@ router.post('/register', validate(registerSchema), async (req: Request, res: Res
 router.post('/login', validate(loginSchema), async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
+    const normalizedEmail = email.trim().toLowerCase();
 
     const user = await prisma.user.findUnique({
-      where: { email },
+      where: { email: normalizedEmail },
       include: { host: true, worker: true, owner: true, client: true },
     });
 
@@ -119,7 +121,8 @@ router.post('/login', validate(loginSchema), async (req: Request, res: Response)
 
 router.post('/register-client', validate(registerClientSchema), async (req: Request, res: Response) => {
   try {
-    const { name, email, password, phone, businessName, businessType, city, gstNumber } = req.body;
+    const { name, password, phone, businessName, businessType, city, gstNumber } = req.body;
+    const email = (req.body.email as string).trim().toLowerCase();
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
