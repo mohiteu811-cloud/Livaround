@@ -95,7 +95,8 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 
 router.post('/', validate(createWorkerSchema), async (req: AuthRequest, res: Response) => {
   try {
-    const { name, email, phone, skills, location, bio } = req.body;
+    const { name, phone, skills, location, bio } = req.body;
+    const email = (req.body.email as string).trim().toLowerCase();
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) return res.status(409).json({ error: 'Email already registered' });
 
