@@ -144,6 +144,10 @@ export const api = {
     delete: (id: string) => request<void>(`/api/workers/${id}`, { method: 'DELETE' }),
     resetPassword: (id: string) => request<{ tempPassword: string }>(`/api/workers/${id}/reset-password`, { method: 'POST' }),
     getLocation: (id: string) => request<WorkerLocation>(`/api/workers/${id}/location`),
+    myProperties: () =>
+      request<{ id: string; name: string; city: string; address?: string; type?: string; staffRole: string }[]>(
+        '/api/workers/me/properties'
+      ),
   },
 
   jobs: {
@@ -152,6 +156,8 @@ export const api = {
       return request<Job[]>(`/api/jobs${qs}`);
     },
     available: () => request<Job[]>('/api/jobs/available'),
+    selfStart: (data: { propertyId: string; type: string; notes?: string }) =>
+      request<Job>('/api/jobs/self-start', { method: 'POST', body: JSON.stringify(data) }),
     claim: (id: string) => request<Job>(`/api/jobs/${id}/claim`, { method: 'POST' }),
     get: (id: string) => request<Job>(`/api/jobs/${id}`),
     create: (data: Partial<Job>) =>

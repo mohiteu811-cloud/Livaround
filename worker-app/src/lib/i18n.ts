@@ -136,8 +136,19 @@ export const hi = {
   signOut: 'साइन आउट',
   signOutConfirm: 'साइन आउट करें?',
 
+  // Properties tab
+  myProperties: 'मेरी प्रॉपर्टी',
+  noPropertiesAssigned: 'कोई प्रॉपर्टी नहीं मिली',
+  startNewJob: 'नया काम शुरू करें',
+  jobTypeLabel: 'काम का प्रकार',
+  optional: 'वैकल्पिक',
+  notesPlaceholder: 'कोई नोट्स… (वैकल्पिक)',
+  startJobNow: 'अभी काम शुरू करें',
+  starting: 'शुरू हो रहा है…',
+
   // Tab bar
   tabJobs: 'काम',
+  tabProperties: 'प्रॉपर्टी',
   tabProfile: 'प्रोफ़ाइल',
 
   // Language
@@ -238,7 +249,18 @@ export const en: typeof hi = {
   signOut: 'Sign Out',
   signOutConfirm: 'Sign out?',
 
+  // Properties tab
+  myProperties: 'My Properties',
+  noPropertiesAssigned: 'No properties assigned yet',
+  startNewJob: 'Start New Job',
+  jobTypeLabel: 'Job Type',
+  optional: 'optional',
+  notesPlaceholder: 'Any notes… (optional)',
+  startJobNow: 'Start Job Now',
+  starting: 'Starting…',
+
   tabJobs: 'Jobs',
+  tabProperties: 'Properties',
   tabProfile: 'Profile',
 
   language: 'Language',

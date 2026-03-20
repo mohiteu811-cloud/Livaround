@@ -9,6 +9,29 @@ import { sendWorkerWelcomeEmail } from '../lib/email';
 const router = Router();
 router.use(authenticate);
 
+// GET /api/workers/me/properties — properties the logged-in worker is assigned to
+router.get('/me/properties', async (req: AuthRequest, res: Response) => {
+  try {
+    if (req.user!.role !== 'WORKER') return res.status(403).json({ error: 'Workers only' });
+    const worker = await prisma.worker.findUnique({ where: { userId: req.user!.id } });
+    if (!worker) return res.json([]);
+    const assignments = await prisma.propertyStaff.findMany({
+      where: { workerId: worker.id },
+      include: {
+        property: { select: { id: true, name: true, city: true, address: true, type: true, isActive: true } },
+      },
+    });
+    return res.json(
+      assignments
+        .filter(a => a.property.isActive)
+        .map(a => ({ ...a.property, staffRole: a.role }))
+    );
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Lightweight location update — worker identifies themselves via JWT
 router.post('/me/location', async (req: AuthRequest, res: Response) => {
   try {

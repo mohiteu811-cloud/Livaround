@@ -107,6 +107,8 @@ export const api = {
       return request<Job[]>(`/api/jobs${qs}`);
     },
     available: () => request<Job[]>('/api/jobs/available'),
+    selfStart: (data: { propertyId: string; type: string; notes?: string }) =>
+      request<Job>('/api/jobs/self-start', { method: 'POST', body: JSON.stringify(data) }),
     claim: (id: string) => request<Job>(`/api/jobs/${id}/claim`, { method: 'POST' }),
     get: (id: string) => request<Job>(`/api/jobs/${id}`),
     accept: (id: string) => request<Job>(`/api/jobs/${id}/accept`, { method: 'POST' }),
@@ -144,5 +146,9 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify({ pushToken }),
       }),
+    myProperties: () =>
+      request<{ id: string; name: string; city: string; address?: string; type?: string; staffRole: string }[]>(
+        '/api/workers/me/properties'
+      ),
   },
 };

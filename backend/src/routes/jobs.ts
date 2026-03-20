@@ -176,6 +176,32 @@ router.post('/', validate(createJobSchema), async (req: AuthRequest, res: Respon
   }
 });
 
+// POST /api/jobs/self-start — worker creates and immediately starts a job at an assigned property
+router.post('/self-start', async (req: AuthRequest, res: Response) => {
+  try {
+    if (!isWorker(req)) return res.status(403).json({ error: 'Workers only' });
+    const { propertyId, type, notes } = req.body;
+    if (!propertyId || !type) return res.status(400).json({ error: 'propertyId and type are required' });
+    if (!['CLEANING', 'COOKING', 'DRIVING', 'MAINTENANCE'].includes(type)) {
+      return res.status(400).json({ error: 'Invalid job type' });
+    }
+    const worker = await prisma.worker.findUnique({ where: { userId: req.user!.id } });
+    if (!worker) return res.status(404).json({ error: 'Worker not found' });
+    const staffAssignment = await prisma.propertyStaff.findFirst({
+      where: { propertyId, workerId: worker.id },
+    });
+    if (!staffAssignment) return res.status(403).json({ error: 'You are not assigned to this property' });
+    const job = await prisma.job.create({
+      data: { propertyId, type, notes: notes || null, workerId: worker.id, status: 'IN_PROGRESS', scheduledAt: new Date() },
+      include: JOB_INCLUDE,
+    });
+    return res.status(201).json(parseJob(job));
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // GET /api/jobs/issues — all issues across the host's jobs (or worker's jobs)
 router.get('/issues', async (req: AuthRequest, res: Response) => {
   try {
