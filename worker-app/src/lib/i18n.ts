@@ -135,6 +135,8 @@ export const hi = {
   skills: 'कौशल',
   signOut: 'साइन आउट',
   signOutConfirm: 'साइन आउट करें?',
+  history: 'इतिहास',
+  noHistory: 'कोई पिछले काम नहीं',
 
   // Properties tab
   myProperties: 'मेरी प्रॉपर्टी',
@@ -248,6 +250,8 @@ export const en: typeof hi = {
   skills: 'Skills',
   signOut: 'Sign Out',
   signOutConfirm: 'Sign out?',
+  history: 'History',
+  noHistory: 'No past jobs yet',
 
   // Properties tab
   myProperties: 'My Properties',

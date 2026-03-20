@@ -38,7 +38,7 @@ function formatDate(iso: string) {
   });
 }
 
-type Tab = 'properties' | 'my' | 'available' | 'history';
+type Tab = 'properties' | 'my' | 'available';
 
 interface AssignedProperty {
   id: string; name: string; city: string; address?: string; type?: string; staffRole: string;
@@ -78,9 +78,6 @@ export default function WorkerJobsPage() {
       if (tab === 'my') {
         const data = await api.jobs.list();
         setJobs(data.filter(j => ['DISPATCHED','ACCEPTED','IN_PROGRESS'].includes(j.status)));
-      } else if (tab === 'history') {
-        const data = await api.jobs.list();
-        setJobs(data.filter(j => ['COMPLETED','CANCELLED'].includes(j.status)));
       } else if (tab === 'available') {
         const data = await api.jobs.available();
         setJobs(data);
@@ -121,7 +118,6 @@ export default function WorkerJobsPage() {
     { key: 'properties', label: tr.myProperties },
     { key: 'my',         label: tr.myJobs },
     { key: 'available',  label: tr.available },
-    { key: 'history',    label: tr.history },
   ];
 
   return (
@@ -187,7 +183,7 @@ export default function WorkerJobsPage() {
         </div>
       )}
 
-      {/* Jobs tabs (my / available / history) */}
+      {/* Jobs tabs (my / available) */}
       {tab !== 'properties' && (
         <>
           <div className="px-5 mb-3 flex justify-end">
@@ -207,11 +203,11 @@ export default function WorkerJobsPage() {
               </div>
             ) : jobs.length === 0 ? (
               <div className="text-center pt-16 space-y-2">
-                <div className="text-5xl">{tab === 'my' ? '✅' : tab === 'history' ? '📋' : '🎉'}</div>
+                <div className="text-5xl">{tab === 'my' ? '✅' : '🎉'}</div>
                 <p className="text-slate-100 font-semibold text-lg">
-                  {tab === 'my' ? tr.noActiveJobs : tab === 'history' ? tr.noHistory : tr.noAvailableJobs}
+                  {tab === 'my' ? tr.noActiveJobs : tr.noAvailableJobs}
                 </p>
-                {tab !== 'history' && <p className="text-slate-500 text-sm">{tr.tapRefresh}</p>}
+                <p className="text-slate-500 text-sm">{tr.tapRefresh}</p>
               </div>
             ) : (
               jobs.map(job => (
