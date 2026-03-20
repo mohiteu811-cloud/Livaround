@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import WorkerShell, { useLang } from '../WorkerShell';
 import { t } from '../i18n';
-import { api, User } from '@/lib/api';
+import { api, User, Job } from '@/lib/api';
 
 const SKILL_ICON: Record<string, string> = {
   CLEANING: '🧹', COOKING: '🍳', DRIVING: '🚗', MAINTENANCE: '🔨',
@@ -18,12 +18,17 @@ export default function WorkerProfilePage() {
   const [available, setAvailable] = useState(false);
   const [toggling, setToggling] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [history, setHistory] = useState<Job[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
 
   useEffect(() => {
     api.auth.me()
       .then(u => { setUser(u); setAvailable(u.worker?.isAvailable ?? false); })
       .catch(() => router.replace('/worker/login'))
       .finally(() => setLoading(false));
+    api.jobs.list()
+      .then(data => setHistory(data.filter(j => ['COMPLETED', 'CANCELLED'].includes(j.status))))
+      .finally(() => setHistoryLoading(false));
   }, [router]);
 
   async function toggleAvailability() {
@@ -120,6 +125,43 @@ export default function WorkerProfilePage() {
             </div>
           </div>
         )}
+
+        {/* Job History */}
+        <div className="bg-slate-800 border border-slate-700 rounded-2xl overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-700">
+            <h3 className="text-sm font-semibold text-slate-100 uppercase tracking-wider">📋 {tr.history}</h3>
+          </div>
+          {historyLoading ? (
+            <div className="flex justify-center py-8">
+              <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : history.length === 0 ? (
+            <p className="text-slate-500 text-sm text-center py-8">{tr.noHistory}</p>
+          ) : (
+            <div className="divide-y divide-slate-700">
+              {history.map(job => (
+                <div key={job.id} className="px-4 py-3 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-xl flex-shrink-0">
+                      {job.type === 'CLEANING' ? '🧹' : job.type === 'COOKING' ? '🍳' : job.type === 'DRIVING' ? '🚗' : '🔨'}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-slate-200 text-sm font-semibold truncate">{job.property?.name ?? '—'}</p>
+                      <p className="text-slate-500 text-xs">{job.type} · {new Date(job.scheduledAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                    </div>
+                  </div>
+                  <span className={`flex-shrink-0 text-xs font-bold px-2 py-0.5 rounded-md border ${
+                    job.status === 'COMPLETED'
+                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                      : 'bg-red-500/10 text-red-400 border-red-500/30'
+                  }`}>
+                    {job.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         <button
           onClick={handleLogout}

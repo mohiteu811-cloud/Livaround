@@ -21,6 +21,7 @@ import {
   BarChart3,
   HardHat,
   MapPin,
+  UserCheck,
 } from 'lucide-react';
 import { clearToken } from '@/lib/auth';
 import { ThemeToggle } from './ThemeToggle';
@@ -29,6 +30,7 @@ const nav = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Overview' },
   { href: '/properties', icon: Building2, label: 'Properties' },
   { href: '/bookings', icon: CalendarCheck, label: 'Bookings' },
+  { href: '/guests', icon: UserCheck, label: 'Guests' },
   { href: '/jobs', icon: Briefcase, label: 'Jobs' },
   { href: '/workers', icon: Users, label: 'Workers' },
   { href: '/tracking', icon: MapPin, label: 'Tracking' },

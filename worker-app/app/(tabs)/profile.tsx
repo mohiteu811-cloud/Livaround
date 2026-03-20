@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { api, clearToken, User } from '../../src/lib/api';
+import { api, clearToken, User, Job } from '../../src/lib/api';
 import { useLang, t } from '../../src/lib/i18n';
 
 const SKILL_ICON: Record<string, string> = {
@@ -24,6 +24,8 @@ export default function ProfileScreen() {
   const [available, setAvailable] = useState(false);
   const [toggling, setToggling] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [history, setHistory] = useState<Job[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
 
   useEffect(() => {
     loadProfile();
@@ -39,6 +41,11 @@ export default function ProfileScreen() {
     } finally {
       setLoading(false);
     }
+    try {
+      const jobs = await api.jobs.list();
+      setHistory(jobs.filter(j => ['COMPLETED', 'CANCELLED'].includes(j.status)));
+    } catch { /* ignore */ }
+    finally { setHistoryLoading(false); }
   }
 
   async function toggleAvailability(value: boolean) {
@@ -167,6 +174,33 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        {/* Job History */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>📋 {tr.history}</Text>
+          {historyLoading ? (
+            <ActivityIndicator color="#3b82f6" />
+          ) : history.length === 0 ? (
+            <Text style={styles.historyEmpty}>{tr.noHistory}</Text>
+          ) : (
+            history.map(job => (
+              <View key={job.id} style={styles.historyRow}>
+                <Text style={styles.historyIcon}>
+                  {job.type === 'CLEANING' ? '🧹' : job.type === 'COOKING' ? '🍳' : job.type === 'DRIVING' ? '🚗' : '🔨'}
+                </Text>
+                <View style={styles.historyInfo}>
+                  <Text style={styles.historyProperty} numberOfLines={1}>{job.property?.name ?? '—'}</Text>
+                  <Text style={styles.historyMeta}>{job.type} · {new Date(job.scheduledAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</Text>
+                </View>
+                <View style={[styles.historyBadge, job.status === 'COMPLETED' ? styles.historyBadgeDone : styles.historyBadgeCancelled]}>
+                  <Text style={[styles.historyBadgeText, job.status === 'COMPLETED' ? styles.historyBadgeTextDone : styles.historyBadgeTextCancelled]}>
+                    {job.status}
+                  </Text>
+                </View>
+              </View>
+            ))
+          )}
+        </View>
+
         {/* Sign Out */}
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
           <Text style={styles.logoutText}>{tr.signOut}</Text>
@@ -237,6 +271,18 @@ const styles = StyleSheet.create({
   },
   langOptionText: { fontSize: 15, fontWeight: '600', color: '#cbd5e1' },
   langOptionTextActive: { color: '#93c5fd' },
+  historyEmpty: { fontSize: 14, color: '#64748b', textAlign: 'center', paddingVertical: 8 },
+  historyRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#334155' },
+  historyIcon: { fontSize: 20, width: 28, textAlign: 'center' },
+  historyInfo: { flex: 1 },
+  historyProperty: { fontSize: 14, fontWeight: '600', color: '#e2e8f0' },
+  historyMeta: { fontSize: 12, color: '#64748b', marginTop: 1 },
+  historyBadge: { borderRadius: 6, borderWidth: 1, paddingHorizontal: 6, paddingVertical: 2 },
+  historyBadgeDone: { backgroundColor: '#10b98120', borderColor: '#10b98150' },
+  historyBadgeCancelled: { backgroundColor: '#ef444420', borderColor: '#ef444450' },
+  historyBadgeText: { fontSize: 10, fontWeight: '700' },
+  historyBadgeTextDone: { color: '#10b981' },
+  historyBadgeTextCancelled: { color: '#ef4444' },
   logoutButton: {
     borderRadius: 14, paddingVertical: 16, alignItems: 'center',
     borderWidth: 1, borderColor: '#ef4444',
