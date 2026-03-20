@@ -117,7 +117,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       },
       include: {
         property: { select: { id: true, name: true, city: true } },
-        _count: { select: { jobs: true } },
+        _count: { select: { jobs: true, guestIds: true, visitors: true } },
       },
       orderBy: { checkIn: 'desc' },
     });
@@ -205,6 +205,8 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
       include: {
         property: { select: { id: true, name: true, city: true, country: true } },
         jobs: { include: { worker: { include: { user: { select: { name: true, email: true } } } } } },
+        guestIds: { orderBy: { createdAt: 'asc' } },
+        visitors: { orderBy: { createdAt: 'asc' } },
       },
     });
     if (!booking) return res.status(404).json({ error: 'Booking not found' });

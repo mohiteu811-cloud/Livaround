@@ -397,6 +397,27 @@ export interface Property {
   _count?: { bookings: number; jobs: number };
 }
 
+export interface GuestID {
+  id: string;
+  bookingId: string;
+  guestName: string;
+  documentType: 'PASSPORT' | 'NATIONAL_ID' | 'DRIVERS_LICENSE' | 'OTHER';
+  documentUrl: string;
+  createdAt: string;
+}
+
+export interface GuestVisitor {
+  id: string;
+  bookingId: string;
+  visitorName: string;
+  purpose?: string;
+  expectedDate?: string;
+  expectedTime?: string;
+  idUrl?: string;
+  notes?: string;
+  createdAt: string;
+}
+
 export interface Booking {
   id: string;
   propertyId: string;
@@ -416,7 +437,9 @@ export interface Booking {
   guestCode?: string;
   lockCode?: string;
   createdAt: string;
-  _count?: { jobs: number };
+  guestIds?: GuestID[];
+  visitors?: GuestVisitor[];
+  _count?: { jobs: number; guestIds?: number; visitors?: number };
 }
 
 export interface GuestServiceRequest {
