@@ -114,6 +114,8 @@ export const hi = {
   permissionRequired: 'अनुमति आवश्यक',
   allowMediaAccess: 'कृपया सेटिंग्स में मीडिया लाइब्रेरी की अनुमति दें।',
   allowCameraAccess: 'कृपया सेटिंग्स में कैमरा की अनुमति दें।',
+  tapToSpeak: '🎤 बोलें',
+  listening: '🎤 सुन रहा है…',
 
   // Complete job
   completeJob: 'काम पूरा करें',
@@ -231,6 +233,8 @@ export const en: typeof hi = {
   permissionRequired: 'Permission required',
   allowMediaAccess: 'Please allow access to media library in Settings.',
   allowCameraAccess: 'Please allow camera access in Settings.',
+  tapToSpeak: '🎤 Speak',
+  listening: '🎤 Listening…',
 
   completeJob: 'Complete Job',
   completionHint: 'Add photos or videos of the completed work before submitting.',

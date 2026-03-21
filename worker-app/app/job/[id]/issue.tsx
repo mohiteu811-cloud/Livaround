@@ -8,6 +8,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { api } from '../../../src/lib/api';
 import { useLang, t } from '../../../src/lib/i18n';
+import { useVoiceInput } from '../../../src/lib/useVoice';
 
 type Severity = 'LOW' | 'MEDIUM' | 'HIGH';
 
@@ -24,6 +25,11 @@ export default function ReportIssueScreen() {
 
   const [description, setDescription] = useState('');
   const [severity, setSeverity] = useState<Severity>('MEDIUM');
+
+  const { listening, supported: voiceSupported, start: startVoice, stop: stopVoice } =
+    useVoiceInput(lang, (transcript) => {
+      setDescription(prev => prev ? `${prev} ${transcript}` : transcript);
+    });
   const [photo, setPhoto] = useState<{ uri: string; type: string } | null>(null);
   const [video, setVideo] = useState<{ uri: string; type: string; duration?: number } | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -155,7 +161,19 @@ export default function ReportIssueScreen() {
         </View>
 
         {/* Description */}
-        <Text style={styles.label}>{tr.description}</Text>
+        <View style={styles.labelRow}>
+          <Text style={styles.label}>{tr.description}</Text>
+          {voiceSupported && (
+            <TouchableOpacity
+              style={[styles.voiceButton, listening && styles.voiceButtonActive]}
+              onPress={listening ? stopVoice : startVoice}
+            >
+              <Text style={styles.voiceButtonText}>
+                {listening ? tr.listening : tr.tapToSpeak}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
         <TextInput
           style={styles.textarea}
           value={description}
@@ -245,10 +263,22 @@ const styles = StyleSheet.create({
   backText: { color: '#3b82f6', fontSize: 16, fontWeight: '600' },
   headerTitle: { fontSize: 18, fontWeight: '700', color: '#f8fafc' },
   content: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 40, gap: 12 },
+  labelRow: {
+    flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between', marginTop: 8,
+  },
   label: {
     fontSize: 13, color: '#94a3b8', fontWeight: '600',
-    textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 8,
+    textTransform: 'uppercase', letterSpacing: 0.5,
   },
+  voiceButton: {
+    backgroundColor: '#1e293b', borderWidth: 1.5, borderColor: '#334155',
+    borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6,
+  },
+  voiceButtonActive: {
+    borderColor: '#3b82f6', backgroundColor: '#1e3a5f',
+  },
+  voiceButtonText: { color: '#94a3b8', fontSize: 13, fontWeight: '600' },
   severityRow: { gap: 10 },
   severityOption: {
     borderWidth: 1.5, borderColor: '#334155',
