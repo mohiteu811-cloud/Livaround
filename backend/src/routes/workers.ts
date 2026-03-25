@@ -103,7 +103,13 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 
     let workers = await prisma.worker.findMany({
       where: hostId
-        ? { OR: [{ hostId }, { isGigWorker: true }] }
+        ? {
+            OR: [
+              { hostId },                                                        // workers this host created
+              { isGigWorker: true },                                             // gig workers visible to all
+              { propertyStaff: { some: { property: { hostId } } } },            // workers assigned to this host's properties
+            ],
+          }
         : undefined,
       include: {
         user: { select: { id: true, name: true, email: true, phone: true } },
