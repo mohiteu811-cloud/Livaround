@@ -466,6 +466,8 @@ export interface Worker {
   rating?: number;
   jobsCompleted: number;
   bio?: string;
+  hostId?: string;
+  isGigWorker?: boolean;
   _count?: { jobs: number };
   propertyStaff?: { id: string; propertyId: string; role: string; property: { id: string; name: string; type: string } }[];
 }

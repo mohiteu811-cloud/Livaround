@@ -1,0 +1,6 @@
+-- AlterTable
+ALTER TABLE "Worker" ADD COLUMN "hostId" TEXT;
+ALTER TABLE "Worker" ADD COLUMN "isGigWorker" BOOLEAN NOT NULL DEFAULT false;
+
+-- AddForeignKey
+ALTER TABLE "Worker" ADD CONSTRAINT "Worker_hostId_fkey" FOREIGN KEY ("hostId") REFERENCES "Host"("id") ON DELETE SET NULL ON UPDATE CASCADE;

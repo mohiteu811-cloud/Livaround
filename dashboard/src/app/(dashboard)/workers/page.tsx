@@ -15,7 +15,7 @@ const TYPE_ICONS: Record<string, string> = {
 };
 
 function WorkerForm({ onSave, onClose }: { onSave: (d: unknown) => Promise<void>; onClose: () => void }) {
-  const [form, setForm] = useState({ name: '', email: '', phone: '', skills: [] as string[], location: '', bio: '' });
+  const [form, setForm] = useState({ name: '', email: '', phone: '', skills: [] as string[], location: '', bio: '', isGigWorker: false });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [created, setCreated] = useState<{ tempPassword: string } | null>(null);
@@ -93,6 +93,20 @@ function WorkerForm({ onSave, onClose }: { onSave: (d: unknown) => Promise<void>
             </button>
           ))}
         </div>
+      </div>
+      <div>
+        <label className="flex items-center gap-3 cursor-pointer group">
+          <input
+            type="checkbox"
+            checked={form.isGigWorker}
+            onChange={(e) => set('isGigWorker', e.target.checked)}
+            className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-brand-500 focus:ring-brand-500 focus:ring-offset-0"
+          />
+          <div>
+            <p className="text-sm font-medium text-slate-300 group-hover:text-slate-200">Gig worker</p>
+            <p className="text-xs text-slate-500">Visible to all hosts on the platform, not just you</p>
+          </div>
+        </label>
       </div>
       <FormField label="Bio (optional)">
         <Textarea rows={2} placeholder="Brief description of experience..." value={form.bio} onChange={(e) => set('bio', e.target.value)} />
@@ -268,6 +282,11 @@ export default function WorkersPage() {
     load();
   }
 
+  async function toggleGigWorker(w: Worker) {
+    await api.workers.update(w.id, { isGigWorker: !w.isGigWorker });
+    load();
+  }
+
   return (
     <div className="p-4 md:p-8 space-y-6">
       <div className="flex items-center justify-between">
@@ -310,6 +329,13 @@ export default function WorkersPage() {
                       className={`px-2 py-1 rounded-full text-xs font-medium transition-colors ${w.isAvailable ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`}
                     >
                       {w.isAvailable ? 'Available' : 'Unavailable'}
+                    </button>
+                    <button
+                      onClick={() => toggleGigWorker(w)}
+                      title={w.isGigWorker ? 'Gig worker — visible to all hosts' : 'Private — only visible to you'}
+                      className={`px-2 py-1 rounded-full text-xs font-medium transition-colors ${w.isGigWorker ? 'bg-purple-500/20 text-purple-400 hover:bg-purple-500/30' : 'bg-slate-700 text-slate-500 hover:bg-slate-600'}`}
+                    >
+                      {w.isGigWorker ? 'Gig' : 'Private'}
                     </button>
                     <button onClick={() => setResetWorker(w)} title="Reset password" className="p-1 rounded hover:bg-slate-800 text-slate-500 hover:text-brand-400 transition-colors">
                       <KeyRound size={13} />

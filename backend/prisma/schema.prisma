@@ -32,6 +32,7 @@ model Host {
   tradeRoles    TradeRole[]
   ownersCreated Owner[]
   tradesmen     Tradesman[]
+  workers       Worker[]
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 }
@@ -160,6 +161,9 @@ model Worker {
   pushToken       String?
   tradeRoleId     String?
   tradeRole       TradeRole? @relation(fields: [tradeRoleId], references: [id], onDelete: SetNull)
+  hostId          String?
+  host            Host?      @relation(fields: [hostId], references: [id], onDelete: SetNull)
+  isGigWorker     Boolean    @default(false)
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
 
