@@ -103,7 +103,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 
     let workers = await prisma.worker.findMany({
       where: hostId
-        ? { OR: [{ hostId }, { isGigWorker: true }, { hostId: null }] }
+        ? { OR: [{ hostId }, { isGigWorker: true }] }
         : undefined,
       include: {
         user: { select: { id: true, name: true, email: true, phone: true } },
