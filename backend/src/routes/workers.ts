@@ -75,6 +75,7 @@ const createWorkerSchema = z.object({
   skills: z.array(z.string()).min(1),
   location: z.string().optional(),
   bio: z.string().optional(),
+  isGigWorker: z.boolean().optional(),
 });
 
 const updateWorkerSchema = z.object({
@@ -85,6 +86,7 @@ const updateWorkerSchema = z.object({
   location: z.string().optional(),
   bio: z.string().optional(),
   pushToken: z.string().optional(),
+  isGigWorker: z.boolean().optional(),
 });
 
 function parseSkills(raw: string | undefined): string[] {
@@ -94,7 +96,15 @@ function parseSkills(raw: string | undefined): string[] {
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const { skill, available } = req.query;
+
+    // Resolve host ID for the current user
+    const host = await prisma.host.findUnique({ where: { userId: req.user!.id } });
+    const hostId = host?.id;
+
     let workers = await prisma.worker.findMany({
+      where: hostId
+        ? { OR: [{ hostId }, { isGigWorker: true }, { hostId: null }] }
+        : undefined,
       include: {
         user: { select: { id: true, name: true, email: true, phone: true } },
         _count: { select: { jobs: true } },
@@ -118,10 +128,13 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 
 router.post('/', validate(createWorkerSchema), async (req: AuthRequest, res: Response) => {
   try {
-    const { name, phone, skills, location, bio } = req.body;
+    const { name, phone, skills, location, bio, isGigWorker } = req.body;
     const email = (req.body.email as string).trim().toLowerCase();
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) return res.status(409).json({ error: 'Email already registered' });
+
+    // Link worker to the host that created them
+    const host = await prisma.host.findUnique({ where: { userId: req.user!.id } });
 
     const tempPassword = Math.random().toString(36).slice(-10);
     const hashed = await bcrypt.hash(tempPassword, 12);
@@ -129,7 +142,15 @@ router.post('/', validate(createWorkerSchema), async (req: AuthRequest, res: Res
     const user = await prisma.user.create({
       data: {
         name, email, password: hashed, phone, role: 'WORKER',
-        worker: { create: { skills: JSON.stringify(skills), location, bio } },
+        worker: {
+          create: {
+            skills: JSON.stringify(skills),
+            location,
+            bio,
+            hostId: host?.id,
+            isGigWorker: isGigWorker === true,
+          },
+        },
       },
       include: { worker: true },
     });
@@ -173,12 +194,13 @@ router.put('/:id', validate(updateWorkerSchema), async (req: AuthRequest, res: R
     const worker = await prisma.worker.findUnique({ where: { id: req.params.id } });
     if (!worker) return res.status(404).json({ error: 'Worker not found' });
 
-    const { name, phone, skills, ...workerData } = req.body;
+    const { name, phone, skills, isGigWorker, ...workerData } = req.body;
     const updated = await prisma.worker.update({
       where: { id: req.params.id },
       data: {
         ...workerData,
         ...(skills && { skills: JSON.stringify(skills) }),
+        ...(isGigWorker !== undefined && { isGigWorker }),
         user: (name || phone) ? { update: { ...(name && { name }), ...(phone && { phone }) } } : undefined,
       },
       include: { user: { select: { id: true, name: true, email: true, phone: true } } },

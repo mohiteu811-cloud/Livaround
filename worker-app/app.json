@@ -42,11 +42,19 @@
         "ACCESS_COARSE_LOCATION",
         "ACCESS_BACKGROUND_LOCATION",
         "FOREGROUND_SERVICE",
-        "FOREGROUND_SERVICE_LOCATION"
+        "FOREGROUND_SERVICE_LOCATION",
+        "RECORD_AUDIO"
       ]
     },
     "plugins": [
       "@react-native-firebase/app",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Allow LivAround to use the microphone for voice input when reporting issues.",
+          "speechRecognitionPermission": "Allow LivAround to use speech recognition for voice input when reporting issues."
+        }
+      ],
       "./plugins/withAsyncStorageAndroidFix",
       "./plugins/withFirebaseMultiProcess",
       "expo-router",
