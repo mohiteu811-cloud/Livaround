@@ -77,6 +77,12 @@ Open http://localhost:3000
 - **Bookings** — manage bookings, check-in/check-out, multi-source support
 - **Jobs** — create cleaning/cooking/driving/maintenance jobs, dispatch to workers, checklists
 - **Workers** — gig worker profiles, skills, availability toggle, ratings
+
+- ## License
+
+LivAround is open source under the [AGPL-3.0 license](LICENSE). 
+You're free to use, modify, and self-host. If you offer it as a 
+hosted service, you must open-source your modifications.
 - **Inventory** — per-property stock tracking, low stock alerts, restock modal, QR cabinet support
 
 ### Next: Mobile apps (React Native / Expo)
