@@ -32,7 +32,8 @@ const loginSchema = z.object({
 });
 
 function signToken(payload: object) {
-  return jwt.sign(payload, process.env.JWT_SECRET || 'dev-secret', { expiresIn: '7d' });
+  if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET environment variable is not set');
+  return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' });
 }
 
 router.post('/register', validate(registerSchema), async (req: Request, res: Response) => {
