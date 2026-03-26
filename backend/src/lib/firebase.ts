@@ -1,9 +1,9 @@
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
-import { getStorage, type Bucket } from 'firebase-admin/storage';
+import { getStorage } from 'firebase-admin/storage';
 
-let _bucket: Bucket | null = null;
+let _bucket: any = null;
 
-function getBucket(): Bucket {
+function getBucket() {
   if (_bucket) return _bucket;
 
   if (!getApps().length) {
