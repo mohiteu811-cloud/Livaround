@@ -5,3 +5,5 @@ dist/
 backend/prisma/dev.db
 backend/prisma/*.db-journal
 *.tsbuildinfo
+google-services.json
+GoogleService-Info.plist
