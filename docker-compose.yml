@@ -5,9 +5,9 @@ services:
     image: postgres:16-alpine
     container_name: livaround_db
     environment:
-      POSTGRES_USER: livaround
-      POSTGRES_PASSWORD: livaround_secret
-      POSTGRES_DB: livaround
+      POSTGRES_USER: ${POSTGRES_USER:-livaround}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-livaround}
     ports:
       - '5432:5432'
     volumes:
