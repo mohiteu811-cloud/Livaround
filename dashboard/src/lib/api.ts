@@ -359,6 +359,10 @@ export const api = {
     },
   },
 
+  admin: {
+    stats: () => request<AdminStats>('/api/admin/stats'),
+  },
+
   billing: {
     features: () =>
       request<{ plan: string | null; features: Record<string, boolean> }>('/api/billing/features'),
@@ -881,4 +885,26 @@ export interface PaymentRecord {
   amount: number;
   date: string;
   status: string;
+}
+
+export interface AdminStats {
+  kpis: {
+    totalMRR: number;
+    totalARR: number;
+    activeSubscriptions: number;
+    trialConversionRate: number;
+    monthlyChurnRate: number;
+    arpu: number;
+    totalProperties: number;
+    pendingPayouts: number;
+  };
+  mrrHistory: { month: string; pro: number; agency: number; total: number }[];
+  recentEvents: {
+    id: string;
+    orgName: string;
+    planName: string;
+    eventType: 'new' | 'upgraded' | 'cancelled' | 'payment_failed';
+    monthlyAmount: number;
+    date: string;
+  }[];
 }
