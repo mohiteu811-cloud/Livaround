@@ -24,6 +24,7 @@ import {
   UserCheck,
   Shield,
   CreditCard,
+  Handshake,
 } from 'lucide-react';
 import { clearToken } from '@/lib/auth';
 import { getCurrentUser } from '@/lib/auth';
@@ -48,6 +49,7 @@ const nav = [
   { group: true, label: 'Ownership' },
   { href: '/owners', icon: UserCircle, label: 'Owners' },
   { href: '/revenue', icon: BarChart3, label: 'Revenue' },
+  { href: '/partner', icon: Handshake, label: 'Partner' },
 ];
 
 function NavLinks({ onNavigate, isAdmin }: { onNavigate?: () => void; isAdmin?: boolean }) {

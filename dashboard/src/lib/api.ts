@@ -359,6 +359,11 @@ export const api = {
     },
   },
 
+  partner: {
+    dashboard: () => request<PartnerDashboard>('/api/partner/dashboard'),
+    register: () => request<{ success: boolean; referralCode: string; tier: string; commissionRate: number }>('/api/partner/register', { method: 'POST' }),
+  },
+
   admin: {
     stats: () => request<AdminStats>('/api/admin/stats'),
     organizations: (params?: { search?: string; plan?: string; status?: string; page?: number; limit?: number }) => {
@@ -908,6 +913,48 @@ export interface PaymentRecord {
   amount: number;
   date: string;
   status: string;
+}
+
+export interface PartnerDashboard {
+  partner: {
+    referralCode: string;
+    tier: string;
+    commissionRate: number;
+    overrideRate: number | null;
+    status: string;
+  };
+  kpis: {
+    totalEarned: number;
+    pendingPayout: number;
+    monthEarnings: number;
+    referralCount: number;
+  };
+  referrals: {
+    orgId: string;
+    orgName: string;
+    plan: string;
+    monthlyAmount: number;
+    status: string;
+    commissionRate: number;
+    commissionEarned: number;
+    createdAt: string;
+  }[];
+  commissions: {
+    id: string;
+    period: string;
+    type: string;
+    amount: number;
+    currency: string;
+    status: string;
+    paidAt: string | null;
+    orgName: string;
+    createdAt: string;
+  }[];
+  payout: {
+    threshold: number;
+    eligible: boolean;
+    pendingAmount: number;
+  };
 }
 
 export interface AdminOrgRow {
