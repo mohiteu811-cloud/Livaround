@@ -208,13 +208,26 @@ router.post('/checkout', async (req: AuthRequest, res: Response) => {
 
     const host = await prisma.host.findUnique({
       where: { userId: req.user!.id },
-      select: { organizationId: true },
+      include: { user: { select: { name: true } } },
     });
-    if (!host?.organizationId) {
-      return res.status(400).json({ error: 'No organization linked to your account' });
+    if (!host) {
+      return res.status(400).json({ error: 'No host profile found for your account' });
     }
 
-    const result = await createCheckoutSession(host.organizationId, planName, prisma);
+    let orgId = host.organizationId;
+    if (!orgId) {
+      // Auto-create an organization for the host on first upgrade
+      const org = await prisma.organization.create({
+        data: { name: host.user?.name ?? host.name },
+      });
+      await prisma.host.update({
+        where: { id: host.id },
+        data: { organizationId: org.id },
+      });
+      orgId = org.id;
+    }
+
+    const result = await createCheckoutSession(orgId, planName, prisma);
     return res.json(result);
   } catch (err: unknown) {
     console.error(err);
@@ -257,13 +270,26 @@ router.post('/change-plan', async (req: AuthRequest, res: Response) => {
 
     const host = await prisma.host.findUnique({
       where: { userId: req.user!.id },
-      select: { organizationId: true },
+      include: { user: { select: { name: true } } },
     });
-    if (!host?.organizationId) {
-      return res.status(400).json({ error: 'No organization linked to your account' });
+    if (!host) {
+      return res.status(400).json({ error: 'No host profile found for your account' });
     }
 
-    const result = await changePlan(host.organizationId, planName, prisma);
+    let orgId = host.organizationId;
+    if (!orgId) {
+      // Auto-create an organization for the host on first plan change
+      const org = await prisma.organization.create({
+        data: { name: host.user?.name ?? host.name },
+      });
+      await prisma.host.update({
+        where: { id: host.id },
+        data: { organizationId: org.id },
+      });
+      orgId = org.id;
+    }
+
+    const result = await changePlan(orgId, planName, prisma);
     return res.json(result ?? { success: true });
   } catch (err: unknown) {
     console.error(err);
