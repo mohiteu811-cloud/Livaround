@@ -74,6 +74,51 @@ function ConfirmDialog({
   );
 }
 
+// ── Become a Partner CTA ────────────────────────────────────────────────────
+
+function BecomePartnerCta({ onRegistered }: { onRegistered: () => void }) {
+  const [registering, setRegistering] = useState(false);
+  const [error, setError] = useState('');
+
+  async function handleRegister() {
+    setRegistering(true);
+    setError('');
+    try {
+      await api.partner.register();
+      onRegistered();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Registration failed');
+    } finally {
+      setRegistering(false);
+    }
+  }
+
+  return (
+    <div className="flex items-start gap-3">
+      <Users className="h-5 w-5 shrink-0 text-slate-500 mt-0.5" />
+      <div>
+        <p className="text-sm font-medium text-slate-200">Become a Partner</p>
+        <p className="mt-0.5 text-sm text-slate-400">
+          Earn 20% commission on every payment from organizations you refer to LivAround.
+          Get a unique referral link and track your earnings.
+        </p>
+        {error && <p className="mt-2 text-xs text-red-400">{error}</p>}
+        <div className="mt-3 flex items-center gap-3">
+          <Button variant="primary" size="sm" loading={registering} onClick={handleRegister}>
+            <Users className="h-3.5 w-3.5" /> Join partner program
+          </Button>
+          <a
+            href="/partner"
+            className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
+          >
+            Learn more
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main page ────────────────────────────────────────────────────────────────
 
 export default function BillingPage() {
@@ -485,20 +530,9 @@ export default function BillingPage() {
               </div>
             </div>
           ) : (
-            <div className="flex items-start gap-3">
-              <Users className="h-5 w-5 shrink-0 text-slate-500 mt-0.5" />
-              <div>
-                <p className="text-sm text-slate-300">
-                  Earn commissions by referring property managers to LivAround.
-                </p>
-                <a
-                  href="/partners"
-                  className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-brand-400 hover:text-brand-300"
-                >
-                  Learn about the partner program <ExternalLink className="h-3.5 w-3.5" />
-                </a>
-              </div>
-            </div>
+            <BecomePartnerCta onRegistered={() => {
+              api.billing.subscription().then(setBilling);
+            }} />
           )}
         </CardBody>
       </Card>
