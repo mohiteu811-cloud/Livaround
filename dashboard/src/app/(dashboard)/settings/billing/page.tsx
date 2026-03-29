@@ -126,6 +126,7 @@ export default function BillingPage() {
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -198,6 +199,7 @@ export default function BillingPage() {
 
   async function handleUpgrade(targetPlan: string) {
     setActionLoading(targetPlan);
+    setActionError(null);
     try {
       const result = isCommunity
         ? await api.billing.checkout(targetPlan)
@@ -211,6 +213,7 @@ export default function BillingPage() {
       }
     } catch (err) {
       console.error(err);
+      setActionError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
     } finally {
       setActionLoading(null);
     }
@@ -423,6 +426,14 @@ export default function BillingPage() {
               )}
             </div>
           </div>
+
+          {/* Error message */}
+          {actionError && (
+            <div className="mt-4 flex items-center gap-3 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3">
+              <AlertTriangle className="h-5 w-5 shrink-0 text-red-400" />
+              <p className="text-sm text-red-200">{actionError}</p>
+            </div>
+          )}
 
           {/* Cancel button */}
           {isActive && !isCommunity && !b.cancelledAt && (
