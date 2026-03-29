@@ -17,10 +17,11 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  host   Host?
-  worker Worker?
-  owner  Owner?
-  client Client?
+  host    Host?
+  worker  Worker?
+  owner   Owner?
+  client  Client?
+  partner Partner?
 }
 
 model Host {
@@ -563,4 +564,160 @@ model ShiftCheckIn {
   hoursWorked   Float?
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Billing, Subscriptions & Partner Program
+// ═══════════════════════════════════════════════════════════════════════════════
+
+enum SubscriptionStatus {
+  active
+  past_due
+  cancelled
+  trialing
+}
+
+enum PartnerTier {
+  referral
+  channel
+  strategic
+}
+
+enum PartnerStatus {
+  active
+  suspended
+  pending
+}
+
+enum CommissionType {
+  direct
+  override
+}
+
+enum CommissionStatus {
+  pending
+  approved
+  paid
+}
+
+enum PayoutMethod {
+  bank_transfer
+  paypal_payout
+  stripe_connect
+}
+
+enum PayoutStatus {
+  pending
+  processing
+  completed
+  failed
+}
+
+// ── Organization ─────────────────────────────────────────────────────────────
+
+model Organization {
+  id                  String        @id @default(cuid())
+  name                String
+  referredByPartnerId String?
+  referredByPartner   Partner?      @relation("ReferredOrganizations", fields: [referredByPartnerId], references: [id], onDelete: SetNull)
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  subscription Subscription?
+}
+
+// ── Plan ─────────────────────────────────────────────────────────────────────
+
+model Plan {
+  id               String   @id @default(cuid())
+  name             String   // community | pro | agency
+  pricePerProperty Float?   // e.g. $10 for Pro
+  flatPrice        Float?   // e.g. $100 for Agency
+  maxProperties    Int?     // null = unlimited
+  features         Json
+  createdAt        DateTime @default(now())
+
+  subscriptions Subscription[]
+}
+
+// ── Subscription ─────────────────────────────────────────────────────────────
+
+model Subscription {
+  id                 String             @id @default(cuid())
+  organizationId     String             @unique
+  organization       Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  planId             String
+  plan               Plan               @relation(fields: [planId], references: [id])
+  status             SubscriptionStatus
+  paypalSubId        String?
+  stripeSubId        String?
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  propertyCount      Int                @default(0)
+  monthlyAmount      Float
+  trialEndsAt        DateTime?
+  cancelledAt        DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  commissions Commission[]
+}
+
+// ── Partner ──────────────────────────────────────────────────────────────────
+
+model Partner {
+  id             String        @id @default(cuid())
+  userId         String        @unique
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tier           PartnerTier
+  referralCode   String        @unique
+  commissionRate Float
+  overrideRate   Float?
+  referredById   String?
+  referredBy     Partner?      @relation("PartnerReferrals", fields: [referredById], references: [id], onDelete: SetNull)
+  referrals      Partner[]     @relation("PartnerReferrals")
+  totalEarned    Float         @default(0)
+  pendingPayout  Float         @default(0)
+  bankDetails    Json?
+  status         PartnerStatus
+  createdAt      DateTime      @default(now())
+
+  commissions            Commission[]
+  payouts                Payout[]
+  referredOrganizations  Organization[] @relation("ReferredOrganizations")
+}
+
+// ── Commission ───────────────────────────────────────────────────────────────
+
+model Commission {
+  id             String           @id @default(cuid())
+  partnerId      String
+  partner        Partner          @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  subscriptionId String
+  subscription   Subscription     @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  type           CommissionType
+  amount         Float
+  currency       String           @default("USD")
+  period         String           // e.g. "2026-04"
+  status         CommissionStatus
+  paidAt         DateTime?
+  payoutId       String?
+  payout         Payout?          @relation(fields: [payoutId], references: [id], onDelete: SetNull)
+  createdAt      DateTime         @default(now())
+}
+
+// ── Payout ───────────────────────────────────────────────────────────────────
+
+model Payout {
+  id          String       @id @default(cuid())
+  partnerId   String
+  partner     Partner      @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  amount      Float
+  currency    String       @default("USD")
+  method      PayoutMethod
+  reference   String?
+  status      PayoutStatus
+  commissions Commission[]
+  processedAt DateTime?
+  createdAt   DateTime     @default(now())
 }
