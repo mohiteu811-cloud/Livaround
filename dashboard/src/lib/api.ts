@@ -358,6 +358,11 @@ export const api = {
         request<SupplyCabinet>('/api/inventory/cabinets', { method: 'POST', body: JSON.stringify(data) }),
     },
   },
+
+  billing: {
+    features: () =>
+      request<{ plan: string | null; features: Record<string, boolean> }>('/api/billing/features'),
+  },
 };
 
 // --- Types ---

@@ -25,6 +25,7 @@ import stayRoutes from './routes/stay';
 import clientsRoutes from './routes/clients';
 import venuesRoutes from './routes/venues';
 import shiftsRoutes from './routes/shifts';
+import billingRoutes from './routes/billing';
 
 const app = express();
 
@@ -54,6 +55,7 @@ app.use('/api/stay', stayRoutes);
 app.use('/api/clients', clientsRoutes);
 app.use('/api/venues', venuesRoutes);
 app.use('/api/shifts', shiftsRoutes);
+app.use('/api/billing', billingRoutes);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
