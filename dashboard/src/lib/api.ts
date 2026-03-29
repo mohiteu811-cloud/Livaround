@@ -399,7 +399,7 @@ export const api = {
     processPayouts: () =>
       request<{ success: boolean; commissionsApproved: number; payoutsCreated: number }>('/api/admin/payouts/process', { method: 'POST' }),
     sendPayouts: (payoutIds?: string[]) =>
-      request<{ success: boolean; processed: number; paypalBatchId?: string; totalAmount?: number }>('/api/admin/payouts/send', {
+      request<{ success: boolean; processed: number; paypalBatchId?: string; totalAmount?: number; message?: string }>('/api/admin/payouts/send', {
         method: 'POST',
         body: JSON.stringify({ payoutIds }),
       }),
