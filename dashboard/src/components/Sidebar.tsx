@@ -51,6 +51,7 @@ const nav = [
   { href: '/owners', icon: UserCircle, label: 'Owners' },
   { href: '/revenue', icon: BarChart3, label: 'Revenue' },
   { href: '/partner', icon: Handshake, label: 'Partner' },
+  { href: '/settings/billing', icon: CreditCard, label: 'Billing' },
 ];
 
 function NavLinks({ onNavigate, isAdmin }: { onNavigate?: () => void; isAdmin?: boolean }) {
