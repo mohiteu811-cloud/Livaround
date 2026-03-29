@@ -23,6 +23,7 @@ import {
   MapPin,
   UserCheck,
   Shield,
+  CreditCard,
 } from 'lucide-react';
 import { clearToken } from '@/lib/auth';
 import { getCurrentUser } from '@/lib/auth';
@@ -53,7 +54,13 @@ function NavLinks({ onNavigate, isAdmin }: { onNavigate?: () => void; isAdmin?: 
   const pathname = usePathname();
 
   const allNav = isAdmin
-    ? [...nav, { group: true, label: 'Platform' }, { href: '/admin', icon: Shield, label: 'Admin' }]
+    ? [
+        ...nav,
+        { group: true, label: 'Platform' },
+        { href: '/admin', icon: Shield, label: 'Admin' },
+        { href: '/admin/organizations', icon: Building2, label: 'Organizations' },
+        { href: '/admin/subscriptions', icon: CreditCard, label: 'Subscriptions' },
+      ]
     : nav;
 
   return (
