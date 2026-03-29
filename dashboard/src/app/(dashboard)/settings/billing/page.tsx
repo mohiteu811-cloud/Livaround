@@ -140,11 +140,14 @@ export default function BillingPage() {
     );
   }
 
-  const plan = billing.plan ?? 'community';
+  // billing is guaranteed non-null past the loading/error guards above
+  const b = billing!;
+
+  const plan = b.plan ?? 'community';
   const isPro = plan === 'pro';
   const isAgency = plan === 'agency';
   const isCommunity = plan === 'community';
-  const isActive = billing.status === 'active' || billing.status === 'trialing';
+  const isActive = b.status === 'active' || b.status === 'trialing';
 
   // ── Action handlers ──────────────────────────────────────────────────────
 
@@ -183,8 +186,8 @@ export default function BillingPage() {
   }
 
   function copyReferralLink() {
-    if (!billing.partner) return;
-    const link = `${window.location.origin}/signup?ref=${billing.partner.referralCode}`;
+    if (!b?.partner) return;
+    const link = `${window.location.origin}/signup?ref=${b.partner.referralCode}`;
     navigator.clipboard.writeText(link);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -196,9 +199,9 @@ export default function BillingPage() {
     if (isCommunity) return 'Free';
     if (isAgency) return '$100/mo flat (unlimited properties)';
     // Pro: count × $10
-    const perProp = billing.subscription?.pricePerProperty ?? 10;
-    const total = billing.propertyCount * perProp;
-    return `${billing.propertyCount} ${billing.propertyCount === 1 ? 'property' : 'properties'} \u00d7 $${perProp} = $${total}/mo`;
+    const perProp = b.subscription?.pricePerProperty ?? 10;
+    const total = b.propertyCount * perProp;
+    return `${b.propertyCount} ${b.propertyCount === 1 ? 'property' : 'properties'} \u00d7 $${perProp} = $${total}/mo`;
   }
 
   // ── Render ───────────────────────────────────────────────────────────────
@@ -208,7 +211,7 @@ export default function BillingPage() {
       <h1 className="text-2xl font-bold text-slate-100">Billing &amp; Subscription</h1>
 
       {/* Past due warning */}
-      {billing.status === 'past_due' && (
+      {b.status === 'past_due' && (
         <div className="flex items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3">
           <AlertTriangle className="h-5 w-5 shrink-0 text-amber-400" />
           <p className="text-sm text-amber-200">
@@ -231,7 +234,7 @@ export default function BillingPage() {
                 <p className="text-lg font-bold capitalize text-slate-100">{plan}</p>
               </div>
             </div>
-            <div className="mt-3">{subscriptionStatusBadge(billing.status)}</div>
+            <div className="mt-3">{subscriptionStatusBadge(b.status)}</div>
           </CardBody>
         </Card>
 
@@ -243,7 +246,7 @@ export default function BillingPage() {
               </div>
               <div>
                 <p className="text-xs text-slate-500">Properties</p>
-                <p className="text-lg font-bold text-slate-100">{billing.propertyCount}</p>
+                <p className="text-lg font-bold text-slate-100">{b.propertyCount}</p>
               </div>
             </div>
           </CardBody>
@@ -265,19 +268,19 @@ export default function BillingPage() {
       </div>
 
       {/* Billing period */}
-      {billing.currentPeriodEnd && isActive && (
+      {b.currentPeriodEnd && isActive && (
         <Card>
           <CardBody className="flex flex-wrap items-center justify-between gap-4">
             <div className="text-sm text-slate-400">
               Current period:{' '}
               <span className="text-slate-200">
-                {new Date(billing.currentPeriodStart!).toLocaleDateString()} &mdash;{' '}
-                {new Date(billing.currentPeriodEnd).toLocaleDateString()}
+                {new Date(b.currentPeriodStart!).toLocaleDateString()} &mdash;{' '}
+                {new Date(b.currentPeriodEnd).toLocaleDateString()}
               </span>
             </div>
-            {billing.cancelledAt && (
+            {b.cancelledAt && (
               <p className="text-sm text-amber-400">
-                Access continues until {new Date(billing.currentPeriodEnd).toLocaleDateString()}
+                Access continues until {new Date(b.currentPeriodEnd).toLocaleDateString()}
               </p>
             )}
           </CardBody>
@@ -377,7 +380,7 @@ export default function BillingPage() {
           </div>
 
           {/* Cancel button */}
-          {isActive && !isCommunity && !billing.cancelledAt && (
+          {isActive && !isCommunity && !b.cancelledAt && (
             <div className="mt-6 border-t border-slate-800 pt-4">
               <Button
                 variant="ghost"
@@ -435,25 +438,25 @@ export default function BillingPage() {
       <Card>
         <CardHeader title="Partner Program" />
         <CardBody>
-          {billing.partner ? (
+          {b.partner ? (
             <div className="space-y-4">
               <div className="flex flex-wrap gap-6">
                 <div>
                   <p className="text-xs text-slate-500">Tier</p>
                   <p className="mt-0.5 text-sm font-medium capitalize text-slate-200">
-                    {billing.partner.tier}
+                    {b.partner.tier}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-slate-500">Total earned</p>
                   <p className="mt-0.5 text-sm font-medium text-emerald-400">
-                    ${billing.partner.totalEarned.toFixed(2)}
+                    ${b.partner.totalEarned.toFixed(2)}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-slate-500">Pending payout</p>
                   <p className="mt-0.5 text-sm font-medium text-amber-400">
-                    ${billing.partner.pendingPayout.toFixed(2)}
+                    ${b.partner.pendingPayout.toFixed(2)}
                   </p>
                 </div>
               </div>
@@ -463,8 +466,8 @@ export default function BillingPage() {
                 <div className="flex items-center gap-2">
                   <code className="flex-1 rounded-lg bg-slate-800 px-3 py-2 text-xs text-slate-300 truncate">
                     {typeof window !== 'undefined'
-                      ? `${window.location.origin}/signup?ref=${billing.partner.referralCode}`
-                      : `https://app.livaround.com/signup?ref=${billing.partner.referralCode}`}
+                      ? `${window.location.origin}/signup?ref=${b.partner.referralCode}`
+                      : `https://app.livaround.com/signup?ref=${b.partner.referralCode}`}
                   </code>
                   <Button variant="secondary" size="sm" onClick={copyReferralLink}>
                     {copied ? (
@@ -478,7 +481,7 @@ export default function BillingPage() {
 
               <div>
                 <p className="text-xs text-slate-500 mb-1">Referral code</p>
-                <p className="text-sm font-mono text-slate-200">{billing.partner.referralCode}</p>
+                <p className="text-sm font-mono text-slate-200">{b.partner.referralCode}</p>
               </div>
             </div>
           ) : (
