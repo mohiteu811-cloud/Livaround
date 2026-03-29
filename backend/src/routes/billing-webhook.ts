@@ -4,7 +4,7 @@ import {
   handleSubscriptionActivated,
   handlePaymentCompleted,
   handleSubscriptionCancelled,
-} from '../../../lib/commercial/subscriptions';
+} from '../lib/commercial/subscriptions';
 import { sendPaymentSuspendedEmail } from '../lib/billing-email';
 
 const router = Router();

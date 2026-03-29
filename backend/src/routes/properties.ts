@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { validate } from '../middleware/validate';
-import { syncPropertyCount } from '../../../lib/commercial/metering';
+import { syncPropertyCount } from '../lib/commercial/metering';
 
 const router = Router();
 router.use(authenticate);

@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
-import { PLANS, PLAN_HIERARCHY } from '../../lib/commercial/plans';
+import { PLANS, PLAN_HIERARCHY } from '../src/lib/commercial/plans';
 
 const prisma = new PrismaClient();
 

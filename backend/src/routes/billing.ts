@@ -1,13 +1,13 @@
 import { Router, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { authenticate, AuthRequest } from '../middleware/auth';
-import { IS_COMMERCIAL } from '../../../lib/config';
-import { PLANS } from '../../../lib/commercial/plans';
+import { IS_COMMERCIAL } from '../lib/config';
+import { PLANS } from '../lib/commercial/plans';
 import {
   createCheckoutSession,
   cancelSubscription,
   changePlan,
-} from '../../../lib/commercial/subscriptions';
+} from '../lib/commercial/subscriptions';
 
 const router = Router();
 router.use(authenticate);
