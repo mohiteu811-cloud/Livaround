@@ -361,6 +361,29 @@ export const api = {
 
   admin: {
     stats: () => request<AdminStats>('/api/admin/stats'),
+    organizations: (params?: { search?: string; plan?: string; status?: string; page?: number; limit?: number }) => {
+      const qs = params ? '?' + new URLSearchParams(
+        Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))
+      ).toString() : '';
+      return request<AdminOrganizationsResponse>(`/api/admin/organizations${qs}`);
+    },
+    organization: (id: string) => request<AdminOrgDetail>(`/api/admin/organizations/${id}`),
+    changePlan: (orgId: string, planName: string) =>
+      request<{ success: boolean; plan: string; monthlyAmount: number }>(`/api/admin/organizations/${orgId}/change-plan`, {
+        method: 'POST',
+        body: JSON.stringify({ planName }),
+      }),
+    extendTrial: (orgId: string, days: number) =>
+      request<{ success: boolean; trialEndsAt: string }>(`/api/admin/organizations/${orgId}/extend-trial`, {
+        method: 'POST',
+        body: JSON.stringify({ days }),
+      }),
+    subscriptions: (params?: { status?: string; plan?: string; page?: number; limit?: number }) => {
+      const qs = params ? '?' + new URLSearchParams(
+        Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))
+      ).toString() : '';
+      return request<AdminSubscriptionsResponse>(`/api/admin/subscriptions${qs}`);
+    },
   },
 
   billing: {
@@ -885,6 +908,79 @@ export interface PaymentRecord {
   amount: number;
   date: string;
   status: string;
+}
+
+export interface AdminOrgRow {
+  id: string;
+  name: string;
+  ownerName: string | null;
+  ownerEmail: string | null;
+  plan: string;
+  status: string | null;
+  propertyCount: number;
+  monthlyAmount: number;
+  trialEndsAt: string | null;
+  cancelledAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminOrganizationsResponse {
+  organizations: AdminOrgRow[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface AdminOrgDetail {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+  owner: { name: string; email: string; phone?: string } | null;
+  properties: { id: string; name: string; city: string; isActive: boolean; createdAt: string }[];
+  subscription: {
+    id: string;
+    plan: string;
+    status: string;
+    monthlyAmount: number;
+    propertyCount: number;
+    currentPeriodStart: string;
+    currentPeriodEnd: string;
+    trialEndsAt: string | null;
+    cancelledAt: string | null;
+    createdAt: string;
+    paypalSubId: string | null;
+  } | null;
+  payments: { period: string; amount: number; date: string }[];
+  referredBy: { code: string; name: string; email: string } | null;
+}
+
+export interface AdminSubscriptionRow {
+  id: string;
+  organizationId: string;
+  orgName: string;
+  ownerName: string | null;
+  ownerEmail: string | null;
+  plan: string;
+  status: string;
+  monthlyAmount: number;
+  propertyCount: number;
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  trialEndsAt: string | null;
+  cancelledAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminSubscriptionsResponse {
+  subscriptions: AdminSubscriptionRow[];
+  total: number;
+  page: number;
+  limit: number;
+  pastDueCount: number;
+  pastDue: AdminSubscriptionRow[];
 }
 
 export interface AdminStats {
