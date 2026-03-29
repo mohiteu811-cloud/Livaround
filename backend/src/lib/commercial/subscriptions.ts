@@ -5,12 +5,12 @@ import { calculateMonthlyAmount, syncPropertyCount } from './metering';
 
 // ── PayPal helpers ───────────────────────────────────────────────────────────
 
-const PAYPAL_BASE =
+export const PAYPAL_BASE =
   process.env.PAYPAL_MODE === 'live'
     ? 'https://api-m.paypal.com'
     : 'https://api-m.sandbox.paypal.com';
 
-async function paypalAccessToken(): Promise<string> {
+export async function paypalAccessToken(): Promise<string> {
   const clientId = process.env.PAYPAL_CLIENT_ID;
   const secret = process.env.PAYPAL_CLIENT_SECRET;
   if (!clientId || !secret) throw new Error('PayPal credentials not configured');
@@ -33,7 +33,7 @@ async function paypalAccessToken(): Promise<string> {
   return data.access_token;
 }
 
-async function paypalRequest<T>(
+export async function paypalRequest<T>(
   method: string,
   path: string,
   body?: unknown,

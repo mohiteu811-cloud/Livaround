@@ -389,6 +389,26 @@ export const api = {
       ).toString() : '';
       return request<AdminSubscriptionsResponse>(`/api/admin/subscriptions${qs}`);
     },
+    payouts: (params?: { status?: string; partner?: string; from?: string; to?: string; page?: number; limit?: number }) => {
+      const qs = params ? '?' + new URLSearchParams(
+        Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))
+      ).toString() : '';
+      return request<AdminPayoutsResponse>(`/api/admin/payouts${qs}`);
+    },
+    payoutStats: () => request<AdminPayoutStats>('/api/admin/payouts/stats'),
+    processPayouts: () =>
+      request<{ success: boolean; commissionsApproved: number; payoutsCreated: number }>('/api/admin/payouts/process', { method: 'POST' }),
+    sendPayouts: (payoutIds?: string[]) =>
+      request<{ success: boolean; processed: number; paypalBatchId?: string; totalAmount?: number }>('/api/admin/payouts/send', {
+        method: 'POST',
+        body: JSON.stringify({ payoutIds }),
+      }),
+    completePayout: (id: string) =>
+      request<{ success: boolean }>(`/api/admin/payouts/${id}/complete`, { method: 'POST' }),
+    rejectPayout: (id: string) =>
+      request<{ success: boolean }>(`/api/admin/payouts/${id}/reject`, { method: 'POST' }),
+    checkPayoutStatus: () =>
+      request<{ success: boolean; completed: number; failed: number }>('/api/admin/payouts/check-status', { method: 'POST' }),
   },
 
   billing: {
@@ -1028,6 +1048,36 @@ export interface AdminSubscriptionsResponse {
   limit: number;
   pastDueCount: number;
   pastDue: AdminSubscriptionRow[];
+}
+
+export interface AdminPayoutRow {
+  id: string;
+  partnerId: string;
+  partnerName: string;
+  partnerEmail: string;
+  partnerTier: string;
+  amount: number;
+  currency: string;
+  method: string;
+  status: string;
+  reference: string | null;
+  commissionCount: number;
+  processedAt: string | null;
+  createdAt: string;
+}
+
+export interface AdminPayoutsResponse {
+  payouts: AdminPayoutRow[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface AdminPayoutStats {
+  paidThisMonth: number;
+  paidAllTime: number;
+  activePartners: number;
+  pendingPayouts: number;
 }
 
 export interface AdminStats {
