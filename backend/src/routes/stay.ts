@@ -539,9 +539,10 @@ router.post('/:code/upload', (req: Request, res: Response) => {
       const url = await uploadToFirebase(buffer, filename, mimetype);
       const type = req.file.mimetype.startsWith('video/') ? 'video' : 'image';
       return res.json({ url, type });
-    } catch (err) {
+    } catch (err: any) {
       console.error('Upload handler error:', err);
-      return res.status(500).json({ error: 'Upload failed. Please try again.' });
+      const message = err?.message || 'Upload failed';
+      return res.status(500).json({ error: message });
     }
   });
 });
