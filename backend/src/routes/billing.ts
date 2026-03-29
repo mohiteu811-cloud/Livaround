@@ -7,6 +7,7 @@ import {
   createCheckoutSession,
   cancelSubscription,
   changePlan,
+  handleSubscriptionActivated,
 } from '../lib/commercial/subscriptions';
 
 const router = Router();
@@ -291,6 +292,42 @@ router.post('/change-plan', async (req: AuthRequest, res: Response) => {
 
     const result = await changePlan(orgId, planName, prisma);
     return res.json(result ?? { success: true });
+  } catch (err: unknown) {
+    console.error(err);
+    const message = err instanceof Error ? err.message : 'Internal server error';
+    return res.status(400).json({ error: message });
+  }
+});
+
+/**
+ * POST /api/billing/activate
+ * Fallback activation: called from the success page after PayPal checkout
+ * in case the webhook hasn't arrived yet.
+ */
+router.post('/activate', async (req: AuthRequest, res: Response) => {
+  try {
+    const { subscriptionId } = req.body as { subscriptionId: string };
+    if (!subscriptionId) return res.status(400).json({ error: 'subscriptionId is required' });
+
+    // Verify this user owns the subscription by checking the org link
+    const host = await prisma.host.findUnique({
+      where: { userId: req.user!.id },
+      select: { organizationId: true },
+    });
+    if (!host?.organizationId) {
+      return res.status(400).json({ error: 'No organization linked to your account' });
+    }
+
+    // Check if already activated
+    const existing = await prisma.subscription.findUnique({
+      where: { organizationId: host.organizationId },
+    });
+    if (existing?.status === 'active') {
+      return res.json({ success: true });
+    }
+
+    await handleSubscriptionActivated(subscriptionId, prisma);
+    return res.json({ success: true });
   } catch (err: unknown) {
     console.error(err);
     const message = err instanceof Error ? err.message : 'Internal server error';

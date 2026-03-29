@@ -430,6 +430,11 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ planName }),
       }),
+    activate: (subscriptionId: string) =>
+      request<{ success: boolean }>('/api/billing/activate', {
+        method: 'POST',
+        body: JSON.stringify({ subscriptionId }),
+      }),
   },
 };
 
