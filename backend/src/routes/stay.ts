@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import multer from 'multer';
 import path from 'path';
+import sharp from 'sharp';
 import { prisma } from '../lib/prisma';
 import { sendPushNotification } from '../lib/pushNotifications';
 import { uploadToFirebase } from '../lib/firebase';
@@ -12,7 +13,7 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 200 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    const ok = /image\/(jpeg|jpg|png|webp)|video\/(mp4|quicktime|webm|3gpp)/.test(file.mimetype);
+    const ok = /image\/(jpeg|jpg|png|webp|heic|heif)|video\/(mp4|quicktime|webm|3gpp)/.test(file.mimetype);
     cb(null, ok);
   },
 });
@@ -516,9 +517,19 @@ router.post('/:code/upload', upload.single('file'), async (req: Request, res: Re
     if (!booking) return res.status(404).json({ error: 'Stay not found' });
     if (!req.file) return res.status(400).json({ error: 'No file or unsupported type' });
 
-    const ext = path.extname(req.file.originalname).toLowerCase();
+    let buffer = req.file.buffer;
+    let mimetype = req.file.mimetype;
+    let ext = path.extname(req.file.originalname).toLowerCase();
+
+    // Convert HEIC/HEIF to JPEG for broad compatibility
+    if (/image\/(heic|heif)/.test(mimetype) || ext === '.heic' || ext === '.heif') {
+      buffer = await sharp(buffer).jpeg({ quality: 85 }).toBuffer();
+      mimetype = 'image/jpeg';
+      ext = '.jpg';
+    }
+
     const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
-    const url = await uploadToFirebase(req.file.buffer, filename, req.file.mimetype);
+    const url = await uploadToFirebase(buffer, filename, mimetype);
     const type = req.file.mimetype.startsWith('video/') ? 'video' : 'image';
     return res.json({ url, type });
   } catch (err) {
