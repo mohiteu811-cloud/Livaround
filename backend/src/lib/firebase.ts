@@ -46,7 +46,7 @@ export async function uploadToFirebase(
     });
   } catch (err: any) {
     console.error('Firebase upload failed:', { filename, mimetype, bufferSize: buffer.length, error: err?.message || err });
-    throw new Error(`Firebase upload failed: ${err?.message || 'Unknown error'}`);
+    throw new Error('File storage is temporarily unavailable. Please try again later.');
   }
   return `https://storage.googleapis.com/${bucket.name}/uploads/${filename}`;
 }
