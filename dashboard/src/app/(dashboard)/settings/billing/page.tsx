@@ -183,7 +183,7 @@ export default function BillingPage() {
   }
 
   function copyReferralLink() {
-    if (!billing.partner) return;
+    if (!billing?.partner) return;
     const link = `${window.location.origin}/signup?ref=${billing.partner.referralCode}`;
     navigator.clipboard.writeText(link);
     setCopied(true);
