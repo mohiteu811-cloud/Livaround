@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { validate } from '../middleware/validate';
+import { syncPropertyCount } from '../../../lib/commercial/metering';
 
 const router = Router();
 router.use(authenticate);
@@ -69,6 +70,9 @@ router.post('/', validate(propertySchema), async (req: AuthRequest, res: Respons
         hostId: host.id,
       },
     });
+    if (host.organizationId) {
+      await syncPropertyCount(host.organizationId, prisma);
+    }
     return res.status(201).json(serializeProp(property as Record<string, unknown>));
   } catch (err) {
     console.error(err);
@@ -97,7 +101,10 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 
 router.put('/:id', validate(propertySchema.partial()), async (req: AuthRequest, res: Response) => {
   try {
-    const existing = await prisma.property.findFirst({ where: { id: req.params.id, host: { userId: req.user!.id } } });
+    const existing = await prisma.property.findFirst({
+      where: { id: req.params.id, host: { userId: req.user!.id } },
+      include: { host: { select: { organizationId: true } } },
+    });
     if (!existing) return res.status(404).json({ error: 'Property not found' });
     const { amenities, images, houseRules, ...rest } = req.body;
     const property = await prisma.property.update({
@@ -109,6 +116,9 @@ router.put('/:id', validate(propertySchema.partial()), async (req: AuthRequest, 
         ...(houseRules !== undefined && { houseRules: JSON.stringify(houseRules) }),
       },
     });
+    if (req.body.isActive !== undefined && existing.host.organizationId) {
+      await syncPropertyCount(existing.host.organizationId, prisma);
+    }
     return res.json(serializeProp(property as Record<string, unknown>));
   } catch (err) {
     console.error(err);
@@ -118,9 +128,15 @@ router.put('/:id', validate(propertySchema.partial()), async (req: AuthRequest, 
 
 router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
-    const existing = await prisma.property.findFirst({ where: { id: req.params.id, host: { userId: req.user!.id } } });
+    const existing = await prisma.property.findFirst({
+      where: { id: req.params.id, host: { userId: req.user!.id } },
+      include: { host: { select: { organizationId: true } } },
+    });
     if (!existing) return res.status(404).json({ error: 'Property not found' });
     await prisma.property.delete({ where: { id: req.params.id } });
+    if (existing.host.organizationId) {
+      await syncPropertyCount(existing.host.organizationId, prisma);
+    }
     return res.status(204).send();
   } catch (err) {
     console.error(err);
