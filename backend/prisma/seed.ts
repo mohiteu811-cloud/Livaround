@@ -1,10 +1,36 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { PLANS, PLAN_HIERARCHY } from '../../lib/commercial/plans';
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log('Seeding database...');
+
+  // ── Plans ──────────────────────────────────────────────────────────────────
+  for (const name of PLAN_HIERARCHY) {
+    const plan = PLANS[name];
+    await prisma.plan.upsert({
+      where: { id: `plan-${name}` },
+      update: {
+        name: plan.name,
+        pricePerProperty: plan.pricePerProperty,
+        flatPrice: plan.flatPrice,
+        maxProperties: plan.maxProperties,
+        features: plan.features,
+      },
+      create: {
+        id: `plan-${name}`,
+        name: plan.name,
+        pricePerProperty: plan.pricePerProperty,
+        flatPrice: plan.flatPrice,
+        maxProperties: plan.maxProperties,
+        features: plan.features,
+      },
+    });
+  }
+  console.log('  Plans seeded (community, pro, agency)');
+
   const password = await bcrypt.hash('password123', 12);
 
   const hostUser = await prisma.user.upsert({
