@@ -362,6 +362,22 @@ export const api = {
   billing: {
     features: () =>
       request<{ plan: string | null; features: Record<string, boolean> }>('/api/billing/features'),
+    subscription: () =>
+      request<BillingSubscription>('/api/billing/subscription'),
+    payments: () =>
+      request<{ payments: PaymentRecord[] }>('/api/billing/payments'),
+    checkout: (planName: string) =>
+      request<{ approvalUrl: string; paypalSubId: string } | null>('/api/billing/checkout', {
+        method: 'POST',
+        body: JSON.stringify({ planName }),
+      }),
+    cancel: () =>
+      request<{ success: boolean }>('/api/billing/cancel', { method: 'POST' }),
+    changePlan: (planName: string) =>
+      request<{ approvalUrl?: string; paypalSubId?: string; success?: boolean }>('/api/billing/change-plan', {
+        method: 'POST',
+        body: JSON.stringify({ planName }),
+      }),
   },
 };
 
@@ -834,4 +850,35 @@ export interface DashboardStats {
   bookingsBySource: { source: string; _count: number; _sum: { totalAmount: number } }[];
   revenueByMonth: { month: string; revenue: number; bookings: number }[];
   lowStockAlerts: InventoryItem[];
+}
+
+export interface BillingSubscription {
+  commercial: boolean;
+  plan: string | null;
+  status: 'active' | 'past_due' | 'cancelled' | 'trialing' | null;
+  propertyCount: number;
+  monthlyAmount: number;
+  currentPeriodStart: string | null;
+  currentPeriodEnd: string | null;
+  trialEndsAt: string | null;
+  cancelledAt: string | null;
+  subscription: {
+    id: string;
+    planName: string;
+    pricePerProperty: number | null;
+    flatPrice: number | null;
+  } | null;
+  partner: {
+    referralCode: string;
+    tier: string;
+    totalEarned: number;
+    pendingPayout: number;
+  } | null;
+}
+
+export interface PaymentRecord {
+  period: string;
+  amount: number;
+  date: string;
+  status: string;
 }
