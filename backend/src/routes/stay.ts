@@ -541,8 +541,7 @@ router.post('/:code/upload', (req: Request, res: Response) => {
       return res.json({ url, type });
     } catch (err: any) {
       console.error('Upload handler error:', err);
-      const message = err?.message || 'Upload failed';
-      return res.status(500).json({ error: message });
+      return res.status(500).json({ error: 'File upload failed. Please try again later.' });
     }
   });
 });
