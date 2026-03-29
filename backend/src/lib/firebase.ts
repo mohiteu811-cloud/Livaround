@@ -29,9 +29,14 @@ export async function uploadToFirebase(
 ): Promise<string> {
   const bucket = getBucket();
   const file = bucket.file(`uploads/${filename}`);
-  await file.save(buffer, {
-    metadata: { contentType: mimetype },
-    public: true,
-  });
+  try {
+    await file.save(buffer, {
+      metadata: { contentType: mimetype },
+      public: true,
+    });
+  } catch (err: any) {
+    console.error('Firebase upload failed:', { filename, mimetype, bufferSize: buffer.length, error: err?.message || err });
+    throw new Error(`Firebase upload failed: ${err?.message || 'Unknown error'}`);
+  }
   return `https://storage.googleapis.com/${bucket.name}/uploads/${filename}`;
 }

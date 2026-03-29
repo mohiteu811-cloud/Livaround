@@ -330,7 +330,11 @@ function AccessTab({ data, guestCode, onRefresh }: { data: StayData; guestCode: 
       const formData = new FormData();
       formData.append('file', idFile);
       const uploadRes = await fetch(`${API_URL}/api/stay/${guestCode}/upload`, { method: 'POST', body: formData });
-      if (!uploadRes.ok) { setIdError('Photo upload failed. Please try again.'); return; }
+      if (!uploadRes.ok) {
+        const errBody = await uploadRes.json().catch(() => null);
+        setIdError(errBody?.error || 'Photo upload failed. Please try again.');
+        return;
+      }
       const { url: documentUrl } = await uploadRes.json();
 
       // Step 2: register the ID
