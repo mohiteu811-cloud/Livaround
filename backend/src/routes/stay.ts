@@ -508,34 +508,42 @@ router.post('/:code/visitor', async (req: Request, res: Response) => {
 // ── POST /api/stay/:code/upload ───────────────────────────────────────────────
 // Public file upload for guest issue reports, ID documents, and visitor IDs
 
-router.post('/:code/upload', upload.single('file'), async (req: Request, res: Response) => {
-  try {
-    const booking = await prisma.booking.findUnique({
-      where: { guestCode: req.params.code },
-      select: { id: true },
-    });
-    if (!booking) return res.status(404).json({ error: 'Stay not found' });
-    if (!req.file) return res.status(400).json({ error: 'No file or unsupported type' });
+router.post('/:code/upload', (req: Request, res: Response) => {
+  upload.single('file')(req, res, async (multerErr: any) => {
+    try {
+      if (multerErr) {
+        console.error('Multer error:', multerErr);
+        const msg = multerErr.code === 'LIMIT_FILE_SIZE' ? 'File too large (max 200 MB)' : 'File upload error';
+        return res.status(400).json({ error: msg });
+      }
 
-    let buffer = req.file.buffer;
-    let mimetype = req.file.mimetype;
-    let ext = path.extname(req.file.originalname).toLowerCase();
+      const booking = await prisma.booking.findUnique({
+        where: { guestCode: req.params.code },
+        select: { id: true },
+      });
+      if (!booking) return res.status(404).json({ error: 'Stay not found' });
+      if (!req.file) return res.status(400).json({ error: 'No file provided or unsupported file type. Allowed: JPEG, PNG, WebP, HEIC, MP4, WebM.' });
 
-    // Convert HEIC/HEIF to JPEG for broad compatibility
-    if (/image\/(heic|heif)/.test(mimetype) || ext === '.heic' || ext === '.heif') {
-      buffer = await sharp(buffer).jpeg({ quality: 85 }).toBuffer();
-      mimetype = 'image/jpeg';
-      ext = '.jpg';
+      let buffer = req.file.buffer;
+      let mimetype = req.file.mimetype;
+      let ext = path.extname(req.file.originalname).toLowerCase();
+
+      // Convert HEIC/HEIF to JPEG for broad compatibility
+      if (/image\/(heic|heif)/.test(mimetype) || ext === '.heic' || ext === '.heif') {
+        buffer = await sharp(buffer).jpeg({ quality: 85 }).toBuffer();
+        mimetype = 'image/jpeg';
+        ext = '.jpg';
+      }
+
+      const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
+      const url = await uploadToFirebase(buffer, filename, mimetype);
+      const type = req.file.mimetype.startsWith('video/') ? 'video' : 'image';
+      return res.json({ url, type });
+    } catch (err) {
+      console.error('Upload handler error:', err);
+      return res.status(500).json({ error: 'Upload failed. Please try again.' });
     }
-
-    const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
-    const url = await uploadToFirebase(buffer, filename, mimetype);
-    const type = req.file.mimetype.startsWith('video/') ? 'video' : 'image';
-    return res.json({ url, type });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: 'Upload failed' });
-  }
+  });
 });
 
 export default router;
