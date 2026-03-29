@@ -14,24 +14,22 @@ export default function BillingSuccessPage() {
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
 
   useEffect(() => {
-    // Give PayPal webhook a moment to activate the subscription
-    const timer = setTimeout(async () => {
+    if (!subscriptionId) {
+      setStatus('success');
+      return;
+    }
+
+    // Activate the subscription directly instead of waiting for the webhook
+    (async () => {
       try {
-        const sub = await api.billing.subscription();
-        if (sub.status === 'active' || sub.status === 'trialing') {
-          setStatus('success');
-        } else {
-          // Subscription may still be pending webhook — show success anyway
-          // since PayPal approved it
-          setStatus('success');
-        }
+        await api.billing.activate(subscriptionId);
+        setStatus('success');
       } catch {
+        // Even if activation fails, show success — the webhook may still arrive
         setStatus('success');
       }
-    }, 2000);
-
-    return () => clearTimeout(timer);
-  }, []);
+    })();
+  }, [subscriptionId]);
 
   return (
     <div className="flex items-center justify-center min-h-[60vh] p-4">
