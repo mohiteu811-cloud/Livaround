@@ -6,7 +6,7 @@ import {
   Wifi, Lock, MapPin, Phone, Home, BookOpen, HelpCircle, Key,
   ChevronDown, ChevronRight, Copy, Check, ExternalLink, Bed, Bath, Users,
   AlertTriangle, X, ConciergeBell, Sparkles, ChefHat, Car, ShoppingBag,
-  Shield, Upload, UserPlus,
+  Shield, Upload, UserPlus, MessageSquare, Send,
 } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://livaroundbackend-production.up.railway.app';
@@ -82,7 +82,7 @@ interface StayData {
   visitors: GuestVisitorRecord[];
 }
 
-type Tab = 'stay' | 'access' | 'guide' | 'services' | 'help';
+type Tab = 'stay' | 'access' | 'guide' | 'services' | 'messages' | 'help';
 
 const CATEGORY_EMOJI: Record<string, string> = {
   STORAGE: '🗄️', APPLIANCE: '🔌', ELECTRICAL: '⚡', UTILITY: '🔧',
@@ -1243,6 +1243,173 @@ function useVoiceInput(onTranscript: (t: string) => void) {
   return { listening, supported, start, stop };
 }
 
+// ── Tab: Messages ─────────────────────────────────────────────────────────────
+
+interface GuestMessage {
+  id: string;
+  senderType: 'HOST' | 'GUEST' | 'SYSTEM';
+  senderName: string;
+  content: string;
+  imageUrl?: string;
+  createdAt: string;
+}
+
+function MessagesTab({ data, guestCode }: { data: StayData; guestCode: string }) {
+  const [messages, setMessages] = useState<GuestMessage[]>([]);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [input, setInput] = useState('');
+  const [sending, setSending] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const loadMessages = useCallback(() => {
+    fetch(`${API_URL}/api/stay/${guestCode}/messages`)
+      .then((r) => {
+        if (r.status === 403) {
+          setError('Messaging is not available for this property');
+          return null;
+        }
+        return r.json();
+      })
+      .then((d) => {
+        if (d) {
+          setMessages(d.messages || []);
+          if (d.conversation?.id) setConversationId(d.conversation.id);
+        }
+      })
+      .catch(() => setError('Failed to load messages'))
+      .finally(() => setLoading(false));
+  }, [guestCode]);
+
+  useEffect(() => {
+    loadMessages();
+    // Mark as read
+    fetch(`${API_URL}/api/stay/${guestCode}/messages/read`, { method: 'PATCH' }).catch(() => {});
+    // Poll every 5 seconds
+    pollRef.current = setInterval(loadMessages, 5000);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [loadMessages, guestCode]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  async function handleSend() {
+    const text = input.trim();
+    if (!text || sending) return;
+
+    setSending(true);
+    setInput('');
+    try {
+      const res = await fetch(`${API_URL}/api/stay/${guestCode}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: text }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || 'Failed to send');
+      }
+      const result = await res.json();
+      if (result.conversationId) setConversationId(result.conversationId);
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === result.message.id)) return prev;
+        return [...prev, result.message];
+      });
+    } catch (err: any) {
+      setInput(text);
+      setError(err.message);
+    }
+    setSending(false);
+  }
+
+  if (loading) {
+    return (
+      <div className="px-5 py-8 text-center">
+        <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto" />
+      </div>
+    );
+  }
+
+  if (error && messages.length === 0) {
+    return (
+      <div className="px-5 py-8 text-center">
+        <MessageSquare size={32} className="mx-auto text-slate-300 mb-3" />
+        <p className="text-slate-500 text-sm">{error}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col" style={{ height: 'calc(100vh - 280px)' }}>
+      <div className="px-5 py-3 border-b border-slate-200">
+        <h2 className="font-bold text-slate-800">Message Your Host</h2>
+        <p className="text-xs text-slate-500">Chat with {data.property.host.name}</p>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+        {messages.length === 0 ? (
+          <div className="text-center py-8">
+            <MessageSquare size={32} className="mx-auto text-slate-300 mb-3" />
+            <p className="text-slate-500 text-sm">Start a conversation with your host</p>
+          </div>
+        ) : (
+          messages.map((msg) => {
+            if (msg.senderType === 'SYSTEM') {
+              return (
+                <div key={msg.id} className="text-center">
+                  <span className="inline-block px-3 py-1 text-xs text-slate-500 bg-slate-100 rounded-full italic">
+                    {msg.content}
+                  </span>
+                </div>
+              );
+            }
+            const isGuest = msg.senderType === 'GUEST';
+            return (
+              <div key={msg.id} className={`flex ${isGuest ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[80%] rounded-2xl px-3.5 py-2.5 ${
+                  isGuest
+                    ? 'bg-indigo-600 text-white rounded-br-md'
+                    : 'bg-slate-100 text-slate-800 rounded-bl-md'
+                }`}>
+                  <p className={`text-[11px] font-medium mb-0.5 ${isGuest ? 'text-indigo-200' : 'text-slate-500'}`}>
+                    {msg.senderName}
+                  </p>
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                  <p className={`text-[10px] mt-1 text-right ${isGuest ? 'text-indigo-200/60' : 'text-slate-400'}`}>
+                    {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
+              </div>
+            );
+          })
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      <div className="px-4 py-3 border-t border-slate-200 flex items-end gap-2">
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSend(); } }}
+          placeholder="Type a message..."
+          className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        />
+        <button
+          onClick={handleSend}
+          disabled={!input.trim() || sending}
+          className="p-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white rounded-xl transition-colors"
+        >
+          <Send size={16} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Tab: Help ─────────────────────────────────────────────────────────────────
 
 function HelpTab({ data, guestCode }: { data: StayData; guestCode: string }) {
@@ -1542,6 +1709,7 @@ export default function StayPage() {
     { id: 'access',   label: 'Access',   icon: <Key size={18} /> },
     { id: 'guide',    label: 'Guide',    icon: <BookOpen size={18} /> },
     { id: 'services', label: 'Services', icon: <ConciergeBell size={18} /> },
+    { id: 'messages', label: 'Chat',     icon: <MessageSquare size={18} /> },
     { id: 'help',     label: 'Help',     icon: <HelpCircle size={18} /> },
   ];
 
@@ -1582,6 +1750,7 @@ export default function StayPage() {
             onRefresh={loadData}
           />
         )}
+        {tab === 'messages' && <MessagesTab data={data} guestCode={code} />}
         {tab === 'help'     && <HelpTab data={data} guestCode={code} />}
       </div>
 

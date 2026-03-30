@@ -411,6 +411,21 @@ export const api = {
       request<{ success: boolean; completed: number; failed: number }>('/api/admin/payouts/check-status', { method: 'POST' }),
   },
 
+  conversations: {
+    list: () =>
+      request<ConversationListItem[]>('/api/conversations'),
+    get: (id: string, before?: string) => {
+      const qs = before ? `?before=${before}` : '';
+      return request<{ conversation: ConversationDetail; messages: MessageItem[]; hasMore: boolean }>(
+        `/api/conversations/${id}${qs}`
+      );
+    },
+    sendMessage: (id: string, data: { content: string; imageUrl?: string }) =>
+      request<MessageItem>(`/api/conversations/${id}/messages`, { method: 'POST', body: JSON.stringify(data) }),
+    markRead: (id: string) =>
+      request<{ ok: boolean }>(`/api/conversations/${id}/read`, { method: 'PATCH' }),
+  },
+
   billing: {
     features: () =>
       request<{ plan: string | null; features: Record<string, boolean> }>('/api/billing/features'),
@@ -1105,4 +1120,50 @@ export interface AdminStats {
     monthlyAmount: number;
     date: string;
   }[];
+}
+
+// ── Messaging types ──────────────────────────────────────────────────────────
+
+export interface ConversationListItem {
+  id: string;
+  bookingId: string;
+  booking: {
+    id: string;
+    checkIn: string;
+    checkOut: string;
+    status: string;
+    property: { id: string; name: string };
+  };
+  guestName: string;
+  guestCode: string;
+  lastMessageAt: string | null;
+  lastMessagePreview: string | null;
+  unreadByHost: number;
+  unreadByGuest: number;
+}
+
+export interface ConversationDetail extends ConversationListItem {
+  booking: {
+    id: string;
+    guestName: string;
+    guestEmail: string | null;
+    guestPhone: string | null;
+    checkIn: string;
+    checkOut: string;
+    status: string;
+    property: { id: string; name: string };
+  };
+}
+
+export interface MessageItem {
+  id: string;
+  conversationId: string;
+  senderType: 'HOST' | 'GUEST' | 'SYSTEM';
+  senderName: string;
+  content: string;
+  imageUrl: string | null;
+  isSystemMessage: boolean;
+  readByHost: boolean;
+  readByGuest: boolean;
+  createdAt: string;
 }

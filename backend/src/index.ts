@@ -1,8 +1,10 @@
 import 'dotenv/config';
 import express from 'express';
+import http from 'http';
 import cors from 'cors';
 import helmet from 'helmet';
 import { json } from 'body-parser';
+import { IS_COMMERCIAL } from './lib/config';
 
 import authRoutes from './routes/auth';
 import propertiesRoutes from './routes/properties';
@@ -32,6 +34,7 @@ import adminPayoutsRoutes from './routes/admin-payouts';
 import partnerRoutes from './routes/partner';
 
 const app = express();
+const server = http.createServer(app);
 
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 const allowedOrigins = (process.env.CORS_ORIGIN || 'https://livarounddashboard-production.up.railway.app,http://localhost:3000').split(',').map(o => o.trim());
@@ -65,6 +68,17 @@ app.use('/api/admin/payouts', adminPayoutsRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/partner', partnerRoutes);
 
+// Load commercial extensions (messaging, host-app endpoints) when available
+if (IS_COMMERCIAL) {
+  try {
+    const commercial = require('../../commercial/backend-extensions');
+    commercial.register(app, server, allowedOrigins);
+    console.log('Commercial extensions loaded');
+  } catch (e) {
+    console.log('Commercial extensions not available');
+  }
+}
+
 app.get('/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
@@ -73,7 +87,7 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 });
 
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`LivAround API running on http://localhost:${PORT}`);
 });
 

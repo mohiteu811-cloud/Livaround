@@ -31,11 +31,13 @@ model Host {
   name           String
   organizationId String?       @unique
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  pushToken      String?
   properties     Property[]
   tradeRoles     TradeRole[]
   ownersCreated  Owner[]
   tradesmen      Tradesman[]
   workers        Worker[]
+  conversations  Conversation[]
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 }
@@ -108,6 +110,7 @@ model Booking {
   serviceRequests GuestServiceRequest[]
   guestIds        GuestID[]
   visitors        GuestVisitor[]
+  conversation    Conversation?
 }
 
 model GuestID {
@@ -723,4 +726,41 @@ model Payout {
   commissions Commission[]
   processedAt DateTime?
   createdAt   DateTime     @default(now())
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Guest-Host Messaging
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model Conversation {
+  id                 String    @id @default(cuid())
+  bookingId          String    @unique
+  booking            Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  hostId             String
+  host               Host      @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  guestName          String
+  guestCode          String
+  lastMessageAt      DateTime?
+  lastMessagePreview String?
+  unreadByHost       Int       @default(0)
+  unreadByGuest      Int       @default(0)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  messages           Message[]
+}
+
+model Message {
+  id              String       @id @default(cuid())
+  conversationId  String
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderType      String       // "HOST" | "GUEST" | "SYSTEM"
+  senderName      String
+  content         String
+  imageUrl        String?
+  isSystemMessage Boolean      @default(false)
+  readByHost      Boolean      @default(false)
+  readByGuest     Boolean      @default(false)
+  createdAt       DateTime     @default(now())
+
+  @@index([conversationId, createdAt])
 }

@@ -26,6 +26,7 @@ import {
   CreditCard,
   Handshake,
   Banknote,
+  MessageSquare,
 } from 'lucide-react';
 import { clearToken } from '@/lib/auth';
 import { getCurrentUser } from '@/lib/auth';
@@ -43,6 +44,7 @@ const nav = [
   { href: '/tracking', icon: MapPin, label: 'Tracking' },
   { href: '/inventory', icon: Package, label: 'Inventory' },
   { href: '/issues', icon: AlertTriangle, label: 'Issues' },
+  { href: '/messages', icon: MessageSquare, label: 'Messages' },
   { group: true, label: 'Maintenance' },
   { href: '/trade-roles', icon: Wrench, label: 'Trade Roles' },
   { href: '/maintenance', icon: ClipboardList, label: 'Requests' },

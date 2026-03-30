@@ -31,6 +31,7 @@ export const PLANS: Record<PlanName, PlanDefinition> = {
       prioritySupport: false,
       whiteLabel: false,
       multiOrg: false,
+      messaging: false,
     },
   },
 
@@ -54,6 +55,7 @@ export const PLANS: Record<PlanName, PlanDefinition> = {
       prioritySupport: true,
       whiteLabel: false,
       multiOrg: false,
+      messaging: true,
     },
   },
 
@@ -77,6 +79,7 @@ export const PLANS: Record<PlanName, PlanDefinition> = {
       prioritySupport: true,
       whiteLabel: true,
       multiOrg: true,
+      messaging: true,
     },
   },
 };

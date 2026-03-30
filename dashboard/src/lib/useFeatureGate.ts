@@ -56,6 +56,7 @@ const FEATURE_MIN_PLAN: Record<string, string> = {
   prioritySupport: 'pro',
   whiteLabel: 'agency',
   multiOrg: 'agency',
+  messaging: 'pro',
 };
 
 /**
