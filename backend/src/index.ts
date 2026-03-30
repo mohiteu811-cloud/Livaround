@@ -74,8 +74,8 @@ if (IS_COMMERCIAL) {
     const commercial = require('../../commercial/backend-extensions');
     commercial.register(app, server, allowedOrigins);
     console.log('Commercial extensions loaded');
-  } catch (e) {
-    console.log('Commercial extensions not available');
+  } catch (e: any) {
+    console.log('Commercial extensions not available:', e?.message || e);
   }
 }
 
