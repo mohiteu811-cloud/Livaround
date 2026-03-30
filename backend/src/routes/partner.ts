@@ -126,19 +126,17 @@ router.post('/join', validate(publicRegisterSchema), async (req: Request, res: R
       { expiresIn: '90d' }
     );
 
-    // Send welcome email
+    // Send welcome email (fire-and-forget, don't block response)
     const referralLink = `https://livaround.com?ref=${referralCode}`;
-    try {
-      await sendPartnerWelcomeEmail({
-        name: fullName,
-        email: normalizedEmail,
-        referralCode,
-        referralLink,
-        dashboardUrl: `${process.env.DASHBOARD_URL || 'https://livarounddashboard-production.up.railway.app'}/partners/dashboard?token=${partnerToken}`,
-      });
-    } catch (emailErr) {
+    sendPartnerWelcomeEmail({
+      name: fullName,
+      email: normalizedEmail,
+      referralCode,
+      referralLink,
+      dashboardUrl: `${process.env.DASHBOARD_URL || 'https://livarounddashboard-production.up.railway.app'}/partners/dashboard?token=${partnerToken}`,
+    }).catch((emailErr) => {
       console.error('Failed to send partner welcome email:', emailErr);
-    }
+    });
 
     return res.status(201).json({
       success: true,
