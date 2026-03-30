@@ -41,6 +41,7 @@ export default function WorkerShell({ children }: { children: React.ReactNode })
   const tr = t(lang);
   const tabs = [
     { href: '/worker/jobs', label: tr.jobs, icon: '🔧' },
+    { href: '/worker/messages', label: 'Messages', icon: '💬' },
     ...(isSupervisor ? [{ href: '/worker/issues/new', label: 'Report Issue', icon: '⚠️' }] : []),
     { href: '/worker/profile', label: tr.profile, icon: '👤' },
   ];

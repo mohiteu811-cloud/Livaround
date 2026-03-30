@@ -137,6 +137,24 @@ export const api = {
     },
   },
 
+  internalConversations: {
+    list: () =>
+      request<any[]>('/api/internal-conversations'),
+    get: (id: string, before?: string) => {
+      const qs = before ? `?before=${before}` : '';
+      return request<{ conversation: any; messages: any[]; hasMore: boolean }>(
+        `/api/internal-conversations/${id}${qs}`
+      );
+    },
+    sendMessage: (id: string, content: string, imageUrl?: string) =>
+      request<any>(`/api/internal-conversations/${id}/messages`, {
+        method: 'POST',
+        body: JSON.stringify({ content, imageUrl }),
+      }),
+    markRead: (id: string) =>
+      request<{ ok: boolean }>(`/api/internal-conversations/${id}/read`, { method: 'PATCH' }),
+  },
+
   workers: {
     updateAvailability: (id: string, isAvailable: boolean) =>
       request<Worker>(`/api/workers/${id}`, {
