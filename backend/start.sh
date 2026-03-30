@@ -8,6 +8,8 @@ if [ -n "$GITHUB_PAT" ]; then
   # Symlink node_modules so commercial code can resolve backend dependencies
   ln -s /app/node_modules ../commercial/backend-extensions/node_modules 2>/dev/null || true
   ln -s /app/node_modules ../commercial/node_modules 2>/dev/null || true
+  # Symlink /backend -> /app so commercial relative imports resolve correctly
+  ln -s /app /backend 2>/dev/null || true
 else
   echo "No GITHUB_PAT set, skipping commercial clone"
 fi
