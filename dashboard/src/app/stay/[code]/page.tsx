@@ -1396,7 +1396,7 @@ function MessagesTab({ data, guestCode }: { data: StayData; guestCode: string })
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSend(); } }}
           placeholder="Type a message..."
-          className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
         />
         <button
           onClick={handleSend}
