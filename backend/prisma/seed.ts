@@ -1,10 +1,36 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { PLANS, PLAN_HIERARCHY } from '../src/lib/commercial/plans';
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log('Seeding database...');
+
+  // ── Plans ──────────────────────────────────────────────────────────────────
+  for (const name of PLAN_HIERARCHY) {
+    const plan = PLANS[name];
+    await prisma.plan.upsert({
+      where: { id: `plan-${name}` },
+      update: {
+        name: plan.name,
+        pricePerProperty: plan.pricePerProperty,
+        flatPrice: plan.flatPrice,
+        maxProperties: plan.maxProperties,
+        features: plan.features,
+      },
+      create: {
+        id: `plan-${name}`,
+        name: plan.name,
+        pricePerProperty: plan.pricePerProperty,
+        flatPrice: plan.flatPrice,
+        maxProperties: plan.maxProperties,
+        features: plan.features,
+      },
+    });
+  }
+  console.log('  Plans seeded (community, pro, agency)');
+
   const password = await bcrypt.hash('password123', 12);
 
   const hostUser = await prisma.user.upsert({
@@ -154,25 +180,44 @@ async function main() {
     },
   });
 
+  // ── Admin / Host user ────────────────────────────────────────────────────────
+
+  const adminPassword = await bcrypt.hash('admin123', 12);
+
+  const mohitAdmin = await prisma.user.upsert({
+    where: { email: 'mohit@livaround.com' },
+    update: { role: 'HOST', password: adminPassword },
+    create: {
+      name: 'Mohit Lalvani', email: 'mohit@livaround.com',
+      password: adminPassword, phone: '+91 98201 55678', role: 'HOST',
+      host: { create: { name: 'LivAround Admin' } },
+    },
+  });
+  // Ensure host record exists (for existing users being migrated to HOST role)
+  const existingHost = await prisma.host.findUnique({ where: { userId: mohitAdmin.id } });
+  if (!existingHost) {
+    await prisma.host.create({ data: { userId: mohitAdmin.id, name: 'LivAround Admin' } });
+  }
+
   // ── Dummy owners ────────────────────────────────────────────────────────────
 
   const ownerPassword = await bcrypt.hash('owner123', 12);
 
-  // Owner 1: Mohit Lalvani — Villa Sussegad
-  const mohitUser = await prisma.user.upsert({
-    where: { email: 'mohit@livaround.com' }, update: {},
+  // Owner 1: Mohit (owner account with different email for owner portal)
+  const mohitOwner = await prisma.user.upsert({
+    where: { email: 'mohit.owner@livaround.com' }, update: {},
     create: {
-      name: 'Mohit Lalvani', email: 'mohit@livaround.com',
+      name: 'Mohit Lalvani', email: 'mohit.owner@livaround.com',
       password: ownerPassword, phone: '+91 98201 55678', role: 'OWNER',
       owner: { create: {} },
     },
     include: { owner: true },
   });
   await prisma.propertyOwnership.upsert({
-    where: { ownerId_propertyId: { ownerId: mohitUser.owner!.id, propertyId: villa.id } },
+    where: { ownerId_propertyId: { ownerId: mohitOwner.owner!.id, propertyId: villa.id } },
     update: {},
     create: {
-      ownerId: mohitUser.owner!.id, propertyId: villa.id,
+      ownerId: mohitOwner.owner!.id, propertyId: villa.id,
       involvementLevel: 'FINANCIAL', ownershipPercent: 100, commissionPct: 20,
     },
   });
@@ -234,10 +279,11 @@ async function main() {
   }
 
   console.log('\nSeed complete!');
+  console.log('  Admin:   mohit@livaround.com / admin123  (Host tab → /admin)');
   console.log('  Host:    host@livaround.com / password123');
-  console.log('  Owner 1: mohit@livaround.com / owner123  → Villa Sussegad');
+  console.log('  Owner 1: mohit.owner@livaround.com / owner123  → Villa Sussegad');
   console.log('  Owner 2: priya.desai@livaround.com / owner123  → Casa Anjuna');
-  console.log('  Login URL: /owner/login');
+  console.log('  Login URL: /login');
 }
 
 main().catch(console.error).finally(() => prisma.$disconnect());

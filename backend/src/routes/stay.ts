@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import multer from 'multer';
 import path from 'path';
+import sharp from 'sharp';
 import { prisma } from '../lib/prisma';
 import { sendPushNotification } from '../lib/pushNotifications';
 import { uploadToFirebase } from '../lib/firebase';
@@ -12,7 +13,7 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 200 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    const ok = /image\/(jpeg|jpg|png|webp)|video\/(mp4|quicktime|webm|3gpp)/.test(file.mimetype);
+    const ok = /image\/(jpeg|jpg|png|webp|heic|heif)|video\/(mp4|quicktime|webm|3gpp)/.test(file.mimetype);
     cb(null, ok);
   },
 });
@@ -507,24 +508,42 @@ router.post('/:code/visitor', async (req: Request, res: Response) => {
 // ── POST /api/stay/:code/upload ───────────────────────────────────────────────
 // Public file upload for guest issue reports, ID documents, and visitor IDs
 
-router.post('/:code/upload', upload.single('file'), async (req: Request, res: Response) => {
-  try {
-    const booking = await prisma.booking.findUnique({
-      where: { guestCode: req.params.code },
-      select: { id: true },
-    });
-    if (!booking) return res.status(404).json({ error: 'Stay not found' });
-    if (!req.file) return res.status(400).json({ error: 'No file or unsupported type' });
+router.post('/:code/upload', (req: Request, res: Response) => {
+  upload.single('file')(req, res, async (multerErr: any) => {
+    try {
+      if (multerErr) {
+        console.error('Multer error:', multerErr);
+        const msg = multerErr.code === 'LIMIT_FILE_SIZE' ? 'File too large (max 200 MB)' : 'File upload error';
+        return res.status(400).json({ error: msg });
+      }
 
-    const ext = path.extname(req.file.originalname).toLowerCase();
-    const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
-    const url = await uploadToFirebase(req.file.buffer, filename, req.file.mimetype);
-    const type = req.file.mimetype.startsWith('video/') ? 'video' : 'image';
-    return res.json({ url, type });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: 'Upload failed' });
-  }
+      const booking = await prisma.booking.findUnique({
+        where: { guestCode: req.params.code },
+        select: { id: true },
+      });
+      if (!booking) return res.status(404).json({ error: 'Stay not found' });
+      if (!req.file) return res.status(400).json({ error: 'No file provided or unsupported file type. Allowed: JPEG, PNG, WebP, HEIC, MP4, WebM.' });
+
+      let buffer = req.file.buffer;
+      let mimetype = req.file.mimetype;
+      let ext = path.extname(req.file.originalname).toLowerCase();
+
+      // Convert HEIC/HEIF to JPEG for broad compatibility
+      if (/image\/(heic|heif)/.test(mimetype) || ext === '.heic' || ext === '.heif') {
+        buffer = await sharp(buffer).jpeg({ quality: 85 }).toBuffer();
+        mimetype = 'image/jpeg';
+        ext = '.jpg';
+      }
+
+      const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
+      const url = await uploadToFirebase(buffer, filename, mimetype);
+      const type = req.file.mimetype.startsWith('video/') ? 'video' : 'image';
+      return res.json({ url, type });
+    } catch (err: any) {
+      console.error('Upload handler error:', err);
+      return res.status(500).json({ error: 'File upload failed. Please try again later.' });
+    }
+  });
 });
 
 export default router;

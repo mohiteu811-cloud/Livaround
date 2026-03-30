@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import clsx from 'clsx';
@@ -22,9 +22,16 @@ import {
   HardHat,
   MapPin,
   UserCheck,
+  Shield,
+  CreditCard,
+  Handshake,
+  Banknote,
 } from 'lucide-react';
 import { clearToken } from '@/lib/auth';
+import { getCurrentUser } from '@/lib/auth';
 import { ThemeToggle } from './ThemeToggle';
+
+const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'mohit@livaround.com';
 
 const nav = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Overview' },
@@ -43,13 +50,27 @@ const nav = [
   { group: true, label: 'Ownership' },
   { href: '/owners', icon: UserCircle, label: 'Owners' },
   { href: '/revenue', icon: BarChart3, label: 'Revenue' },
+  { href: '/partner', icon: Handshake, label: 'Partner' },
+  { href: '/settings/billing', icon: CreditCard, label: 'Billing' },
 ];
 
-function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
+function NavLinks({ onNavigate, isAdmin }: { onNavigate?: () => void; isAdmin?: boolean }) {
   const pathname = usePathname();
+
+  const allNav = isAdmin
+    ? [
+        ...nav,
+        { group: true, label: 'Platform' },
+        { href: '/admin', icon: Shield, label: 'Admin' },
+        { href: '/admin/organizations', icon: Building2, label: 'Organizations' },
+        { href: '/admin/subscriptions', icon: CreditCard, label: 'Subscriptions' },
+        { href: '/admin/payouts', icon: Banknote, label: 'Payouts' },
+      ]
+    : nav;
+
   return (
     <>
-      {nav.map((item, i) => {
+      {allNav.map((item, i) => {
         if ('group' in item) {
           return (
             <p key={i} className="px-3 pt-4 pb-1 text-xs font-semibold text-slate-600 uppercase tracking-wider">
@@ -80,9 +101,20 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
+function useIsAdmin() {
+  const [isAdmin, setIsAdmin] = useState(false);
+  useEffect(() => {
+    getCurrentUser().then((user) => {
+      if (user?.email === ADMIN_EMAIL) setIsAdmin(true);
+    });
+  }, []);
+  return isAdmin;
+}
+
 export function MobileHeader() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const isAdmin = useIsAdmin();
 
   function handleLogout() {
     clearToken();
@@ -135,7 +167,7 @@ export function MobileHeader() {
           </button>
         </div>
         <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-          <NavLinks onNavigate={() => setOpen(false)} />
+          <NavLinks onNavigate={() => setOpen(false)} isAdmin={isAdmin} />
         </nav>
         <div className="px-3 py-4 border-t border-slate-800 space-y-0.5">
           <ThemeToggle />
@@ -154,6 +186,7 @@ export function MobileHeader() {
 
 export function Sidebar() {
   const router = useRouter();
+  const isAdmin = useIsAdmin();
 
   function handleLogout() {
     clearToken();
@@ -172,7 +205,7 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto scrollbar-thin">
-        <NavLinks />
+        <NavLinks isAdmin={isAdmin} />
       </nav>
 
       {/* Theme & Logout */}

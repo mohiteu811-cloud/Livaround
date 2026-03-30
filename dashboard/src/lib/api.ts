@@ -358,6 +358,84 @@ export const api = {
         request<SupplyCabinet>('/api/inventory/cabinets', { method: 'POST', body: JSON.stringify(data) }),
     },
   },
+
+  partner: {
+    dashboard: () => request<PartnerDashboard>('/api/partner/dashboard'),
+    register: () => request<{ success: boolean; referralCode: string; tier: string; commissionRate: number }>('/api/partner/register', { method: 'POST' }),
+  },
+
+  admin: {
+    stats: () => request<AdminStats>('/api/admin/stats'),
+    organizations: (params?: { search?: string; plan?: string; status?: string; page?: number; limit?: number }) => {
+      const qs = params ? '?' + new URLSearchParams(
+        Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))
+      ).toString() : '';
+      return request<AdminOrganizationsResponse>(`/api/admin/organizations${qs}`);
+    },
+    organization: (id: string) => request<AdminOrgDetail>(`/api/admin/organizations/${id}`),
+    changePlan: (orgId: string, planName: string) =>
+      request<{ success: boolean; plan: string; monthlyAmount: number }>(`/api/admin/organizations/${orgId}/change-plan`, {
+        method: 'POST',
+        body: JSON.stringify({ planName }),
+      }),
+    extendTrial: (orgId: string, days: number) =>
+      request<{ success: boolean; trialEndsAt: string }>(`/api/admin/organizations/${orgId}/extend-trial`, {
+        method: 'POST',
+        body: JSON.stringify({ days }),
+      }),
+    subscriptions: (params?: { status?: string; plan?: string; page?: number; limit?: number }) => {
+      const qs = params ? '?' + new URLSearchParams(
+        Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))
+      ).toString() : '';
+      return request<AdminSubscriptionsResponse>(`/api/admin/subscriptions${qs}`);
+    },
+    payouts: (params?: { status?: string; partner?: string; from?: string; to?: string; page?: number; limit?: number }) => {
+      const qs = params ? '?' + new URLSearchParams(
+        Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]))
+      ).toString() : '';
+      return request<AdminPayoutsResponse>(`/api/admin/payouts${qs}`);
+    },
+    payoutStats: () => request<AdminPayoutStats>('/api/admin/payouts/stats'),
+    processPayouts: () =>
+      request<{ success: boolean; commissionsApproved: number; payoutsCreated: number }>('/api/admin/payouts/process', { method: 'POST' }),
+    sendPayouts: (payoutIds?: string[]) =>
+      request<{ success: boolean; processed: number; paypalBatchId?: string; totalAmount?: number; message?: string }>('/api/admin/payouts/send', {
+        method: 'POST',
+        body: JSON.stringify({ payoutIds }),
+      }),
+    completePayout: (id: string) =>
+      request<{ success: boolean }>(`/api/admin/payouts/${id}/complete`, { method: 'POST' }),
+    rejectPayout: (id: string) =>
+      request<{ success: boolean }>(`/api/admin/payouts/${id}/reject`, { method: 'POST' }),
+    checkPayoutStatus: () =>
+      request<{ success: boolean; completed: number; failed: number }>('/api/admin/payouts/check-status', { method: 'POST' }),
+  },
+
+  billing: {
+    features: () =>
+      request<{ plan: string | null; features: Record<string, boolean> }>('/api/billing/features'),
+    subscription: () =>
+      request<BillingSubscription>('/api/billing/subscription'),
+    payments: () =>
+      request<{ payments: PaymentRecord[] }>('/api/billing/payments'),
+    checkout: (planName: string) =>
+      request<{ approvalUrl: string; paypalSubId: string } | null>('/api/billing/checkout', {
+        method: 'POST',
+        body: JSON.stringify({ planName }),
+      }),
+    cancel: () =>
+      request<{ success: boolean }>('/api/billing/cancel', { method: 'POST' }),
+    changePlan: (planName: string) =>
+      request<{ approvalUrl?: string; paypalSubId?: string; success?: boolean }>('/api/billing/change-plan', {
+        method: 'POST',
+        body: JSON.stringify({ planName }),
+      }),
+    activate: (subscriptionId: string) =>
+      request<{ success: boolean }>('/api/billing/activate', {
+        method: 'POST',
+        body: JSON.stringify({ subscriptionId }),
+      }),
+  },
 };
 
 // --- Types ---
@@ -829,4 +907,202 @@ export interface DashboardStats {
   bookingsBySource: { source: string; _count: number; _sum: { totalAmount: number } }[];
   revenueByMonth: { month: string; revenue: number; bookings: number }[];
   lowStockAlerts: InventoryItem[];
+}
+
+export interface BillingSubscription {
+  commercial: boolean;
+  plan: string | null;
+  status: 'active' | 'past_due' | 'cancelled' | 'trialing' | null;
+  propertyCount: number;
+  monthlyAmount: number;
+  currentPeriodStart: string | null;
+  currentPeriodEnd: string | null;
+  trialEndsAt: string | null;
+  cancelledAt: string | null;
+  subscription: {
+    id: string;
+    planName: string;
+    pricePerProperty: number | null;
+    flatPrice: number | null;
+  } | null;
+  partner: {
+    referralCode: string;
+    tier: string;
+    totalEarned: number;
+    pendingPayout: number;
+  } | null;
+}
+
+export interface PaymentRecord {
+  period: string;
+  amount: number;
+  date: string;
+  status: string;
+}
+
+export interface PartnerDashboard {
+  partner: {
+    referralCode: string;
+    tier: string;
+    commissionRate: number;
+    overrideRate: number | null;
+    status: string;
+  };
+  kpis: {
+    totalEarned: number;
+    pendingPayout: number;
+    monthEarnings: number;
+    referralCount: number;
+  };
+  referrals: {
+    orgId: string;
+    orgName: string;
+    plan: string;
+    monthlyAmount: number;
+    status: string;
+    commissionRate: number;
+    commissionEarned: number;
+    createdAt: string;
+  }[];
+  commissions: {
+    id: string;
+    period: string;
+    type: string;
+    amount: number;
+    currency: string;
+    status: string;
+    paidAt: string | null;
+    orgName: string;
+    createdAt: string;
+  }[];
+  payout: {
+    threshold: number;
+    eligible: boolean;
+    pendingAmount: number;
+  };
+}
+
+export interface AdminOrgRow {
+  id: string;
+  name: string;
+  ownerName: string | null;
+  ownerEmail: string | null;
+  plan: string;
+  status: string | null;
+  propertyCount: number;
+  monthlyAmount: number;
+  trialEndsAt: string | null;
+  cancelledAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminOrganizationsResponse {
+  organizations: AdminOrgRow[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface AdminOrgDetail {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+  owner: { name: string; email: string; phone?: string } | null;
+  properties: { id: string; name: string; city: string; isActive: boolean; createdAt: string }[];
+  subscription: {
+    id: string;
+    plan: string;
+    status: string;
+    monthlyAmount: number;
+    propertyCount: number;
+    currentPeriodStart: string;
+    currentPeriodEnd: string;
+    trialEndsAt: string | null;
+    cancelledAt: string | null;
+    createdAt: string;
+    paypalSubId: string | null;
+  } | null;
+  payments: { period: string; amount: number; date: string }[];
+  referredBy: { code: string; name: string; email: string } | null;
+}
+
+export interface AdminSubscriptionRow {
+  id: string;
+  organizationId: string;
+  orgName: string;
+  ownerName: string | null;
+  ownerEmail: string | null;
+  plan: string;
+  status: string;
+  monthlyAmount: number;
+  propertyCount: number;
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  trialEndsAt: string | null;
+  cancelledAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminSubscriptionsResponse {
+  subscriptions: AdminSubscriptionRow[];
+  total: number;
+  page: number;
+  limit: number;
+  pastDueCount: number;
+  pastDue: AdminSubscriptionRow[];
+}
+
+export interface AdminPayoutRow {
+  id: string;
+  partnerId: string;
+  partnerName: string;
+  partnerEmail: string;
+  partnerTier: string;
+  amount: number;
+  currency: string;
+  method: string;
+  status: string;
+  reference: string | null;
+  commissionCount: number;
+  processedAt: string | null;
+  createdAt: string;
+}
+
+export interface AdminPayoutsResponse {
+  payouts: AdminPayoutRow[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface AdminPayoutStats {
+  paidThisMonth: number;
+  paidAllTime: number;
+  activePartners: number;
+  pendingPayouts: number;
+}
+
+export interface AdminStats {
+  kpis: {
+    totalMRR: number;
+    totalARR: number;
+    activeSubscriptions: number;
+    trialConversionRate: number;
+    monthlyChurnRate: number;
+    arpu: number;
+    totalProperties: number;
+    pendingPayouts: number;
+  };
+  mrrHistory: { month: string; pro: number; agency: number; total: number }[];
+  recentEvents: {
+    id: string;
+    orgName: string;
+    planName: string;
+    eventType: 'new' | 'upgraded' | 'cancelled' | 'payment_failed';
+    monthlyAmount: number;
+    date: string;
+  }[];
 }

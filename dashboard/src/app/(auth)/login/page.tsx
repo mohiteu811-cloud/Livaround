@@ -48,12 +48,14 @@ export default function LoginPage() {
       } else {
         res = await api.auth.login(form.email.trim().toLowerCase(), form.password);
         if (res.user.role !== role) {
+          // Redirect to the correct dashboard for their actual role
           const actual = ROLES.find((r) => r.id === res.user.role);
-          setError(
-            actual
-              ? `This account is a ${actual.label.toLowerCase()} account. Please select the "${actual.label}" tab.`
-              : 'Wrong role selected for this account.'
-          );
+          if (actual) {
+            saveToken(res.token);
+            router.push(actual.redirect);
+            return;
+          }
+          setError('Wrong role selected for this account.');
           return;
         }
       }
