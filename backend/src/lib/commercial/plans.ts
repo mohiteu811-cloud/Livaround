@@ -32,6 +32,8 @@ export const PLANS: Record<PlanName, PlanDefinition> = {
       whiteLabel: false,
       multiOrg: false,
       messaging: false,
+      internalMessaging: false,
+      aiMessaging: false,
     },
   },
 
@@ -56,6 +58,8 @@ export const PLANS: Record<PlanName, PlanDefinition> = {
       whiteLabel: false,
       multiOrg: false,
       messaging: true,
+      internalMessaging: true,
+      aiMessaging: true,
     },
   },
 
@@ -80,6 +84,8 @@ export const PLANS: Record<PlanName, PlanDefinition> = {
       whiteLabel: true,
       multiOrg: true,
       messaging: true,
+      internalMessaging: true,
+      aiMessaging: true,
     },
   },
 };

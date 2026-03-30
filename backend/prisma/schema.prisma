@@ -83,6 +83,7 @@ model Property {
   docs                PropertyDoc[]
   contacts            PropertyContact[]
   tradesmen           TradesmanProperty[]
+  conversations       Conversation[]
 }
 
 model Booking {
@@ -180,6 +181,7 @@ model Worker {
   audits                   JobAudit[]
   reportedIssues           Issue[]              @relation("ReportedIssues")
   shiftApplications        ShiftApplication[]
+  conversations            Conversation[]
 }
 
 model Job {
@@ -729,38 +731,71 @@ model Payout {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Guest-Host Messaging
+// Messaging (Guest↔Host + Internal: Host↔Worker, Supervisor↔Worker)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 model Conversation {
   id                 String    @id @default(cuid())
-  bookingId          String    @unique
-  booking            Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  channelType        String    @default("GUEST_HOST") // GUEST_HOST | HOST_WORKER | SUPERVISOR_WORKER
+  bookingId          String?   @unique
+  booking            Booking?  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   hostId             String
   host               Host      @relation(fields: [hostId], references: [id], onDelete: Cascade)
-  guestName          String
-  guestCode          String
+  workerId           String?
+  worker             Worker?   @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  propertyId         String?
+  property           Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  guestName          String?
+  guestCode          String?
   lastMessageAt      DateTime?
   lastMessagePreview String?
   unreadByHost       Int       @default(0)
   unreadByGuest      Int       @default(0)
+  unreadByWorker     Int       @default(0)
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
   messages           Message[]
+  aiSuggestions      AiSuggestion[]
+
+  @@index([hostId, channelType])
+  @@index([workerId, channelType])
 }
 
 model Message {
-  id              String       @id @default(cuid())
+  id              String        @id @default(cuid())
   conversationId  String
-  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  senderType      String       // "HOST" | "GUEST" | "SYSTEM"
+  conversation    Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderType      String        // "HOST" | "GUEST" | "SYSTEM" | "WORKER" | "SUPERVISOR" | "AI"
   senderName      String
   content         String
   imageUrl        String?
-  isSystemMessage Boolean      @default(false)
-  readByHost      Boolean      @default(false)
-  readByGuest     Boolean      @default(false)
-  createdAt       DateTime     @default(now())
+  isSystemMessage Boolean       @default(false)
+  readByHost      Boolean       @default(false)
+  readByGuest     Boolean       @default(false)
+  readByWorker    Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+  aiSuggestion    AiSuggestion?
 
   @@index([conversationId, createdAt])
+}
+
+model AiSuggestion {
+  id              String       @id @default(cuid())
+  conversationId  String
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  messageId       String       @unique
+  message         Message      @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  category        String       // MAINTENANCE, CLEANING, SAFETY, APPLIANCE, PEST, etc.
+  urgency         String       // LOW, MEDIUM, HIGH, CRITICAL
+  sentiment       String       // POSITIVE, NEUTRAL, NEGATIVE, DISTRESSED
+  summary         String
+  suggestedAction String       // CREATE_ISSUE, CREATE_JOB, DISPATCH_WORKER, AUTO_REPLY, NOTIFY_ONLY
+  suggestedReply  String?
+  actionPayload   Json?
+  status          String       @default("PENDING") // PENDING, APPROVED, DISMISSED
+  createdIssueId  String?
+  createdJobId    String?
+  createdAt       DateTime     @default(now())
+
+  @@index([conversationId, status])
 }

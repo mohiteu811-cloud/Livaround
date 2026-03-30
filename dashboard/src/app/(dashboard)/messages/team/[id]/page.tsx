@@ -2,16 +2,14 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { api, ConversationDetail, MessageItem } from '@/lib/api';
+import { api } from '@/lib/api';
 import { FeatureGate } from '@/components/FeatureGate';
-import { ArrowLeft, Send, Sparkles, Check, X } from 'lucide-react';
+import { ArrowLeft, Send, Sparkles, Check } from 'lucide-react';
 
 interface AiSuggestion {
   id: string;
-  messageId?: string;
   category: string;
   urgency: string;
-  sentiment: string;
   summary: string;
   suggestedAction: string;
   suggestedReply?: string;
@@ -20,7 +18,14 @@ interface AiSuggestion {
   createdJobId?: string;
 }
 
-interface MessageWithAi extends MessageItem {
+interface Message {
+  id: string;
+  conversationId: string;
+  senderType: string;
+  senderName: string;
+  content: string;
+  imageUrl?: string;
+  createdAt: string;
   aiSuggestion?: AiSuggestion;
 }
 
@@ -31,11 +36,11 @@ const urgencyColors: Record<string, string> = {
   LOW: 'text-slate-400 bg-slate-500/10 border-slate-500/30',
 };
 
-export default function ConversationPage() {
+export default function TeamConversationPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const [conversation, setConversation] = useState<ConversationDetail | null>(null);
-  const [messages, setMessages] = useState<MessageWithAi[]>([]);
+  const [conversation, setConversation] = useState<any>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -45,7 +50,7 @@ export default function ConversationPage() {
 
   useEffect(() => {
     loadConversation();
-    api.conversations.markRead(id).catch(() => {});
+    api.internalConversations.markRead(id).catch(() => {});
 
     pollRef.current = setInterval(() => {
       loadConversation(true);
@@ -58,14 +63,14 @@ export default function ConversationPage() {
 
   async function loadConversation(silent = false) {
     try {
-      const data = await api.conversations.get(id);
+      const data = await api.internalConversations.get(id);
       setConversation(data.conversation);
       if (!silent || data.messages.length > messages.length) {
         setMessages(data.messages);
         setHasMore(data.hasMore);
       }
       if (data.conversation.unreadByHost > 0) {
-        api.conversations.markRead(id).catch(() => {});
+        api.internalConversations.markRead(id).catch(() => {});
       }
     } catch {}
     if (!silent) setLoading(false);
@@ -82,22 +87,12 @@ export default function ConversationPage() {
     setSending(true);
     setInput('');
     try {
-      const msg = await api.conversations.sendMessage(id, { content: text });
+      const msg = await api.internalConversations.sendMessage(id, { content: text });
       setMessages((prev) => [...prev, msg]);
     } catch {
       setInput(text);
     }
     setSending(false);
-  }
-
-  async function loadMore() {
-    if (!hasMore || messages.length === 0) return;
-    const oldest = messages[0];
-    try {
-      const data = await api.conversations.get(id, oldest.createdAt);
-      setMessages((prev) => [...data.messages, ...prev]);
-      setHasMore(data.hasMore);
-    } catch {}
   }
 
   async function approveSuggestion(suggestion: AiSuggestion) {
@@ -126,54 +121,12 @@ export default function ConversationPage() {
     } catch {}
   }
 
-  function renderAiCard(suggestion: AiSuggestion) {
-    if (suggestion.status === 'DISMISSED') return null;
-    const isPending = suggestion.status === 'PENDING';
-    const isApproved = suggestion.status === 'APPROVED';
-    const urgencyClass = urgencyColors[suggestion.urgency] || urgencyColors.LOW;
-
-    return (
-      <div className={`ml-2 mt-1 mb-3 p-3 rounded-xl border-l-4 ${isPending ? 'border-l-blue-500 bg-slate-800/60' : 'border-l-green-500 bg-slate-800/40'}`}>
-        <div className="flex items-center gap-2 mb-1.5">
-          {isPending ? <Sparkles size={14} className="text-blue-400" /> : <Check size={14} className="text-green-400" />}
-          <span className="px-2 py-0.5 text-[10px] font-bold bg-slate-700 text-slate-300 rounded">{suggestion.category}</span>
-          <span className={`px-2 py-0.5 text-[10px] font-bold rounded border ${urgencyClass}`}>{suggestion.urgency}</span>
-        </div>
-        <p className="text-sm text-slate-200 mb-1">{suggestion.summary}</p>
-        {suggestion.suggestedReply && isPending && (
-          <p className="text-xs text-slate-400 italic mb-2">Suggested reply: &ldquo;{suggestion.suggestedReply}&rdquo;</p>
-        )}
-        {isPending && (
-          <div className="flex gap-2">
-            <button
-              onClick={() => approveSuggestion(suggestion)}
-              className="px-3 py-1 text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors"
-            >
-              {suggestion.suggestedAction === 'CREATE_ISSUE' ? 'Create Issue' :
-               suggestion.suggestedAction === 'CREATE_JOB' ? 'Create Job' :
-               suggestion.suggestedAction === 'DISPATCH_WORKER' ? 'Dispatch Worker' :
-               suggestion.suggestedAction === 'AUTO_REPLY' ? 'Send Reply' : 'Approve'}
-            </button>
-            <button
-              onClick={() => dismissSuggestion(suggestion)}
-              className="px-3 py-1 text-xs font-semibold bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors"
-            >
-              Dismiss
-            </button>
-          </div>
-        )}
-        {isApproved && (
-          <p className="text-xs text-green-400 font-semibold">
-            {suggestion.createdIssueId ? 'Issue created' : suggestion.createdJobId ? 'Job created' : 'Approved'}
-          </p>
-        )}
-      </div>
-    );
-  }
-
   if (loading) {
     return <div className="text-center py-12 text-slate-500">Loading...</div>;
   }
+
+  const workerName = conversation?.worker?.user?.name || 'Worker';
+  const propertyName = conversation?.property?.name;
 
   return (
     <FeatureGate feature="messaging">
@@ -184,28 +137,18 @@ export default function ConversationPage() {
             <ArrowLeft size={20} />
           </button>
           <div>
-            <h1 className="text-lg font-bold text-slate-100">{conversation?.guestName}</h1>
-            {conversation?.booking?.property && (
-              <p className="text-xs text-brand-400">{conversation.booking.property.name}</p>
-            )}
-          </div>
-          {conversation?.booking && (
-            <div className="ml-auto text-right">
-              <p className="text-xs text-slate-500">
-                {new Date(conversation.booking.checkIn).toLocaleDateString()} - {new Date(conversation.booking.checkOut).toLocaleDateString()}
-              </p>
-              <p className="text-xs text-slate-600">{conversation.booking.status}</p>
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-bold text-slate-100">{workerName}</h1>
+              <span className="px-2 py-0.5 text-xs bg-slate-700 text-slate-300 rounded-full">
+                {conversation?.channelType === 'HOST_WORKER' ? 'Worker' : 'Supervisor'}
+              </span>
             </div>
-          )}
+            {propertyName && <p className="text-xs text-brand-400">{propertyName}</p>}
+          </div>
         </div>
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto py-4 space-y-3">
-          {hasMore && (
-            <button onClick={loadMore} className="block mx-auto text-sm text-brand-400 hover:text-brand-300 py-2">
-              Load earlier messages
-            </button>
-          )}
           {messages.length === 0 ? (
             <div className="text-center py-12 text-slate-500">No messages yet. Start the conversation!</div>
           ) : (
@@ -241,7 +184,42 @@ export default function ConversationPage() {
                       </p>
                     </div>
                   </div>
-                  {msg.aiSuggestion && renderAiCard(msg.aiSuggestion)}
+                  {/* AI Suggestion Card */}
+                  {msg.aiSuggestion && msg.aiSuggestion.status !== 'DISMISSED' && (
+                    <div className={`ml-2 mt-1 mb-3 p-3 rounded-xl border-l-4 ${
+                      msg.aiSuggestion.status === 'PENDING' ? 'border-l-blue-500 bg-slate-800/60' : 'border-l-green-500 bg-slate-800/40'
+                    }`}>
+                      <div className="flex items-center gap-2 mb-1.5">
+                        {msg.aiSuggestion.status === 'PENDING'
+                          ? <Sparkles size={14} className="text-blue-400" />
+                          : <Check size={14} className="text-green-400" />}
+                        <span className="px-2 py-0.5 text-[10px] font-bold bg-slate-700 text-slate-300 rounded">{msg.aiSuggestion.category}</span>
+                        <span className={`px-2 py-0.5 text-[10px] font-bold rounded border ${urgencyColors[msg.aiSuggestion.urgency] || ''}`}>{msg.aiSuggestion.urgency}</span>
+                      </div>
+                      <p className="text-sm text-slate-200 mb-1">{msg.aiSuggestion.summary}</p>
+                      {msg.aiSuggestion.suggestedReply && msg.aiSuggestion.status === 'PENDING' && (
+                        <p className="text-xs text-slate-400 italic mb-2">Suggested reply: &ldquo;{msg.aiSuggestion.suggestedReply}&rdquo;</p>
+                      )}
+                      {msg.aiSuggestion.status === 'PENDING' && (
+                        <div className="flex gap-2">
+                          <button onClick={() => approveSuggestion(msg.aiSuggestion!)} className="px-3 py-1 text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white rounded-lg">
+                            {msg.aiSuggestion.suggestedAction === 'CREATE_ISSUE' ? 'Create Issue' :
+                             msg.aiSuggestion.suggestedAction === 'CREATE_JOB' ? 'Create Job' :
+                             msg.aiSuggestion.suggestedAction === 'DISPATCH_WORKER' ? 'Dispatch Worker' :
+                             msg.aiSuggestion.suggestedAction === 'AUTO_REPLY' ? 'Send Reply' : 'Approve'}
+                          </button>
+                          <button onClick={() => dismissSuggestion(msg.aiSuggestion!)} className="px-3 py-1 text-xs font-semibold bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg">
+                            Dismiss
+                          </button>
+                        </div>
+                      )}
+                      {msg.aiSuggestion.status === 'APPROVED' && (
+                        <p className="text-xs text-green-400 font-semibold">
+                          {msg.aiSuggestion.createdIssueId ? 'Issue created' : msg.aiSuggestion.createdJobId ? 'Job created' : 'Approved'}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })
