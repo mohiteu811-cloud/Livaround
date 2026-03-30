@@ -21,8 +21,13 @@
         "NSLocationWhenInUseUsageDescription": "LivAround needs your location while using the app.",
         "UIBackgroundModes": [
           "location",
+          "fetch",
+          "location",
           "fetch"
-        ]
+        ],
+        "NSSpeechRecognitionUsageDescription": "Allow LivAround to use speech recognition for voice input when reporting issues.",
+        "NSMicrophoneUsageDescription": "Allow LivAround to use the microphone for voice input when reporting issues.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -43,7 +48,13 @@
         "ACCESS_BACKGROUND_LOCATION",
         "FOREGROUND_SERVICE",
         "FOREGROUND_SERVICE_LOCATION",
-        "RECORD_AUDIO"
+        "RECORD_AUDIO",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION"
       ]
     },
     "plugins": [
