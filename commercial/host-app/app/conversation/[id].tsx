@@ -2,9 +2,11 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, FlatList,
   StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator,
+  Image, Linking, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 import { api, Message, Conversation } from '../../src/lib/api';
 import { joinConversation, leaveConversation, getSocket } from '../../src/lib/socket';
 
@@ -16,6 +18,8 @@ export default function ConversationScreen() {
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(false);
+  const [mediaPreview, setMediaPreview] = useState<{ uri: string; mimeType: string } | null>(null);
+  const [uploading, setUploading] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
   const load = useCallback(async () => {
@@ -51,14 +55,75 @@ export default function ConversationScreen() {
     };
   }, [id, load]);
 
+  async function pickFromGallery() {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permission required', 'Please allow access to your photo library.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images', 'videos'],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets.length > 0) {
+      const asset = result.assets[0];
+      const mimeType = asset.mimeType || (asset.type === 'video' ? 'video/mp4' : 'image/jpeg');
+      setMediaPreview({ uri: asset.uri, mimeType });
+    }
+  }
+
+  async function takePhoto() {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permission required', 'Please allow access to your camera.');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images', 'videos'],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets.length > 0) {
+      const asset = result.assets[0];
+      const mimeType = asset.mimeType || (asset.type === 'video' ? 'video/mp4' : 'image/jpeg');
+      setMediaPreview({ uri: asset.uri, mimeType });
+    }
+  }
+
+  function clearMediaPreview() {
+    setMediaPreview(null);
+  }
+
   async function handleSend() {
     const text = input.trim();
-    if (!text || sending) return;
+    if ((!text && !mediaPreview) || sending || uploading) return;
 
     setSending(true);
     setInput('');
+
+    let imageUrl: string | undefined;
+
+    // Upload media if selected
+    if (mediaPreview) {
+      setUploading(true);
+      try {
+        imageUrl = await api.upload.file(mediaPreview.uri, mediaPreview.mimeType);
+      } catch {
+        Alert.alert('Upload failed', 'Could not upload the file. Please try again.');
+        setInput(text);
+        setSending(false);
+        setUploading(false);
+        return;
+      }
+      setUploading(false);
+      setMediaPreview(null);
+    }
+
     try {
-      const msg = await api.conversations.sendMessage(id, text);
+      const msg = await api.conversations.sendMessage(id, text || '', imageUrl);
       // Message will arrive via socket, but add optimistically
       setMessages((prev) => {
         if (prev.some((m) => m.id === msg.id)) return prev;
@@ -80,6 +145,11 @@ export default function ConversationScreen() {
     } catch {}
   }
 
+  function isVideoUrl(url: string): boolean {
+    const lower = url.toLowerCase();
+    return lower.endsWith('.mp4') || lower.endsWith('.mov') || lower.endsWith('.webm');
+  }
+
   function renderMessage({ item }: { item: Message }) {
     const isHost = item.senderType === 'HOST';
     const isSystem = item.senderType === 'SYSTEM';
@@ -95,9 +165,40 @@ export default function ConversationScreen() {
     return (
       <View style={[styles.messageBubble, isHost ? styles.hostBubble : styles.guestBubble]}>
         <Text style={styles.senderName}>{item.senderName}</Text>
-        <Text style={[styles.messageText, isHost ? styles.hostText : styles.guestText]}>
-          {item.content}
-        </Text>
+
+        {item.imageUrl && (
+          isVideoUrl(item.imageUrl) ? (
+            <TouchableOpacity
+              style={styles.mediaContainer}
+              onPress={() => Linking.openURL(item.imageUrl!)}
+              activeOpacity={0.8}
+            >
+              <View style={styles.videoPlaceholder}>
+                <Text style={styles.videoPlayIcon}>▶</Text>
+                <Text style={styles.videoLabel}>Video</Text>
+              </View>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.mediaContainer}
+              onPress={() => Linking.openURL(item.imageUrl!)}
+              activeOpacity={0.8}
+            >
+              <Image
+                source={{ uri: item.imageUrl }}
+                style={styles.messageImage}
+                resizeMode="cover"
+              />
+            </TouchableOpacity>
+          )
+        )}
+
+        {item.content ? (
+          <Text style={[styles.messageText, isHost ? styles.hostText : styles.guestText]}>
+            {item.content}
+          </Text>
+        ) : null}
+
         <Text style={styles.messageTime}>
           {new Date(item.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
         </Text>
@@ -112,6 +213,8 @@ export default function ConversationScreen() {
       </SafeAreaView>
     );
   }
+
+  const canSend = (input.trim() || mediaPreview) && !sending && !uploading;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -149,7 +252,32 @@ export default function ConversationScreen() {
           }
         />
 
+        {/* Media preview bar */}
+        {mediaPreview && (
+          <View style={styles.mediaPreviewBar}>
+            {mediaPreview.mimeType.startsWith('video') ? (
+              <View style={styles.mediaPreviewVideoThumb}>
+                <Text style={styles.mediaPreviewVideoIcon}>▶</Text>
+              </View>
+            ) : (
+              <Image source={{ uri: mediaPreview.uri }} style={styles.mediaPreviewImage} resizeMode="cover" />
+            )}
+            {uploading && (
+              <ActivityIndicator color="#3b82f6" size="small" style={styles.uploadingIndicator} />
+            )}
+            <TouchableOpacity style={styles.mediaPreviewCancel} onPress={clearMediaPreview}>
+              <Text style={styles.mediaPreviewCancelText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         <View style={styles.inputBar}>
+          <TouchableOpacity style={styles.mediaButton} onPress={takePhoto}>
+            <Text style={styles.mediaButtonText}>📷</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.mediaButton} onPress={pickFromGallery}>
+            <Text style={styles.mediaButtonText}>🖼</Text>
+          </TouchableOpacity>
           <TextInput
             style={styles.textInput}
             value={input}
@@ -160,11 +288,15 @@ export default function ConversationScreen() {
             maxLength={2000}
           />
           <TouchableOpacity
-            style={[styles.sendButton, (!input.trim() || sending) && styles.sendDisabled]}
+            style={[styles.sendButton, !canSend && styles.sendDisabled]}
             onPress={handleSend}
-            disabled={!input.trim() || sending}
+            disabled={!canSend}
           >
-            <Text style={styles.sendText}>Send</Text>
+            {sending || uploading ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <Text style={styles.sendText}>Send</Text>
+            )}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -194,9 +326,29 @@ const styles = StyleSheet.create({
   systemText: { fontSize: 12, color: '#94a3b8', fontStyle: 'italic' },
   emptyChat: { alignItems: 'center', marginTop: 40 },
   emptyChatText: { color: '#64748b', fontSize: 14 },
-  inputBar: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 12, paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#1e293b', backgroundColor: '#0f172a' },
+
+  // Media in message bubbles
+  mediaContainer: { marginVertical: 6, borderRadius: 12, overflow: 'hidden' },
+  messageImage: { width: 250, aspectRatio: 4 / 3, borderRadius: 12 },
+  videoPlaceholder: { width: 250, aspectRatio: 4 / 3, backgroundColor: '#334155', borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  videoPlayIcon: { fontSize: 36, color: '#fff', marginBottom: 4 },
+  videoLabel: { fontSize: 13, color: '#94a3b8', fontWeight: '600' },
+
+  // Media preview bar
+  mediaPreviewBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#1e293b', backgroundColor: '#1e293b' },
+  mediaPreviewImage: { width: 60, height: 60, borderRadius: 8 },
+  mediaPreviewVideoThumb: { width: 60, height: 60, borderRadius: 8, backgroundColor: '#334155', alignItems: 'center', justifyContent: 'center' },
+  mediaPreviewVideoIcon: { fontSize: 22, color: '#fff' },
+  uploadingIndicator: { marginLeft: 12 },
+  mediaPreviewCancel: { marginLeft: 'auto', backgroundColor: '#475569', borderRadius: 14, width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
+  mediaPreviewCancelText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+
+  // Input bar
+  inputBar: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 8, paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#1e293b', backgroundColor: '#0f172a' },
+  mediaButton: { padding: 8, marginBottom: 2 },
+  mediaButtonText: { fontSize: 22 },
   textInput: { flex: 1, backgroundColor: '#1e293b', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, color: '#f8fafc', fontSize: 15, maxHeight: 100, borderWidth: 1, borderColor: '#334155' },
-  sendButton: { backgroundColor: '#3b82f6', borderRadius: 20, paddingHorizontal: 18, paddingVertical: 10, marginLeft: 8 },
+  sendButton: { backgroundColor: '#3b82f6', borderRadius: 20, paddingHorizontal: 18, paddingVertical: 10, marginLeft: 8, minWidth: 56, alignItems: 'center', justifyContent: 'center' },
   sendDisabled: { opacity: 0.4 },
   sendText: { color: '#fff', fontWeight: '700', fontSize: 14 },
 });
