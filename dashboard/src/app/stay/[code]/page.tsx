@@ -6,7 +6,7 @@ import {
   Wifi, Lock, MapPin, Phone, Home, BookOpen, HelpCircle, Key,
   ChevronDown, ChevronRight, Copy, Check, ExternalLink, Bed, Bath, Users,
   AlertTriangle, X, ConciergeBell, Sparkles, ChefHat, Car, ShoppingBag,
-  Shield, Upload, UserPlus, MessageSquare, Send,
+  Shield, Upload, UserPlus, MessageSquare, Send, Camera, Image as ImageIcon, Play,
 } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://livaroundbackend-production.up.railway.app';
@@ -1261,8 +1261,12 @@ function MessagesTab({ data, guestCode }: { data: StayData; guestCode: string })
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [mediaPreview, setMediaPreview] = useState<{ file: File; url: string; type: string } | null>(null);
+  const [uploading, setUploading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const loadMessages = useCallback(() => {
     fetch(`${API_URL}/api/stay/${guestCode}/messages`)
@@ -1296,17 +1300,45 @@ function MessagesTab({ data, guestCode }: { data: StayData; guestCode: string })
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    setMediaPreview({ file, url, type: file.type.startsWith('video') ? 'video' : 'image' });
+    e.target.value = '';
+  }
+
+  async function uploadFile(file: File): Promise<string> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await fetch(`${API_URL}/api/upload`, { method: 'POST', body: formData });
+    if (!res.ok) throw new Error('Upload failed');
+    const data = await res.json();
+    return data.url;
+  }
+
   async function handleSend() {
     const text = input.trim();
-    if (!text || sending) return;
+    if (!text && !mediaPreview) return;
+    if (sending || uploading) return;
 
     setSending(true);
     setInput('');
+    const currentMedia = mediaPreview;
+    setMediaPreview(null);
+
     try {
+      let imageUrl: string | undefined;
+      if (currentMedia) {
+        setUploading(true);
+        imageUrl = await uploadFile(currentMedia.file);
+        setUploading(false);
+      }
+
       const res = await fetch(`${API_URL}/api/stay/${guestCode}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: text }),
+        body: JSON.stringify({ content: text || (imageUrl ? '' : ''), imageUrl }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -1320,7 +1352,9 @@ function MessagesTab({ data, guestCode }: { data: StayData; guestCode: string })
       });
     } catch (err: any) {
       setInput(text);
+      setMediaPreview(currentMedia);
       setError(err.message);
+      setUploading(false);
     }
     setSending(false);
   }
@@ -1377,7 +1411,21 @@ function MessagesTab({ data, guestCode }: { data: StayData; guestCode: string })
                   <p className={`text-[11px] font-medium mb-0.5 ${isGuest ? 'text-indigo-200' : 'text-slate-500'}`}>
                     {msg.senderName}
                   </p>
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                  {msg.imageUrl && (
+                    msg.imageUrl.match(/\.(mp4|mov|webm)$/i) ? (
+                      <a href={msg.imageUrl} target="_blank" rel="noopener noreferrer" className="block my-1 relative rounded-lg overflow-hidden">
+                        <div className={`flex items-center justify-center w-48 h-32 rounded-lg ${isGuest ? 'bg-indigo-700' : 'bg-slate-200'}`}>
+                          <Play size={28} className={isGuest ? 'text-white' : 'text-slate-600'} />
+                          <span className={`ml-1 text-xs ${isGuest ? 'text-indigo-200' : 'text-slate-500'}`}>Video</span>
+                        </div>
+                      </a>
+                    ) : (
+                      <a href={msg.imageUrl} target="_blank" rel="noopener noreferrer" className="block my-1">
+                        <img src={msg.imageUrl} alt="" className="max-w-[240px] rounded-lg" />
+                      </a>
+                    )
+                  )}
+                  {msg.content && <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>}
                   <p className={`text-[10px] mt-1 text-right ${isGuest ? 'text-indigo-200/60' : 'text-slate-400'}`}>
                     {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </p>
@@ -1389,7 +1437,41 @@ function MessagesTab({ data, guestCode }: { data: StayData; guestCode: string })
         <div ref={messagesEndRef} />
       </div>
 
+      {mediaPreview && (
+        <div className="px-4 py-2 border-t border-slate-200 flex items-center gap-2">
+          {mediaPreview.type === 'video' ? (
+            <div className="w-14 h-14 bg-slate-100 rounded-lg flex items-center justify-center">
+              <Play size={20} className="text-slate-500" />
+            </div>
+          ) : (
+            <img src={mediaPreview.url} alt="" className="w-14 h-14 rounded-lg object-cover" />
+          )}
+          {uploading && <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />}
+          <button onClick={() => setMediaPreview(null)} className="ml-auto p-1 text-slate-400 hover:text-slate-600">
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
       <div className="px-4 py-3 border-t border-slate-200 flex items-end gap-2">
+        <input ref={cameraInputRef} type="file" accept="image/*,video/*" capture="environment" onChange={handleFileSelect} className="hidden" />
+        <input ref={fileInputRef} type="file" accept="image/*,video/*" onChange={handleFileSelect} className="hidden" />
+
+        <button
+          onClick={() => cameraInputRef.current?.click()}
+          className="p-2 text-slate-400 hover:text-indigo-600 transition-colors"
+          title="Take photo"
+        >
+          <Camera size={18} />
+        </button>
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="p-2 text-slate-400 hover:text-indigo-600 transition-colors"
+          title="Choose from gallery"
+        >
+          <ImageIcon size={18} />
+        </button>
+
         <input
           type="text"
           value={input}
@@ -1400,7 +1482,7 @@ function MessagesTab({ data, guestCode }: { data: StayData; guestCode: string })
         />
         <button
           onClick={handleSend}
-          disabled={!input.trim() || sending}
+          disabled={(!input.trim() && !mediaPreview) || sending}
           className="p-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white rounded-xl transition-colors"
         >
           <Send size={16} />
