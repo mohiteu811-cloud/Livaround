@@ -5,11 +5,9 @@ set -e
 if [ -n "$GITHUB_PAT" ]; then
   echo "Cloning commercial extensions..."
   git clone https://${GITHUB_PAT}@github.com/mohiteu811-cloud/livaround-commercial.git ../commercial 2>&1 || echo "Commercial clone FAILED"
-  echo "Clone done. Checking files:"
-  ls -la ../commercial/ 2>&1 || echo "No ../commercial directory"
-  ls -la ../commercial/backend-extensions/ 2>&1 || echo "No backend-extensions directory"
-  echo "Current dir: $(pwd)"
-  echo "PAYMENTS_ENABLED=$PAYMENTS_ENABLED"
+  # Symlink node_modules so commercial code can resolve backend dependencies
+  ln -s /app/node_modules ../commercial/backend-extensions/node_modules 2>/dev/null || true
+  ln -s /app/node_modules ../commercial/node_modules 2>/dev/null || true
 else
   echo "No GITHUB_PAT set, skipping commercial clone"
 fi
