@@ -40,6 +40,9 @@ router.post('/register', validate(registerSchema), async (req: Request, res: Res
   try {
     const { name, password, phone } = req.body;
     const email = (req.body.email as string).trim().toLowerCase();
+    const referralCode = req.body.referralCode as string | undefined;
+    const signupIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || undefined;
+    const signupFingerprint = req.body.fingerprint as string | undefined;
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
@@ -48,6 +51,26 @@ router.post('/register', validate(registerSchema), async (req: Request, res: Res
 
     const hashed = await bcrypt.hash(password, 12);
 
+    // Create organization eagerly if referral code is present
+    let orgData: any = undefined;
+    if (referralCode) {
+      const { processReferralAttribution } = require('../lib/anti-gaming');
+      // Create org first, then attribute
+      const org = await prisma.organization.create({
+        data: { name },
+      });
+      orgData = { connect: { id: org.id } };
+
+      // Process referral attribution with anti-gaming checks
+      await processReferralAttribution({
+        organizationId: org.id,
+        referralCode,
+        adminEmail: email,
+        signupIp,
+        signupFingerprint,
+      });
+    }
+
     const user = await prisma.user.create({
       data: {
         name,
@@ -55,7 +78,12 @@ router.post('/register', validate(registerSchema), async (req: Request, res: Res
         password: hashed,
         phone,
         role: 'HOST',
-        host: { create: { name } },
+        host: {
+          create: {
+            name,
+            ...(orgData ? { organization: orgData } : {}),
+          },
+        },
       },
       include: { host: true },
     });

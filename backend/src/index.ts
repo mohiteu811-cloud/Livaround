@@ -31,6 +31,7 @@ import billingRoutes from './routes/billing';
 import billingWebhookRoutes from './routes/billing-webhook';
 import adminRoutes from './routes/admin';
 import adminPayoutsRoutes from './routes/admin-payouts';
+import adminPartnersRoutes from './routes/admin-partners';
 import partnerRoutes from './routes/partner';
 
 const app = express();
@@ -65,6 +66,7 @@ app.use('/api/shifts', shiftsRoutes);
 app.use('/api/billing', billingRoutes);
 app.use('/api/billing/webhook', billingWebhookRoutes);
 app.use('/api/admin/payouts', adminPayoutsRoutes);
+app.use('/api/admin/partners', adminPartnersRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/partner', partnerRoutes);
 

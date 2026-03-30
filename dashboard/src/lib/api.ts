@@ -362,6 +362,12 @@ export const api = {
   partner: {
     dashboard: () => request<PartnerDashboard>('/api/partner/dashboard'),
     register: () => request<{ success: boolean; referralCode: string; tier: string; commissionRate: number }>('/api/partner/register', { method: 'POST' }),
+    join: (data: { fullName: string; email: string; paypalEmail: string; country: string; promotionMethod: string }) =>
+      request<{ success: boolean; referralCode: string; referralLink: string; partnerToken: string }>('/api/partner/join', { method: 'POST', body: JSON.stringify(data) }),
+    trackClick: (code: string) =>
+      request<{ success: boolean }>('/api/partner/track-click', { method: 'POST', body: JSON.stringify({ code }) }),
+    validateCode: (code: string) =>
+      request<{ valid: boolean; partnerName?: string }>(`/api/partner/validate-code/${code}`),
   },
 
   admin: {

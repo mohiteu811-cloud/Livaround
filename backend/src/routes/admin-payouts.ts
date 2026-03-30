@@ -92,7 +92,7 @@ router.post('/process', async (req: AuthRequest, res: Response) => {
 
       payoutsCreated.push({
         partnerId: partner.id,
-        partnerName: partner.user.name,
+        partnerName: partner.user?.name ?? partner.fullName ?? 'Unknown',
         amount: payoutAmount,
         payoutId: payout.id,
       });
@@ -174,8 +174,8 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     const rows = payouts.map((p) => ({
       id: p.id,
       partnerId: p.partnerId,
-      partnerName: p.partner.user.name,
-      partnerEmail: p.partner.user.email,
+      partnerName: p.partner.user?.name ?? p.partner.fullName ?? 'Unknown',
+      partnerEmail: p.partner.user?.email ?? p.partner.email ?? '',
       partnerTier: p.partner.tier,
       amount: p.amount,
       currency: p.currency,
@@ -276,8 +276,8 @@ router.post('/send', async (req: AuthRequest, res: Response) => {
         value: p.amount.toFixed(2),
         currency: p.currency,
       },
-      receiver: p.partner.user.email,
-      note: `LivAround partner payout - ${p.partner.user.name}`,
+      receiver: p.partner.paypalEmail ?? p.partner.user?.email ?? p.partner.email ?? '',
+      note: `LivAround partner payout - ${p.partner.user?.name ?? p.partner.fullName ?? 'Partner'}`,
       sender_item_id: p.id,
     }));
 

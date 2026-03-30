@@ -592,6 +592,7 @@ enum PartnerStatus {
   active
   suspended
   pending
+  flagged
 }
 
 enum CommissionType {
@@ -603,6 +604,8 @@ enum CommissionStatus {
   pending
   approved
   paid
+  voided
+  clawback
 }
 
 enum PayoutMethod {
@@ -625,6 +628,8 @@ model Organization {
   name                String
   referredByPartnerId String?
   referredByPartner   Partner?      @relation("ReferredOrganizations", fields: [referredByPartnerId], references: [id], onDelete: SetNull)
+  signupIp            String?
+  signupFingerprint   String?
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
 
@@ -672,25 +677,39 @@ model Subscription {
 // ── Partner ──────────────────────────────────────────────────────────────────
 
 model Partner {
-  id             String        @id @default(cuid())
-  userId         String        @unique
-  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tier           PartnerTier
-  referralCode   String        @unique
-  commissionRate Float
-  overrideRate   Float?
-  referredById   String?
-  referredBy     Partner?      @relation("PartnerReferrals", fields: [referredById], references: [id], onDelete: SetNull)
-  referrals      Partner[]     @relation("PartnerReferrals")
-  totalEarned    Float         @default(0)
-  pendingPayout  Float         @default(0)
-  bankDetails    Json?
-  status         PartnerStatus
-  createdAt      DateTime      @default(now())
+  id              String        @id @default(cuid())
+  userId          String?       @unique
+  user            User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Public registration fields (no User account required)
+  fullName        String?
+  email           String?       @unique
+  paypalEmail     String?
+  country         String?
+  promotionMethod String?       // social_media, blog_content, direct_outreach, property_management, real_estate, other
+  tier            PartnerTier
+  referralCode    String        @unique
+  commissionRate  Float
+  overrideRate    Float?
+  referredById    String?
+  referredBy      Partner?      @relation("PartnerReferrals", fields: [referredById], references: [id], onDelete: SetNull)
+  referrals       Partner[]     @relation("PartnerReferrals")
+  totalEarned     Float         @default(0)
+  pendingPayout   Float         @default(0)
+  bankDetails     Json?
+  status          PartnerStatus
+  // Anti-gaming fields
+  dailyReferralCount Int        @default(0)
+  dailyReferralDate  String?    // "YYYY-MM-DD" for tracking daily cap
+  monthlyPayout      Float      @default(0)
+  monthlyPayoutMonth String?    // "YYYY-MM" for tracking monthly cap
+  suspendReason      String?
+  createdAt          DateTime   @default(now())
 
   commissions            Commission[]
   payouts                Payout[]
   referredOrganizations  Organization[] @relation("ReferredOrganizations")
+  flags                  PartnerFlag[]
+  referralClicks         ReferralClick[]
 }
 
 // ── Commission ───────────────────────────────────────────────────────────────
@@ -706,6 +725,8 @@ model Commission {
   currency       String           @default("USD")
   period         String           // e.g. "2026-04"
   status         CommissionStatus
+  holdUntil      DateTime?        // 30-day hold before approval
+  clawbackUntil  DateTime?        // 60-day clawback window
   paidAt         DateTime?
   payoutId       String?
   payout         Payout?          @relation(fields: [payoutId], references: [id], onDelete: SetNull)
@@ -726,6 +747,35 @@ model Payout {
   commissions Commission[]
   processedAt DateTime?
   createdAt   DateTime     @default(now())
+}
+
+// ── Partner Flags (anti-gaming) ──────────────────────────────────────────────
+
+model PartnerFlag {
+  id         String   @id @default(cuid())
+  partnerId  String
+  partner    Partner  @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  reason     String   // self_referral, same_ip, domain_match, high_churn, velocity_limit, manual
+  details    String?  // JSON details about the flag
+  status     String   @default("pending") // pending, approved, rejected, dismissed
+  reviewedAt DateTime?
+  reviewedBy String?  // admin email
+  createdAt  DateTime @default(now())
+
+  @@index([partnerId])
+}
+
+// ── Referral Click Tracking ─────────────────────────────────────────────────
+
+model ReferralClick {
+  id         String   @id @default(cuid())
+  partnerId  String
+  partner    Partner  @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([partnerId])
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

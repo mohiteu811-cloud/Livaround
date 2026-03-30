@@ -66,6 +66,7 @@ function NavLinks({ onNavigate, isAdmin }: { onNavigate?: () => void; isAdmin?: 
         { href: '/admin', icon: Shield, label: 'Admin' },
         { href: '/admin/organizations', icon: Building2, label: 'Organizations' },
         { href: '/admin/subscriptions', icon: CreditCard, label: 'Subscriptions' },
+        { href: '/admin/partners', icon: Handshake, label: 'Partners' },
         { href: '/admin/payouts', icon: Banknote, label: 'Payouts' },
       ]
     : nav;
