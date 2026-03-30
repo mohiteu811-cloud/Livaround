@@ -432,6 +432,45 @@ export const api = {
       request<{ ok: boolean }>(`/api/conversations/${id}/read`, { method: 'PATCH' }),
   },
 
+  internalConversations: {
+    list: () =>
+      request<any[]>('/api/internal-conversations'),
+    get: (id: string, before?: string) => {
+      const qs = before ? `?before=${before}` : '';
+      return request<{ conversation: any; messages: any[]; hasMore: boolean }>(
+        `/api/internal-conversations/${id}${qs}`
+      );
+    },
+    create: (workerId: string, propertyId?: string) =>
+      request<any>('/api/internal-conversations', {
+        method: 'POST',
+        body: JSON.stringify({ workerId, propertyId, channelType: 'HOST_WORKER' }),
+      }),
+    sendMessage: (id: string, data: { content: string; imageUrl?: string }) =>
+      request<any>(`/api/internal-conversations/${id}/messages`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    markRead: (id: string) =>
+      request<{ ok: boolean }>(`/api/internal-conversations/${id}/read`, { method: 'PATCH' }),
+  },
+
+  aiSuggestions: {
+    list: (status?: string) => {
+      const qs = status ? `?status=${status}` : '';
+      return request<any[]>(`/api/ai-suggestions${qs}`);
+    },
+    forConversation: (conversationId: string) =>
+      request<any[]>(`/api/ai-suggestions/conversation/${conversationId}`),
+    approve: (id: string, overrides?: any) =>
+      request<{ ok: boolean; createdIssueId?: string; createdJobId?: string }>(
+        `/api/ai-suggestions/${id}/approve`,
+        { method: 'POST', body: JSON.stringify(overrides || {}) }
+      ),
+    dismiss: (id: string) =>
+      request<{ ok: boolean }>(`/api/ai-suggestions/${id}/dismiss`, { method: 'POST' }),
+  },
+
   billing: {
     features: () =>
       request<{ plan: string | null; features: Record<string, boolean> }>('/api/billing/features'),
