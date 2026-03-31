@@ -1326,6 +1326,67 @@ function MessagesTab({ data, guestCode }: { data: StayData; guestCode: string })
     return data.url;
   }
 
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4',
+      });
+      const chunks: BlobPart[] = [];
+      mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
+      mediaRecorder.onstop = async () => {
+        const blob = new Blob(chunks, { type: mediaRecorder.mimeType });
+        stream.getTracks().forEach((t) => t.stop());
+        const duration = recordingDuration;
+        setRecordingDuration(0);
+        if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+
+        // Upload and send voice message
+        try {
+          setSending(true);
+          const formData = new FormData();
+          formData.append('file', blob, 'voice.webm');
+          const uploadRes = await fetch(`${API_URL}/api/upload`, { method: 'POST', body: formData });
+          if (!uploadRes.ok) throw new Error('Upload failed');
+          const { url: voiceUrl } = await uploadRes.json();
+
+          const res = await fetch(`${API_URL}/api/stay/${guestCode}/messages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content: '', voiceUrl, voiceDuration: duration }),
+          });
+          if (!res.ok) throw new Error('Failed to send');
+          const result = await res.json();
+          if (result.conversationId) setConversationId(result.conversationId);
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === result.message.id)) return prev;
+            return [...prev, result.message];
+          });
+        } catch {
+          setError('Failed to send voice message');
+        }
+        setSending(false);
+      };
+      mediaRecorderRef.current = mediaRecorder;
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingDuration(0);
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingDuration((d) => d + 1);
+      }, 1000);
+    } catch {
+      setError('Could not access microphone');
+    }
+  }
+
+  function stopRecording() {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecording(false);
+    if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+  }
+
   async function handleSend() {
     const text = input.trim();
     if (!text && !mediaPreview) return;
