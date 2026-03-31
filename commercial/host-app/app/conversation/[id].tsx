@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import { Audio, Video, ResizeMode } from 'expo-av';
 import { api, Message, Conversation } from '../../src/lib/api';
 import { joinConversation, leaveConversation, getSocket } from '../../src/lib/socket';
 
@@ -37,6 +38,12 @@ export default function ConversationScreen() {
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(false);
   const [mediaPreview, setMediaPreview] = useState<{ uri: string; type: string } | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
+  const recordingRef = useRef<Audio.Recording | null>(null);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const voiceSoundRef = useRef<Audio.Sound | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
   const load = useCallback(async () => {
@@ -80,13 +87,25 @@ export default function ConversationScreen() {
       );
     };
 
+    const handleVoiceTranslated = (data: any) => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === data.messageId
+            ? { ...m, voiceTranscript: data.voiceTranscript, voiceTranslation: data.voiceTranslation, voiceLanguage: data.voiceLanguage }
+            : m
+        )
+      );
+    };
+
     socket?.on('new_message', handleNewMessage);
     socket?.on('ai_suggestion', handleAiSuggestion);
+    socket?.on('voice_translated', handleVoiceTranslated);
 
     return () => {
       leaveConversation(id);
       socket?.off('new_message', handleNewMessage);
       socket?.off('ai_suggestion', handleAiSuggestion);
+      socket?.off('voice_translated', handleVoiceTranslated);
     };
   }, [id, load, isInternal]);
 

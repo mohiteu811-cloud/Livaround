@@ -3,6 +3,7 @@ import { Server, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../../../../backend/src/lib/prisma';
 import { sendPushNotification } from '../../../../backend/src/lib/pushNotifications';
+import { translateVoiceAsync } from './voice-translator';
 
 let io: Server;
 
@@ -56,7 +57,7 @@ export function setupSocketIO(server: http.Server, allowedOrigins: string[]): Se
       socket.leave(`conv:${conversationId}`);
     });
 
-    socket.on('send_message', async (data: { conversationId: string; content: string; imageUrl?: string }) => {
+    socket.on('send_message', async (data: { conversationId: string; content: string; imageUrl?: string; voiceUrl?: string; voiceDuration?: number }) => {
       try {
         const conversation = await prisma.conversation.findFirst({
           where: { id: data.conversationId, hostId },
@@ -71,23 +72,46 @@ export function setupSocketIO(server: http.Server, allowedOrigins: string[]): Se
             senderName: conversation.host.name,
             content: data.content,
             imageUrl: data.imageUrl || null,
+            voiceUrl: data.voiceUrl || null,
+            voiceDuration: data.voiceDuration || null,
             readByHost: true,
             readByGuest: false,
           },
         });
 
+        const updateData: any = {
+          lastMessageAt: message.createdAt,
+          lastMessagePreview: data.content.slice(0, 100),
+          unreadByGuest: { increment: 1 },
+        };
+
+        // If GUEST_HOST conversation, also increment unreadByWorker
+        if (conversation.channelType === 'GUEST_HOST') {
+          updateData.unreadByWorker = { increment: 1 };
+        }
+
         await prisma.conversation.update({
           where: { id: data.conversationId },
-          data: {
-            lastMessageAt: message.createdAt,
-            lastMessagePreview: data.content.slice(0, 100),
-            unreadByGuest: { increment: 1 },
-          },
+          data: updateData,
         });
 
         // Emit to all clients in the conversation room
         hostNs.to(`conv:${data.conversationId}`).emit('new_message', message);
         guestNs.to(`conv:${data.conversationId}`).emit('new_message', message);
+
+        // If GUEST_HOST conversation, also broadcast to workers
+        if (conversation.channelType === 'GUEST_HOST') {
+          workerNs.to(`conv:${data.conversationId}`).emit('new_message', message);
+        }
+
+        // Trigger voice translation if voice message
+        if (data.voiceUrl) {
+          try {
+            translateVoiceAsync(message, io);
+          } catch (err) {
+            console.error('Voice translation trigger failed:', err);
+          }
+        }
       } catch (err) {
         console.error('Host send_message error:', err);
       }
@@ -154,7 +178,7 @@ export function setupSocketIO(server: http.Server, allowedOrigins: string[]): Se
       socket.leave(`conv:${conversationId}`);
     });
 
-    socket.on('send_message', async (data: { conversationId: string; content: string; imageUrl?: string }) => {
+    socket.on('send_message', async (data: { conversationId: string; content: string; imageUrl?: string; voiceUrl?: string; voiceDuration?: number }) => {
       try {
         const guestName = (socket as any).guestName;
         const hostId = (socket as any).hostId;
@@ -172,23 +196,37 @@ export function setupSocketIO(server: http.Server, allowedOrigins: string[]): Se
             senderName: guestName,
             content: data.content,
             imageUrl: data.imageUrl || null,
+            voiceUrl: data.voiceUrl || null,
+            voiceDuration: data.voiceDuration || null,
             readByHost: false,
             readByGuest: true,
           },
         });
 
+        const updateData: any = {
+          lastMessageAt: message.createdAt,
+          lastMessagePreview: data.content.slice(0, 100),
+          unreadByHost: { increment: 1 },
+        };
+
+        // If GUEST_HOST conversation, also increment unreadByWorker
+        if (conversation.channelType === 'GUEST_HOST') {
+          updateData.unreadByWorker = { increment: 1 };
+        }
+
         await prisma.conversation.update({
           where: { id: data.conversationId },
-          data: {
-            lastMessageAt: message.createdAt,
-            lastMessagePreview: data.content.slice(0, 100),
-            unreadByHost: { increment: 1 },
-          },
+          data: updateData,
         });
 
         // Emit to room
         hostNs.to(`conv:${data.conversationId}`).emit('new_message', message);
         guestNs.to(`conv:${data.conversationId}`).emit('new_message', message);
+
+        // If GUEST_HOST conversation, also broadcast to workers
+        if (conversation.channelType === 'GUEST_HOST') {
+          workerNs.to(`conv:${data.conversationId}`).emit('new_message', message);
+        }
 
         // Send push notification to host
         const host = await prisma.host.findUnique({
@@ -204,6 +242,15 @@ export function setupSocketIO(server: http.Server, allowedOrigins: string[]): Se
             priority: 'high',
             channelId: 'messages',
           });
+        }
+
+        // Trigger voice translation if voice message
+        if (data.voiceUrl) {
+          try {
+            translateVoiceAsync(message, io);
+          } catch (err) {
+            console.error('Voice translation trigger failed:', err);
+          }
         }
       } catch (err) {
         console.error('Guest send_message error:', err);
@@ -260,22 +307,63 @@ export function setupSocketIO(server: http.Server, allowedOrigins: string[]): Se
     const workerId = (socket as any).workerId;
 
     socket.on('join_conversation', async (conversationId: string) => {
+      // Allow joining internal conversations (worker is directly assigned)
       const conv = await prisma.conversation.findFirst({
         where: { id: conversationId, workerId },
       });
-      if (conv) socket.join(`conv:${conversationId}`);
+      if (conv) {
+        socket.join(`conv:${conversationId}`);
+        return;
+      }
+
+      // Allow joining GUEST_HOST conversations if worker is assigned to the booking's property
+      const guestHostConv = await prisma.conversation.findFirst({
+        where: { id: conversationId, channelType: 'GUEST_HOST' },
+        include: { booking: { select: { propertyId: true } } },
+      });
+      if (guestHostConv?.booking?.propertyId) {
+        const staffAssignment = await prisma.propertyStaff.findFirst({
+          where: { workerId, propertyId: guestHostConv.booking.propertyId },
+        });
+        if (staffAssignment) {
+          socket.join(`conv:${conversationId}`);
+        }
+      }
     });
 
     socket.on('leave_conversation', (conversationId: string) => {
       socket.leave(`conv:${conversationId}`);
     });
 
-    socket.on('send_message', async (data: { conversationId: string; content: string; imageUrl?: string }) => {
+    socket.on('send_message', async (data: { conversationId: string; content: string; imageUrl?: string; voiceUrl?: string; voiceDuration?: number }) => {
       try {
-        const conversation = await prisma.conversation.findFirst({
+        // First try: worker is directly assigned to conversation (internal)
+        let conversation = await prisma.conversation.findFirst({
           where: { id: data.conversationId, workerId },
         });
+
+        // Second try: GUEST_HOST conversation where worker is assigned to the property
+        let isGuestHostConversation = false;
+        if (!conversation) {
+          const guestHostConv = await prisma.conversation.findFirst({
+            where: { id: data.conversationId, channelType: 'GUEST_HOST' },
+            include: { booking: { select: { propertyId: true } } },
+          });
+          if (guestHostConv?.booking?.propertyId) {
+            const staffAssignment = await prisma.propertyStaff.findFirst({
+              where: { workerId, propertyId: guestHostConv.booking.propertyId },
+            });
+            if (staffAssignment) {
+              conversation = guestHostConv;
+              isGuestHostConversation = true;
+            }
+          }
+        }
         if (!conversation) return;
+
+        if (conversation.channelType === 'GUEST_HOST') {
+          isGuestHostConversation = true;
+        }
 
         const worker = await prisma.worker.findUnique({
           where: { id: workerId },
@@ -295,23 +383,37 @@ export function setupSocketIO(server: http.Server, allowedOrigins: string[]): Se
             senderName: worker?.user?.name || 'Worker',
             content: data.content,
             imageUrl: data.imageUrl || null,
+            voiceUrl: data.voiceUrl || null,
+            voiceDuration: data.voiceDuration || null,
             readByHost: false,
             readByWorker: true,
           },
         });
 
+        const updateData: any = {
+          lastMessageAt: message.createdAt,
+          lastMessagePreview: data.content.slice(0, 100),
+          unreadByHost: { increment: 1 },
+        };
+
+        // If GUEST_HOST conversation, also increment guest unread count
+        if (isGuestHostConversation) {
+          updateData.unreadByGuest = { increment: 1 };
+        }
+
         await prisma.conversation.update({
           where: { id: data.conversationId },
-          data: {
-            lastMessageAt: message.createdAt,
-            lastMessagePreview: data.content.slice(0, 100),
-            unreadByHost: { increment: 1 },
-          },
+          data: updateData,
         });
 
         // Emit to all namespaces in the conversation room
         hostNs.to(`conv:${data.conversationId}`).emit('new_message', message);
         workerNs.to(`conv:${data.conversationId}`).emit('new_message', message);
+
+        // If GUEST_HOST conversation, also broadcast to guests
+        if (isGuestHostConversation) {
+          guestNs.to(`conv:${data.conversationId}`).emit('new_message', message);
+        }
 
         // Push notification to host
         const host = await prisma.host.findUnique({
@@ -334,6 +436,15 @@ export function setupSocketIO(server: http.Server, allowedOrigins: string[]): Se
         analyzeMessageAsync(message, conversation).catch((err: any) =>
           console.error('AI analysis failed:', err)
         );
+
+        // Trigger voice translation if voice message
+        if (data.voiceUrl) {
+          try {
+            translateVoiceAsync(message, io);
+          } catch (err) {
+            console.error('Voice translation trigger failed:', err);
+          }
+        }
       } catch (err) {
         console.error('Worker send_message error:', err);
       }

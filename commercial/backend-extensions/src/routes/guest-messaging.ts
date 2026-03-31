@@ -3,6 +3,7 @@ import { prisma } from '../../../../backend/src/lib/prisma';
 import { sendPushNotification } from '../../../../backend/src/lib/pushNotifications';
 import { IS_COMMERCIAL } from '../../../../backend/src/lib/config';
 import { analyzeMessageAsync } from '../lib/ai-analyzer';
+import { translateVoiceAsync } from '../lib/voice-translator';
 
 const router = Router();
 
@@ -63,6 +64,23 @@ router.get('/:code/messages', async (req: Request, res: Response) => {
       },
       orderBy: { createdAt: 'desc' },
       take: limit,
+      select: {
+        id: true,
+        conversationId: true,
+        senderType: true,
+        senderName: true,
+        content: true,
+        imageUrl: true,
+        voiceUrl: true,
+        voiceDuration: true,
+        voiceTranscript: true,
+        voiceTranslation: true,
+        voiceLanguage: true,
+        readByHost: true,
+        readByGuest: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
 
     return res.json({
@@ -84,8 +102,8 @@ router.get('/:code/messages', async (req: Request, res: Response) => {
 
 router.post('/:code/messages', async (req: Request, res: Response) => {
   try {
-    const { content, imageUrl } = req.body;
-    if (!content && !imageUrl) return res.status(400).json({ error: 'content or imageUrl required' });
+    const { content, imageUrl, voiceUrl, voiceDuration } = req.body;
+    if (!content && !imageUrl && !voiceUrl) return res.status(400).json({ error: 'content, imageUrl, or voiceUrl required' });
 
     // Sanitize content
     const sanitizedContent = (content || '').replace(/<[^>]*>/g, '').slice(0, 2000);
@@ -144,6 +162,8 @@ router.post('/:code/messages', async (req: Request, res: Response) => {
         senderName: booking.guestName,
         content: sanitizedContent,
         imageUrl: imageUrl || null,
+        voiceUrl: voiceUrl || null,
+        voiceDuration: voiceDuration || null,
         readByHost: false,
         readByGuest: true,
       },
@@ -181,6 +201,15 @@ router.post('/:code/messages', async (req: Request, res: Response) => {
     analyzeMessageAsync(message, conversation).catch((err) =>
       console.error('AI analysis failed:', err)
     );
+
+    // Trigger voice translation if voice message (non-blocking)
+    if (voiceUrl) {
+      try {
+        translateVoiceAsync(message, io);
+      } catch (err) {
+        console.error('Voice translation failed:', err);
+      }
+    }
 
     return res.status(201).json({ message, conversationId: conversation.id });
   } catch (err) {

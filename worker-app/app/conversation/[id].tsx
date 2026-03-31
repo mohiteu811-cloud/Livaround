@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, FlatList, Image,
-  StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator,
+  StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import { Audio, Video, ResizeMode } from 'expo-av';
 import { api } from '../../src/lib/api';
 import { joinConversation, leaveConversation, getSocket } from '../../src/lib/socket';
 
@@ -16,6 +17,11 @@ interface Message {
   senderName: string;
   content: string;
   imageUrl?: string;
+  voiceUrl?: string;
+  voiceDuration?: number;
+  voiceTranscript?: string;
+  voiceTranslation?: string;
+  voiceLanguage?: string;
   createdAt: string;
   aiSuggestion?: AiSuggestion;
 }
@@ -34,11 +40,15 @@ interface Conversation {
   channelType: string;
   host?: { id: string; name: string };
   worker?: { id: string; user: { name: string } };
+  guest?: { id: string; name: string };
+  guestName?: string;
   property?: { id: string; name: string };
 }
 
 export default function ConversationScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, type } = useLocalSearchParams<{ id: string; type?: string }>();
+  const isGuest = type === 'guest';
+
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -46,18 +56,34 @@ export default function ConversationScreen() {
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(false);
   const [mediaPreview, setMediaPreview] = useState<{ uri: string; type: string } | null>(null);
+
+  // Voice recording state
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const recordingRef = useRef<Audio.Recording | null>(null);
+  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Voice playback state
+  const [playingMsgId, setPlayingMsgId] = useState<string | null>(null);
+  const soundRef = useRef<Audio.Sound | null>(null);
+
   const flatListRef = useRef<FlatList>(null);
+
+  // Select the right API based on conversation type
+  const convApi = isGuest ? api.guestConversations : api.internalConversations;
 
   const load = useCallback(async () => {
     try {
-      const data = await api.internalConversations.get(id);
+      const data = await convApi.get(id);
       setConversation(data.conversation);
       setMessages(data.messages);
       setHasMore(data.hasMore);
-      api.internalConversations.markRead(id).catch(() => {});
-    } catch {}
+      convApi.markRead(id).catch(() => {});
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to load conversation');
+    }
     setLoading(false);
-  }, [id]);
+  }, [id, isGuest]);
 
   useEffect(() => {
     load();
@@ -66,16 +92,35 @@ export default function ConversationScreen() {
     const socket = getSocket();
     const handleNewMessage = (msg: Message) => {
       if (msg.conversationId === id) {
-        setMessages((prev) => [...prev, msg]);
-        api.internalConversations.markRead(id).catch(() => {});
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === msg.id)) return prev;
+          return [...prev, msg];
+        });
+        convApi.markRead(id).catch(() => {});
       }
     };
 
+    const handleVoiceTranslated = (data: { messageId: string; voiceTranscript?: string; voiceTranslation?: string }) => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === data.messageId
+            ? { ...m, voiceTranscript: data.voiceTranscript, voiceTranslation: data.voiceTranslation }
+            : m
+        )
+      );
+    };
+
     socket?.on('new_message', handleNewMessage);
+    socket?.on('voice_translated', handleVoiceTranslated);
 
     return () => {
       leaveConversation(id);
       socket?.off('new_message', handleNewMessage);
+      socket?.off('voice_translated', handleVoiceTranslated);
+      // Clean up audio
+      soundRef.current?.unloadAsync();
+      recordingRef.current?.stopAndUnloadAsync();
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
     };
   }, [id, load]);
 
@@ -93,13 +138,14 @@ export default function ConversationScreen() {
         imageUrl = uploaded.url;
         setMediaPreview(null);
       }
-      const msg = await api.internalConversations.sendMessage(id, text, imageUrl);
+      const msg = await convApi.sendMessage(id, text, imageUrl);
       setMessages((prev) => {
         if (prev.some((m) => m.id === msg.id)) return prev;
         return [...prev, msg];
       });
-    } catch {
+    } catch (e: any) {
       setInput(text);
+      Alert.alert('Error', e.message || 'Failed to send message');
     }
     setSending(false);
   }
@@ -123,6 +169,177 @@ export default function ConversationScreen() {
     }
   }
 
+  // Voice recording
+  async function startRecording() {
+    try {
+      const permission = await Audio.requestPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Permission required', 'Please grant microphone access to send voice messages.');
+        return;
+      }
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      const recording = new Audio.Recording();
+      await recording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+      await recording.startAsync();
+
+      recordingRef.current = recording;
+      setIsRecording(true);
+      setRecordingDuration(0);
+
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingDuration((d) => d + 1);
+      }, 1000);
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to start recording');
+    }
+  }
+
+  async function stopRecording() {
+    if (!recordingRef.current) return;
+
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+
+    setIsRecording(false);
+
+    try {
+      await recordingRef.current.stopAndUnloadAsync();
+      const uri = recordingRef.current.getURI();
+      const status = await recordingRef.current.getStatusAsync();
+      recordingRef.current = null;
+
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
+
+      if (!uri) return;
+
+      const durationSec = Math.round((status.durationMillis || 0) / 1000);
+      if (durationSec < 1) return; // Too short
+
+      setSending(true);
+      try {
+        const uploaded = await api.upload.file(uri, 'audio/m4a');
+        const msg = await convApi.sendMessage(id, '', undefined, uploaded.url, durationSec);
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === msg.id)) return prev;
+          return [...prev, msg];
+        });
+      } catch (e: any) {
+        Alert.alert('Error', e.message || 'Failed to send voice message');
+      }
+      setSending(false);
+    } catch (e: any) {
+      recordingRef.current = null;
+      Alert.alert('Error', e.message || 'Failed to stop recording');
+    }
+  }
+
+  // Voice playback
+  async function togglePlayVoice(msg: Message) {
+    if (playingMsgId === msg.id) {
+      // Stop
+      await soundRef.current?.stopAsync();
+      await soundRef.current?.unloadAsync();
+      soundRef.current = null;
+      setPlayingMsgId(null);
+      return;
+    }
+
+    // Stop any current playback
+    if (soundRef.current) {
+      await soundRef.current.stopAsync();
+      await soundRef.current.unloadAsync();
+      soundRef.current = null;
+    }
+
+    try {
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: true });
+      const { sound } = await Audio.Sound.createAsync({ uri: msg.voiceUrl! });
+      soundRef.current = sound;
+      setPlayingMsgId(msg.id);
+
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded && status.didJustFinish) {
+          sound.unloadAsync();
+          soundRef.current = null;
+          setPlayingMsgId(null);
+        }
+      });
+
+      await sound.playAsync();
+    } catch (e: any) {
+      setPlayingMsgId(null);
+      Alert.alert('Error', e.message || 'Failed to play audio');
+    }
+  }
+
+  function formatDuration(secs: number): string {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  }
+
+  function isVideoUrl(url: string): boolean {
+    return /\.(mp4|mov|webm|3gpp)$/i.test(url);
+  }
+
+  function renderSenderBadge(item: Message) {
+    if (!isGuest) return null;
+
+    if (item.senderType === 'HOST') {
+      return (
+        <View style={[styles.senderBadge, { backgroundColor: '#1e40af' }]}>
+          <Text style={styles.senderBadgeText}>Host</Text>
+        </View>
+      );
+    }
+    if (item.senderType === 'GUEST') {
+      return (
+        <View style={[styles.senderBadge, { backgroundColor: '#166534' }]}>
+          <Text style={styles.senderBadgeText}>Guest</Text>
+        </View>
+      );
+    }
+    if (item.senderType === 'WORKER') {
+      return (
+        <View style={[styles.senderBadge, { backgroundColor: '#334155' }]}>
+          <Text style={styles.senderBadgeText}>You</Text>
+        </View>
+      );
+    }
+    return null;
+  }
+
+  function renderVoicePlayer(item: Message) {
+    const isPlaying = playingMsgId === item.id;
+    return (
+      <View style={styles.voiceContainer}>
+        <TouchableOpacity style={styles.voicePlayBtn} onPress={() => togglePlayVoice(item)}>
+          <Text style={styles.voicePlayIcon}>{isPlaying ? '⏸' : '▶️'}</Text>
+        </TouchableOpacity>
+        <View style={styles.voiceInfo}>
+          <View style={styles.voiceWaveform}>
+            {[...Array(12)].map((_, i) => (
+              <View
+                key={i}
+                style={[styles.voiceBar, { height: 6 + Math.random() * 14 }]}
+              />
+            ))}
+          </View>
+          <Text style={styles.voiceDuration}>
+            {formatDuration(item.voiceDuration || 0)}
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
   function renderMessage({ item }: { item: Message }) {
     const isOwn = item.senderType === 'WORKER' || item.senderType === 'SUPERVISOR';
     const isSystem = item.senderType === 'SYSTEM' || item.senderType === 'AI';
@@ -138,9 +355,33 @@ export default function ConversationScreen() {
     return (
       <View>
         <View style={[styles.messageBubble, isOwn ? styles.ownBubble : styles.otherBubble]}>
-          <Text style={styles.senderName}>{item.senderName}</Text>
+          <View style={styles.senderRow}>
+            <Text style={styles.senderName}>{item.senderName}</Text>
+            {renderSenderBadge(item)}
+          </View>
+          {item.voiceUrl ? (
+            <>
+              {renderVoicePlayer(item)}
+              {item.voiceTranscript && (
+                <Text style={styles.voiceTranscript}>{item.voiceTranscript}</Text>
+              )}
+              {item.voiceTranslation && (
+                <Text style={styles.voiceTranslation}>{item.voiceTranslation}</Text>
+              )}
+            </>
+          ) : null}
           {item.imageUrl && (
-            <Image source={{ uri: item.imageUrl }} style={styles.messageImage} resizeMode="cover" />
+            isVideoUrl(item.imageUrl) ? (
+              <Video
+                source={{ uri: item.imageUrl }}
+                style={styles.messageVideo}
+                resizeMode={ResizeMode.CONTAIN}
+                useNativeControls
+                isLooping={false}
+              />
+            ) : (
+              <Image source={{ uri: item.imageUrl }} style={styles.messageImage} resizeMode="cover" />
+            )
           )}
           {item.content ? (
             <Text style={[styles.messageText, isOwn ? styles.ownText : styles.otherText]}>
@@ -176,7 +417,9 @@ export default function ConversationScreen() {
     );
   }
 
-  const headerName = conversation?.host?.name || 'Host';
+  const headerName = isGuest
+    ? (conversation?.guestName || conversation?.guest?.name || 'Guest')
+    : (conversation?.host?.name || 'Host');
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -190,6 +433,11 @@ export default function ConversationScreen() {
             <Text style={styles.headerProperty}>{conversation.property.name}</Text>
           )}
         </View>
+        {isGuest && (
+          <View style={styles.headerTypeBadge}>
+            <Text style={styles.headerTypeBadgeText}>Guest Chat</Text>
+          </View>
+        )}
       </View>
 
       <KeyboardAvoidingView
@@ -210,6 +458,14 @@ export default function ConversationScreen() {
             </View>
           }
         />
+
+        {/* Recording indicator */}
+        {isRecording && (
+          <View style={styles.recordingIndicator}>
+            <View style={styles.recordingDot} />
+            <Text style={styles.recordingText}>Recording... {formatDuration(recordingDuration)}</Text>
+          </View>
+        )}
 
         {mediaPreview && (
           <View style={styles.mediaPreview}>
@@ -236,6 +492,13 @@ export default function ConversationScreen() {
             multiline
             maxLength={2000}
           />
+          <TouchableOpacity
+            style={styles.micButton}
+            onPressIn={startRecording}
+            onPressOut={stopRecording}
+          >
+            <Text style={[styles.micIcon, isRecording && styles.micRecording]}>🎙</Text>
+          </TouchableOpacity>
           <TouchableOpacity
             style={[styles.sendButton, (!input.trim() && !mediaPreview || sending) && styles.sendDisabled]}
             onPress={handleSend}
@@ -266,21 +529,43 @@ const styles = StyleSheet.create({
   headerInfo: { flex: 1 },
   headerName: { fontSize: 17, fontWeight: '700', color: '#f8fafc' },
   headerProperty: { fontSize: 12, color: '#94a3b8', marginTop: 1 },
+  headerTypeBadge: { backgroundColor: '#166534', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  headerTypeBadgeText: { fontSize: 11, color: '#4ade80', fontWeight: '600' },
   chatArea: { flex: 1 },
   messagesList: { paddingHorizontal: 16, paddingVertical: 12 },
   messageBubble: { maxWidth: '80%', borderRadius: 16, padding: 12, marginBottom: 8 },
   ownBubble: { backgroundColor: '#1e40af', alignSelf: 'flex-end', borderBottomRightRadius: 4 },
   otherBubble: { backgroundColor: '#1e293b', alignSelf: 'flex-start', borderBottomLeftRadius: 4 },
-  senderName: { fontSize: 11, color: '#94a3b8', marginBottom: 2, fontWeight: '600' },
+  senderRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 },
+  senderName: { fontSize: 11, color: '#94a3b8', fontWeight: '600' },
+  senderBadge: { borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 },
+  senderBadgeText: { fontSize: 9, color: '#fff', fontWeight: '700' },
   messageText: { fontSize: 15, lineHeight: 20 },
   ownText: { color: '#fff' },
   otherText: { color: '#e2e8f0' },
   messageTime: { fontSize: 10, color: '#64748b', marginTop: 4, alignSelf: 'flex-end' },
   messageImage: { width: 200, height: 150, borderRadius: 8, marginBottom: 4 },
+  messageVideo: { width: 200, height: 150, borderRadius: 8, marginBottom: 4, backgroundColor: '#000' },
   systemMessage: { alignSelf: 'center', backgroundColor: '#334155', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 6, marginBottom: 8 },
   systemText: { fontSize: 12, color: '#94a3b8', fontStyle: 'italic' },
   emptyChat: { alignItems: 'center', marginTop: 40 },
   emptyChatText: { color: '#64748b', fontSize: 14 },
+  // Voice recording
+  voiceContainer: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  voicePlayBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
+  voicePlayIcon: { fontSize: 16 },
+  voiceInfo: { flex: 1 },
+  voiceWaveform: { flexDirection: 'row', alignItems: 'center', gap: 2, marginBottom: 2 },
+  voiceBar: { width: 3, backgroundColor: '#94a3b8', borderRadius: 1.5 },
+  voiceDuration: { fontSize: 11, color: '#94a3b8' },
+  voiceTranscript: { fontSize: 13, color: '#cbd5e1', marginTop: 4, fontStyle: 'italic' },
+  voiceTranslation: { fontSize: 13, color: '#3b82f6', marginTop: 2 },
+  recordingIndicator: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 8, backgroundColor: '#1e293b' },
+  recordingDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#ef4444' },
+  recordingText: { fontSize: 14, color: '#ef4444', fontWeight: '600' },
+  micButton: { padding: 8 },
+  micIcon: { fontSize: 20 },
+  micRecording: { opacity: 0.5 },
   // AI suggestion card (read-only for workers)
   aiCard: { backgroundColor: '#1e293b', borderRadius: 12, padding: 12, marginBottom: 8, marginLeft: 8, borderLeftWidth: 3, borderLeftColor: '#3b82f6' },
   aiHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },

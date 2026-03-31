@@ -3,6 +3,7 @@ import { prisma } from '../../../../backend/src/lib/prisma';
 import { authenticate, AuthRequest } from '../../../../backend/src/middleware/auth';
 import { requirePlan } from '../../../../backend/src/lib/commercial/enforcement';
 import { analyzeMessageAsync } from '../lib/ai-analyzer';
+import { translateVoiceAsync } from '../lib/voice-translator';
 
 const router = Router();
 router.use(authenticate);
@@ -68,14 +69,17 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 router.post('/', async (req: AuthRequest, res: Response) => {
   try {
     const { workerId, propertyId, channelType } = req.body;
-    if (!workerId) return res.status(400).json({ error: 'workerId is required' });
-
     const type = channelType || 'HOST_WORKER';
     if (!['HOST_WORKER', 'SUPERVISOR_WORKER'].includes(type)) {
       return res.status(400).json({ error: 'Invalid channelType' });
     }
 
     const role = req.user!.role;
+
+    // workerId is required unless a WORKER is creating a HOST_WORKER conversation (they use their own id)
+    if (!workerId && !(type === 'HOST_WORKER' && role === 'WORKER')) {
+      return res.status(400).json({ error: 'workerId is required' });
+    }
 
     if (type === 'HOST_WORKER' && role === 'HOST') {
       const host = await prisma.host.findUnique({ where: { userId: req.user!.id } });
@@ -172,6 +176,44 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       return res.status(201).json(conversation);
     }
 
+    // Worker initiating a conversation with their host
+    if (type === 'HOST_WORKER' && role === 'WORKER') {
+      const worker = await prisma.worker.findUnique({
+        where: { userId: req.user!.id },
+        include: { user: { select: { name: true } } },
+      });
+      if (!worker) return res.status(403).json({ error: 'Worker not found' });
+      if (!worker.hostId) return res.status(400).json({ error: 'Worker has no assigned host' });
+
+      // Return existing conversation if one exists
+      const existing = await prisma.conversation.findFirst({
+        where: { hostId: worker.hostId, workerId: worker.id, channelType: 'HOST_WORKER' },
+        include: {
+          worker: { select: { id: true, user: { select: { name: true, email: true } } } },
+          property: { select: { id: true, name: true } },
+          host: { select: { id: true, name: true } },
+        },
+      });
+      if (existing) return res.json(existing);
+
+      // Create new conversation
+      const conversation = await prisma.conversation.create({
+        data: {
+          channelType: 'HOST_WORKER',
+          hostId: worker.hostId,
+          workerId: worker.id,
+          propertyId: propertyId || null,
+        },
+        include: {
+          worker: { select: { id: true, user: { select: { name: true, email: true } } } },
+          property: { select: { id: true, name: true } },
+          host: { select: { id: true, name: true } },
+        },
+      });
+
+      return res.status(201).json(conversation);
+    }
+
     return res.status(403).json({ error: 'Unauthorized for this channel type' });
   } catch (err) {
     console.error(err);
@@ -221,8 +263,8 @@ router.post('/:id/messages', async (req: AuthRequest, res: Response) => {
     const conversation = await getAuthorizedConversation(req);
     if (!conversation) return res.status(404).json({ error: 'Conversation not found' });
 
-    const { content, imageUrl } = req.body;
-    if (!content && !imageUrl) return res.status(400).json({ error: 'content or imageUrl required' });
+    const { content, imageUrl, voiceUrl, voiceDuration } = req.body;
+    if (!content && !imageUrl && !voiceUrl) return res.status(400).json({ error: 'content, imageUrl, or voiceUrl required' });
 
     const role = req.user!.role;
     let senderType: string;
@@ -258,6 +300,8 @@ router.post('/:id/messages', async (req: AuthRequest, res: Response) => {
         senderName,
         content: content || '',
         imageUrl: imageUrl || null,
+        voiceUrl: voiceUrl || null,
+        voiceDuration: voiceDuration || null,
         readByHost: isHost,
         readByWorker: !isHost,
       },
@@ -321,6 +365,15 @@ router.post('/:id/messages', async (req: AuthRequest, res: Response) => {
     analyzeMessageAsync(message, conversation).catch((err) =>
       console.error('AI analysis failed:', err)
     );
+
+    // Trigger voice translation if voice message (non-blocking)
+    if (voiceUrl) {
+      try {
+        translateVoiceAsync(message, io);
+      } catch (err) {
+        console.error('Voice translation failed:', err);
+      }
+    }
 
     return res.status(201).json(message);
   } catch (err) {

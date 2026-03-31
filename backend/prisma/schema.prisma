@@ -818,8 +818,13 @@ model Message {
   senderType      String        // "HOST" | "GUEST" | "SYSTEM" | "WORKER" | "SUPERVISOR" | "AI"
   senderName      String
   content         String
-  imageUrl        String?
-  isSystemMessage Boolean       @default(false)
+  imageUrl         String?
+  voiceUrl         String?
+  voiceDuration    Int?
+  voiceTranscript  String?
+  voiceTranslation String?
+  voiceLanguage    String?
+  isSystemMessage  Boolean       @default(false)
   readByHost      Boolean       @default(false)
   readByGuest     Boolean       @default(false)
   readByWorker    Boolean       @default(false)

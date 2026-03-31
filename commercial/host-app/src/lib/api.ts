@@ -126,10 +126,15 @@ export interface Conversation {
 export interface Message {
   id: string;
   conversationId: string;
-  senderType: 'HOST' | 'GUEST' | 'SYSTEM';
+  senderType: 'HOST' | 'GUEST' | 'WORKER' | 'SYSTEM';
   senderName: string;
   content: string;
   imageUrl?: string;
+  voiceUrl?: string;
+  voiceDuration?: number;
+  voiceTranscript?: string;
+  voiceTranslation?: string;
+  voiceLanguage?: string;
   isSystemMessage: boolean;
   readByHost: boolean;
   readByGuest: boolean;
@@ -320,10 +325,10 @@ export const api = {
         `/api/conversations/${id}${qs}`
       );
     },
-    sendMessage: (id: string, content: string, imageUrl?: string) =>
+    sendMessage: (id: string, content: string, imageUrl?: string, voiceUrl?: string, voiceDuration?: number) =>
       request<Message>(`/api/conversations/${id}/messages`, {
         method: 'POST',
-        body: JSON.stringify({ content, imageUrl }),
+        body: JSON.stringify({ content, imageUrl, voiceUrl, voiceDuration }),
       }),
     markRead: (id: string) =>
       request<{ ok: boolean }>(`/api/conversations/${id}/read`, { method: 'PATCH' }),
@@ -342,10 +347,10 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ workerId, propertyId, channelType: 'HOST_WORKER' }),
       }),
-    sendMessage: (id: string, content: string, imageUrl?: string) =>
+    sendMessage: (id: string, content: string, imageUrl?: string, voiceUrl?: string, voiceDuration?: number) =>
       request<any>(`/api/internal-conversations/${id}/messages`, {
         method: 'POST',
-        body: JSON.stringify({ content, imageUrl }),
+        body: JSON.stringify({ content, imageUrl, voiceUrl, voiceDuration }),
       }),
     markRead: (id: string) =>
       request<{ ok: boolean }>(`/api/internal-conversations/${id}/read`, { method: 'PATCH' }),

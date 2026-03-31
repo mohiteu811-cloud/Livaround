@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl, Modal } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl, Modal, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { api, Conversation } from '../../src/lib/api';
@@ -34,14 +34,18 @@ export default function MessagesScreen() {
     try {
       const data = await api.conversations.list();
       setGuestConvos(data);
-    } catch {}
+    } catch (err: any) {
+      console.error('Failed to load guest conversations:', err);
+    }
   }, []);
 
   const loadTeam = useCallback(async () => {
     try {
       const data = await api.internalConversations.list();
       setTeamConvos(data);
-    } catch {}
+    } catch (err: any) {
+      console.error('Failed to load team conversations:', err);
+    }
   }, []);
 
   const load = useCallback(async () => {
@@ -62,7 +66,10 @@ export default function MessagesScreen() {
       const w = await api.workers.list();
       setWorkers(w);
       setShowWorkerPicker(true);
-    } catch {}
+    } catch (err: any) {
+      console.error('Failed to load workers:', err);
+      Alert.alert('Error', 'Failed to load workers. Please try again.');
+    }
   }
 
   async function startChatWithWorker(workerId: string) {
@@ -70,7 +77,10 @@ export default function MessagesScreen() {
     try {
       const conv = await api.internalConversations.create(workerId);
       router.push(`/conversation/${conv.id}?type=internal`);
-    } catch {}
+    } catch (err: any) {
+      console.error('Failed to create conversation:', err);
+      Alert.alert('Error', 'Failed to start conversation. Please try again.');
+    }
   }
 
   function timeAgo(dateStr?: string) {
