@@ -188,7 +188,7 @@ export default function ConversationScreen() {
       const duration = recordingDuration;
 
       setSending(true);
-      const uploaded = await api.upload.file(uri, 'audio/m4a');
+      const uploaded = await api.upload.file(uri, 'audio/mp4');
       const msg = isInternal
         ? await api.internalConversations.sendMessage(id, '', undefined, uploaded.url, duration)
         : await api.conversations.sendMessage(id, '', undefined, uploaded.url, duration);
