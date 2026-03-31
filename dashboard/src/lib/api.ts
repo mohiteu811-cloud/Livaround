@@ -446,13 +446,35 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ workerId, propertyId, channelType: 'HOST_WORKER' }),
       }),
-    sendMessage: (id: string, data: { content: string; imageUrl?: string }) =>
+    createAsWorker: () =>
+      request<any>('/api/internal-conversations', {
+        method: 'POST',
+        body: JSON.stringify({ channelType: 'HOST_WORKER' }),
+      }),
+    sendMessage: (id: string, data: { content: string; imageUrl?: string; voiceUrl?: string; voiceDuration?: number }) =>
       request<any>(`/api/internal-conversations/${id}/messages`, {
         method: 'POST',
         body: JSON.stringify(data),
       }),
     markRead: (id: string) =>
       request<{ ok: boolean }>(`/api/internal-conversations/${id}/read`, { method: 'PATCH' }),
+  },
+
+  guestConversations: {
+    list: () => request<any[]>('/api/conversations/worker-guest'),
+    get: (id: string, before?: string) => {
+      const qs = before ? `?before=${before}` : '';
+      return request<{ conversation: any; messages: any[]; hasMore: boolean }>(
+        `/api/conversations/${id}${qs}`
+      );
+    },
+    sendMessage: (id: string, data: { content: string; imageUrl?: string; voiceUrl?: string; voiceDuration?: number }) =>
+      request<any>(`/api/conversations/${id}/messages`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    markRead: (id: string) =>
+      request<{ ok: boolean }>(`/api/conversations/${id}/read`, { method: 'PATCH' }),
   },
 
   aiSuggestions: {
