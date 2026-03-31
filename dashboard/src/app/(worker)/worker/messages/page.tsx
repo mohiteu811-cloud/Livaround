@@ -72,7 +72,7 @@ export default function WorkerMessagesPage() {
                     </span>
                   )}
                 </div>
-                <span className="text-xs text-slate-500">{timeAgo(conv.lastMessageAt)}</span>
+                <span className="text-xs text-slate-500">{timeAgo(conv.lastMessageAt ?? null)}</span>
               </div>
               {conv.property && <p className="text-xs text-blue-400 mb-1">{conv.property.name}</p>}
               {conv.lastMessagePreview && (
