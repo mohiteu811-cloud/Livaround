@@ -383,6 +383,7 @@ router.post('/:id/messages', async (req: AuthRequest, res: Response) => {
         where: { id: conversation.hostId },
         select: { pushToken: true },
       });
+      console.log('Push to host:', { hostId: conversation.hostId, hasPushToken: !!host?.pushToken });
       if (host?.pushToken) {
         const { sendPushNotification } = require('../../../../backend/src/lib/pushNotifications');
         await sendPushNotification(host.pushToken, {

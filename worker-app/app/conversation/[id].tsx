@@ -474,11 +474,12 @@ export default function ConversationScreen() {
           }
         />
 
-        {/* Recording indicator */}
+        {/* Recording overlay - WhatsApp style */}
         {isRecording && (
-          <View style={styles.recordingIndicator}>
+          <View style={styles.recordingOverlay}>
             <View style={styles.recordingDot} />
-            <Text style={styles.recordingText}>Recording... {formatDuration(recordingDuration)}</Text>
+            <Text style={styles.recordingText}>{formatDuration(recordingDuration)}</Text>
+            <Text style={styles.recordingHint}>Release to send</Text>
           </View>
         )}
 
@@ -582,19 +583,20 @@ const styles = StyleSheet.create({
   emptyChat: { alignItems: 'center', marginTop: 40 },
   emptyChatText: { color: '#64748b', fontSize: 14 },
   // Voice recording
-  voiceContainer: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
-  voicePlayBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
-  voicePlayIcon: { fontSize: 16 },
+  voiceContainer: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4, minWidth: 180 },
+  voicePlayBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#f97316', alignItems: 'center', justifyContent: 'center' },
+  voicePlayIcon: { fontSize: 18, color: '#fff' },
   voiceInfo: { flex: 1 },
-  voiceWaveform: { flexDirection: 'row', alignItems: 'center', gap: 2, marginBottom: 2 },
+  voiceWaveform: { flexDirection: 'row', alignItems: 'center', gap: 2, height: 24, marginBottom: 2 },
   voiceBar: { width: 3, backgroundColor: '#94a3b8', borderRadius: 1.5 },
-  voiceDuration: { fontSize: 11, color: '#94a3b8' },
+  voiceDuration: { fontSize: 12, color: '#94a3b8', fontVariant: ['tabular-nums'] },
   voiceTranscript: { fontSize: 13, color: '#cbd5e1', marginTop: 4, fontStyle: 'italic' },
   voiceTranscriptSmall: { fontSize: 11, color: '#94a3b8', marginTop: 2, fontStyle: 'italic' },
   voiceTranslation: { fontSize: 14, color: '#3b82f6', marginTop: 4, fontWeight: '600' },
-  recordingIndicator: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 8, backgroundColor: '#1e293b' },
-  recordingDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#ef4444' },
-  recordingText: { fontSize: 14, color: '#ef4444', fontWeight: '600' },
+  recordingOverlay: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#1c1917', borderTopWidth: 1, borderTopColor: '#ef4444' },
+  recordingDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: '#ef4444' },
+  recordingText: { fontSize: 16, color: '#ef4444', fontWeight: '700', fontVariant: ['tabular-nums'] },
+  recordingHint: { flex: 1, textAlign: 'right', fontSize: 13, color: '#a1a1aa' },
   micButton: { padding: 8 },
   micIcon: { fontSize: 20 },
   micRecording: { opacity: 0.5 },

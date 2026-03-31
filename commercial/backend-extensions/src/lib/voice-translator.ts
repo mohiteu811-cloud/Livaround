@@ -1,5 +1,6 @@
 import { prisma } from '../../../../backend/src/lib/prisma';
 import { Server } from 'socket.io';
+import { analyzeMessageAsync } from './ai-analyzer';
 
 // Google Cloud clients - lazy initialized
 let speechClient: any = null;
@@ -78,16 +79,42 @@ async function processTranslation(
     const audioContent = audioBuffer.toString('base64');
 
     // 2. Speech-to-Text with auto language detection
-    const [sttResponse] = await speech.recognize({
-      audio: { content: audioContent },
-      config: {
-        encoding: 'WEBM_OPUS', // Most common from MediaRecorder/expo-av
-        languageCode: 'en-US',
-        alternativeLanguageCodes: ['hi-IN', 'mr-IN', 'kn-IN', 'ta-IN', 'te-IN', 'bn-IN', 'gu-IN', 'pa-IN', 'ml-IN', 'ur-IN'],
-        enableAutomaticPunctuation: true,
-        model: 'latest_long',
-      },
-    });
+    // Determine encoding from the file URL extension
+    const urlLower = message.voiceUrl.toLowerCase();
+    const isWebm = urlLower.includes('.webm');
+    const isOgg = urlLower.includes('.ogg');
+    // expo-av on mobile records AAC/M4A; web MediaRecorder uses WEBM_OPUS
+    const encoding = isWebm ? 'WEBM_OPUS' : isOgg ? 'OGG_OPUS' : 'AMR_WB';
+
+    // For AAC/M4A files, use longRunningRecognize with auto-detect encoding
+    const useAutoDetect = !isWebm && !isOgg;
+
+    const recognizeConfig: any = {
+      languageCode: 'en-US',
+      alternativeLanguageCodes: ['hi-IN', 'mr-IN', 'kn-IN', 'ta-IN', 'te-IN', 'bn-IN', 'gu-IN', 'pa-IN', 'ml-IN', 'ur-IN'],
+      enableAutomaticPunctuation: true,
+      model: 'latest_long',
+    };
+
+    if (!useAutoDetect) {
+      recognizeConfig.encoding = encoding;
+    }
+
+    // Try direct recognition first; if it fails (wrong encoding), retry with URI-based recognition
+    let sttResponse: any;
+    try {
+      [sttResponse] = await speech.recognize({
+        audio: { content: audioContent },
+        config: recognizeConfig,
+      });
+    } catch (recognizeError: any) {
+      // Fallback: use the audio URI directly (Google can auto-detect format from URL)
+      console.warn('Direct recognition failed, trying URI-based:', recognizeError.message);
+      [sttResponse] = await speech.recognize({
+        audio: { uri: message.voiceUrl },
+        config: recognizeConfig,
+      });
+    }
 
     if (!sttResponse.results?.length) {
       console.warn('No transcription results for message', message.id);
@@ -101,8 +128,8 @@ async function processTranslation(
     if (!transcript) return;
 
     // 3. Determine target language
-    // Workers → translate to English for host/guest
-    // Host/Guest → translate to Hindi (most common worker language) as default
+    // Workers \u2192 translate to English for host/guest
+    // Host/Guest \u2192 translate to Hindi (most common worker language) as default
     const isWorkerSender = message.senderType === 'WORKER' || message.senderType === 'SUPERVISOR';
     const sourceLang = detectedLanguage.split('-')[0]; // e.g., 'hi' from 'hi-IN'
     const targetLang = isWorkerSender ? 'en' : 'hi';
@@ -145,6 +172,21 @@ async function processTranslation(
     io.of('/host').to(room).emit('voice_translated', translationData);
     io.of('/guest').to(room).emit('voice_translated', translationData);
     io.of('/worker').to(room).emit('voice_translated', translationData);
+
+    // 6. Trigger AI analysis on the transcript (now that we have text to analyze)
+    const analyzableText = translation || transcript;
+    if (analyzableText) {
+      const conversation = await prisma.conversation.findUnique({
+        where: { id: message.conversationId },
+        select: { id: true, channelType: true, hostId: true, propertyId: true, bookingId: true },
+      });
+      if (conversation) {
+        analyzeMessageAsync(
+          { id: message.id, conversationId: message.conversationId, content: analyzableText, senderType: message.senderType },
+          conversation as any
+        ).catch((err) => console.error('AI analysis after voice translation failed:', err));
+      }
+    }
 
   } catch (err: any) {
     console.error('Voice translation error:', err.message);
