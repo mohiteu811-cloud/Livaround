@@ -21,12 +21,28 @@ export function requirePlan(minimumPlan: 'pro' | 'agency', prisma: PrismaClient)
     const userId = req.user?.id;
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
+    let organizationId: string | null = null;
+
+    // Check if user is a host
     const host = await prisma.host.findUnique({
       where: { userId },
       select: { organizationId: true },
     });
 
-    if (!host?.organizationId) {
+    if (host?.organizationId) {
+      organizationId = host.organizationId;
+    } else {
+      // Check if user is a worker — use their host's organization
+      const worker = await (prisma as any).worker.findUnique({
+        where: { userId },
+        select: { host: { select: { organizationId: true } } },
+      });
+      if (worker?.host?.organizationId) {
+        organizationId = worker.host.organizationId;
+      }
+    }
+
+    if (!organizationId) {
       // No org linked — treat as community (free) tier
       return res.status(403).json({
         error: 'upgrade_required',
@@ -36,7 +52,7 @@ export function requirePlan(minimumPlan: 'pro' | 'agency', prisma: PrismaClient)
     }
 
     const subscription = await prisma.subscription.findUnique({
-      where: { organizationId: host.organizationId },
+      where: { organizationId },
       include: { plan: true },
     });
 
