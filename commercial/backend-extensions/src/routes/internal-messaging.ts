@@ -186,7 +186,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 
       let resolvedHostId = worker.hostId;
 
-      // Fallback: resolve host through property staff assignments
+      // Fallback 1: resolve host through property staff assignments
       if (!resolvedHostId) {
         const staffAssignment = await prisma.propertyStaff.findFirst({
           where: { workerId: worker.id },
@@ -194,6 +194,18 @@ router.post('/', async (req: AuthRequest, res: Response) => {
         });
         if (staffAssignment?.property?.hostId) {
           resolvedHostId = staffAssignment.property.hostId;
+        }
+      }
+
+      // Fallback 2: resolve host through assigned jobs
+      if (!resolvedHostId) {
+        const job = await prisma.job.findFirst({
+          where: { workerId: worker.id },
+          select: { property: { select: { hostId: true } } },
+          orderBy: { createdAt: 'desc' },
+        });
+        if (job?.property?.hostId) {
+          resolvedHostId = job.property.hostId;
         }
       }
 

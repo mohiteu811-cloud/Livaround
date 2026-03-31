@@ -40,6 +40,7 @@ export default function WorkerMessagesPage() {
   const [loading, setLoading] = useState(true);
   const [showNewMenu, setShowNewMenu] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [error, setError] = useState('');
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -63,19 +64,32 @@ export default function WorkerMessagesPage() {
   async function handleMessageHost() {
     setShowNewMenu(false);
     setCreating(true);
+    setError('');
     try {
       const conv = await api.internalConversations.create();
+      if (!conv?.id) {
+        setError('Failed to create conversation — no conversation returned');
+        setCreating(false);
+        return;
+      }
       router.push(`/worker/messages/${conv.id}`);
     } catch (err: any) {
-      alert(err.message || 'Failed to create conversation');
+      console.error('Failed to create conversation:', err);
+      const msg = err?.message || 'Failed to create conversation';
+      setError(msg === 'upgrade_required'
+        ? 'Your host needs a Pro plan to enable messaging.'
+        : msg === 'Worker has no assigned host'
+        ? 'You are not linked to a host yet. Please ask your host to add you to their team.'
+        : msg);
     }
     setCreating(false);
   }
 
   async function handleMessageGuest() {
     setShowNewMenu(false);
+    setError('');
     if (guestConversations.length === 0) {
-      alert('No active guest conversations available.');
+      setError('No active guest conversations available.');
       return;
     }
     // Switch to guest tab so user can pick a conversation
@@ -156,6 +170,13 @@ export default function WorkerMessagesPage() {
           )}
         </button>
       </div>
+
+      {error && (
+        <div className="px-4 py-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-sm flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={() => setError('')} className="ml-3 text-red-400/60 hover:text-red-300 font-bold">x</button>
+        </div>
+      )}
 
       {loading ? (
         <div className="text-center py-12 text-slate-500">Loading...</div>
