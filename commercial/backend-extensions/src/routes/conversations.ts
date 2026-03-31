@@ -90,7 +90,50 @@ router.get('/worker-guest', async (req: any, res: Response) => {
 router.get('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const host = await prisma.host.findUnique({ where: { userId: req.user!.id } });
-    if (!host) return res.status(403).json({ error: 'Host not found' });
+    if (!host) {
+      // Check if user is a worker (handles users whose JWT role may differ)
+      const worker = await prisma.worker.findUnique({ where: { userId: req.user!.id } });
+      if (!worker) return res.status(403).json({ error: 'Host not found' });
+
+      // Worker access: check if assigned to the property
+      const conv = await prisma.conversation.findFirst({
+        where: { id: req.params.id },
+        include: {
+          booking: {
+            select: {
+              id: true,
+              guestName: true,
+              guestEmail: true,
+              guestPhone: true,
+              checkIn: true,
+              checkOut: true,
+              status: true,
+              propertyId: true,
+              property: { select: { id: true, name: true } },
+            },
+          },
+        },
+      });
+      if (conv?.booking) {
+        const assigned = await prisma.propertyStaff.findFirst({
+          where: { workerId: worker.id, propertyId: conv.booking.propertyId },
+        });
+        if (assigned) {
+          const before = req.query.before as string | undefined;
+          const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
+          const messages = await prisma.message.findMany({
+            where: {
+              conversationId: conv.id,
+              ...(before ? { createdAt: { lt: new Date(before) } } : {}),
+            },
+            orderBy: { createdAt: 'desc' },
+            take: limit,
+          });
+          return res.json({ conversation: conv, messages: messages.reverse(), hasMore: messages.length === limit });
+        }
+      }
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
 
     let conversation: any = await prisma.conversation.findFirst({
       where: { id: req.params.id, hostId: host.id },
