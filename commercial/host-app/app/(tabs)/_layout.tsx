@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
-import { Text, View, Platform, StyleSheet } from 'react-native';
+import { Text, View, StyleSheet } from 'react-native';
 import { useState, useEffect } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../../src/lib/api';
 
 function Icon({ emoji, focused }: { emoji: string; focused: boolean }) {
@@ -22,6 +23,7 @@ function BadgeIcon({ emoji, focused, count }: { emoji: string; focused: boolean;
 
 export default function TabsLayout() {
   const [unreadMessages, setUnreadMessages] = useState(0);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     loadUnread();
@@ -44,8 +46,8 @@ export default function TabsLayout() {
           backgroundColor: '#0f172a',
           borderTopColor: '#1e293b',
           paddingTop: 8,
-          paddingBottom: Platform.OS === 'android' ? 12 : 8,
-          height: Platform.OS === 'android' ? 72 : 64,
+          paddingBottom: Math.max(insets.bottom, 8),
+          height: 56 + Math.max(insets.bottom, 8),
         },
         tabBarActiveTintColor: '#3b82f6',
         tabBarInactiveTintColor: '#475569',

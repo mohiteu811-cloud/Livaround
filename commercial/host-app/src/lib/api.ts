@@ -75,6 +75,8 @@ export interface Booking {
   status: string;
   source: string;
   guestCode?: string;
+  lockCode?: string;
+  notes?: string;
 }
 
 export interface Job {
@@ -89,6 +91,19 @@ export interface Job {
   scheduledAt: string;
   completedAt?: string;
   notes?: string;
+  checklist?: { item: string; done: boolean }[];
+}
+
+export interface Worker {
+  id: string;
+  skills: string[];
+  isAvailable: boolean;
+  isGigWorker?: boolean;
+  jobsCompleted: number;
+  user: { id: string; name: string; email: string; phone?: string };
+  name?: string;
+  email?: string;
+  phone?: string;
 }
 
 export interface Conversation {
@@ -136,6 +151,18 @@ export interface DashboardSummary {
   };
 }
 
+export interface Issue {
+  id: string;
+  jobId?: string;
+  propertyId: string;
+  description: string;
+  severity: 'LOW' | 'MEDIUM' | 'HIGH';
+  status: 'OPEN' | 'IN_REVIEW' | 'RESOLVED';
+  photoUrl?: string;
+  videoUrl?: string;
+  createdAt: string;
+}
+
 // ── API Client ───────────────────────────────────────────────────────────────
 
 export const api = {
@@ -144,6 +171,11 @@ export const api = {
       request<{ token: string; user: User }>('/api/auth/login', {
         method: 'POST',
         body: JSON.stringify({ email, password }),
+      }),
+    register: (data: { name: string; email: string; password: string; phone?: string }) =>
+      request<{ token: string; user: User }>('/api/auth/register', {
+        method: 'POST',
+        body: JSON.stringify(data),
       }),
     me: () => request<User>('/api/auth/me'),
   },
@@ -170,6 +202,35 @@ export const api = {
       return request<Booking[]>(`/api/bookings${qs}`);
     },
     get: (id: string) => request<Booking>(`/api/bookings/${id}`),
+    create: (data: {
+      propertyId: string;
+      guestName: string;
+      guestEmail?: string;
+      guestPhone?: string;
+      checkIn: string;
+      checkOut: string;
+      guestCount?: number;
+      totalAmount: number;
+      currency?: string;
+      source?: string;
+      notes?: string;
+      lockCode?: string;
+    }) =>
+      request<Booking>('/api/bookings', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    update: (id: string, data: Partial<Booking>) =>
+      request<Booking>(`/api/bookings/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+    delete: (id: string) =>
+      request<void>(`/api/bookings/${id}`, { method: 'DELETE' }),
+    checkin: (id: string) =>
+      request<Booking>(`/api/bookings/${id}/checkin`, { method: 'POST' }),
+    checkout: (id: string) =>
+      request<Booking>(`/api/bookings/${id}/checkout`, { method: 'POST' }),
   },
 
   jobs: {
@@ -178,10 +239,77 @@ export const api = {
       return request<Job[]>(`/api/jobs${qs}`);
     },
     get: (id: string) => request<Job>(`/api/jobs/${id}`),
+    create: (data: {
+      propertyId: string;
+      bookingId?: string;
+      type: string;
+      scheduledAt: string;
+      notes?: string;
+      workerId?: string;
+      checklist?: { item: string; done: boolean }[];
+    }) =>
+      request<Job>('/api/jobs', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    dispatch: (id: string, workerId: string) =>
+      request<Job>(`/api/jobs/${id}/dispatch`, {
+        method: 'POST',
+        body: JSON.stringify({ workerId }),
+      }),
+    accept: (id: string) =>
+      request<Job>(`/api/jobs/${id}/accept`, { method: 'POST' }),
+    start: (id: string) =>
+      request<Job>(`/api/jobs/${id}/start`, { method: 'POST' }),
+    complete: (id: string, data?: { completionPhotoUrl?: string; completionVideoUrl?: string }) =>
+      request<Job>(`/api/jobs/${id}/complete`, {
+        method: 'POST',
+        body: JSON.stringify(data || {}),
+      }),
+    cancel: (id: string) =>
+      request<Job>(`/api/jobs/${id}/cancel`, { method: 'POST' }),
+    archive: (id: string) =>
+      request<Job>(`/api/jobs/${id}/archive`, { method: 'POST' }),
+    dispatchWorkers: (propertyId: string) =>
+      request<Worker[]>(`/api/jobs/dispatch-workers?propertyId=${propertyId}`),
+    issues: (id: string) =>
+      request<Issue[]>(`/api/jobs/${id}/issues`),
+    reportIssue: (id: string, data: { description: string; severity: string; photoUrl?: string; videoUrl?: string }) =>
+      request<Issue>(`/api/jobs/${id}/issues`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
   },
 
   workers: {
-    list: () => request<any[]>('/api/workers'),
+    list: () => request<Worker[]>('/api/workers'),
+    get: (id: string) => request<Worker>(`/api/workers/${id}`),
+    create: (data: { name: string; email: string; phone?: string; skills: string[] }) =>
+      request<Worker & { tempPassword: string }>('/api/workers', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    update: (id: string, data: { name?: string; phone?: string; skills?: string[]; isAvailable?: boolean }) =>
+      request<Worker>(`/api/workers/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+    delete: (id: string) =>
+      request<void>(`/api/workers/${id}`, { method: 'DELETE' }),
+    resetPassword: (id: string) =>
+      request<{ tempPassword: string }>(`/api/workers/${id}/reset-password`, { method: 'POST' }),
+  },
+
+  issues: {
+    list: (params?: { severity?: string; status?: string }) => {
+      const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
+      return request<Issue[]>(`/api/jobs/issues${qs}`);
+    },
+    update: (id: string, data: { status: string }) =>
+      request<Issue>(`/api/jobs/issues/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
   },
 
   conversations: {
