@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, FlatList, Image,
-  StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator,
+  StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator, Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -43,6 +43,9 @@ export default function ConversationScreen() {
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
   const [visibility, setVisibility] = useState<'ALL' | 'TEAM_ONLY'>('ALL');
+  const [showWorkerPicker, setShowWorkerPicker] = useState(false);
+  const [availableWorkers, setAvailableWorkers] = useState<any[]>([]);
+  const [loopingIn, setLoopingIn] = useState(false);
   const recordingRef = useRef<Audio.Recording | null>(null);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const voiceSoundRef = useRef<Audio.Sound | null>(null);
@@ -267,6 +270,26 @@ export default function ConversationScreen() {
     } catch {}
   }
 
+  async function openWorkerPicker() {
+    try {
+      const propertyId = conversation?.booking?.property?.id || conversation?.propertyId;
+      if (!propertyId) return;
+      const staff = await api.properties.getStaff(propertyId);
+      setAvailableWorkers(staff);
+      setShowWorkerPicker(true);
+    } catch {}
+  }
+
+  async function loopInWorker(workerId: string) {
+    setLoopingIn(true);
+    try {
+      const updated = await api.conversations.loopInWorker(id, workerId);
+      setConversation(updated);
+      setShowWorkerPicker(false);
+    } catch {}
+    setLoopingIn(false);
+  }
+
   function renderMessage({ item }: { item: MessageWithAi }) {
     const isHost = item.senderType === 'HOST';
     const isSystem = item.senderType === 'SYSTEM' || item.senderType === 'AI';
@@ -452,8 +475,8 @@ export default function ConversationScreen() {
           </View>
         )}
 
-        {/* Visibility toggle — only for GUEST_HOST conversations */}
-        {!isInternal && (
+        {/* Visibility toggle — only for GUEST_HOST conversations with a worker looped in */}
+        {conversation?.channelType === 'GUEST_HOST' && conversation?.workerId && (
           <TouchableOpacity
             style={[styles.visibilityToggle, visibility === 'TEAM_ONLY' && styles.visibilityToggleActive]}
             onPress={() => setVisibility((v) => v === 'ALL' ? 'TEAM_ONLY' : 'ALL')}
@@ -461,6 +484,13 @@ export default function ConversationScreen() {
             <Text style={styles.visibilityToggleText}>
               {visibility === 'TEAM_ONLY' ? '🔒 Team only — guest won\'t see this' : '🌐 Everyone'}
             </Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Loop in worker button — for GUEST_HOST conversations without a worker */}
+        {conversation?.channelType === 'GUEST_HOST' && !conversation?.workerId && (
+          <TouchableOpacity style={styles.loopInButton} onPress={openWorkerPicker}>
+            <Text style={styles.loopInButtonText}>+ Loop in a worker</Text>
           </TouchableOpacity>
         )}
 
@@ -500,6 +530,38 @@ export default function ConversationScreen() {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Worker picker modal */}
+      <Modal visible={showWorkerPicker} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Loop in a Worker</Text>
+            {availableWorkers.length === 0 ? (
+              <Text style={styles.modalEmpty}>No workers assigned to this property</Text>
+            ) : (
+              <FlatList
+                data={availableWorkers}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.workerOption}
+                    onPress={() => loopInWorker(item.worker?.id || item.workerId)}
+                    disabled={loopingIn}
+                  >
+                    <Text style={styles.workerOptionName}>
+                      {item.worker?.user?.name || 'Worker'}
+                    </Text>
+                    <Text style={styles.workerOptionRole}>{item.role}</Text>
+                  </TouchableOpacity>
+                )}
+              />
+            )}
+            <TouchableOpacity style={styles.modalCancel} onPress={() => setShowWorkerPicker(false)}>
+              <Text style={styles.modalCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -598,4 +660,17 @@ const styles = StyleSheet.create({
   sendButton: { backgroundColor: '#3b82f6', borderRadius: 20, paddingHorizontal: 18, paddingVertical: 10, marginLeft: 8 },
   sendDisabled: { opacity: 0.4 },
   sendText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  // Loop in worker
+  loopInButton: { paddingVertical: 8, alignItems: 'center', backgroundColor: '#1e293b' },
+  loopInButtonText: { fontSize: 13, color: '#3b82f6', fontWeight: '600' },
+  // Worker picker modal
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: '#1e293b', borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 20, maxHeight: '50%' },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: '#f8fafc', marginBottom: 16, textAlign: 'center' },
+  modalEmpty: { color: '#94a3b8', textAlign: 'center', paddingVertical: 20 },
+  workerOption: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: '#334155' },
+  workerOptionName: { fontSize: 16, color: '#f8fafc', fontWeight: '600' },
+  workerOptionRole: { fontSize: 13, color: '#94a3b8' },
+  modalCancel: { marginTop: 12, paddingVertical: 14, alignItems: 'center', backgroundColor: '#334155', borderRadius: 10 },
+  modalCancelText: { color: '#f8fafc', fontWeight: '600', fontSize: 15 },
 });

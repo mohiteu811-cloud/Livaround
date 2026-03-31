@@ -199,6 +199,8 @@ export const api = {
   properties: {
     list: () => request<Property[]>('/api/properties'),
     get: (id: string) => request<Property>(`/api/properties/${id}`),
+    getStaff: (propertyId: string) =>
+      request<any[]>(`/api/properties/${propertyId}/staff`),
   },
 
   bookings: {
@@ -332,6 +334,11 @@ export const api = {
       }),
     markRead: (id: string) =>
       request<{ ok: boolean }>(`/api/conversations/${id}/read`, { method: 'PATCH' }),
+    loopInWorker: (id: string, workerId: string) =>
+      request<Conversation>(`/api/conversations/${id}/loop-in-worker`, {
+        method: 'PATCH',
+        body: JSON.stringify({ workerId }),
+      }),
   },
 
   internalConversations: {

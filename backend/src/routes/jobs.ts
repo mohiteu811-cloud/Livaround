@@ -537,6 +537,21 @@ router.post('/:id/issues', validate(issueSchema), async (req: AuthRequest, res: 
         videoUrl: req.body.videoUrl ?? null,
       },
     });
+
+    // Trigger AI analysis if commercial extension is available
+    if (req.app.locals.analyzeIssue) {
+      const property = await prisma.property.findUnique({
+        where: { id: job.propertyId },
+        select: { hostId: true },
+      });
+      if (property?.hostId) {
+        req.app.locals.analyzeIssue(
+          { ...issue, propertyId: job.propertyId },
+          property.hostId
+        ).catch((err: any) => console.error('AI issue analysis failed:', err));
+      }
+    }
+
     return res.status(201).json(issue);
   } catch (err: any) {
     console.error('Issue create error:', err);

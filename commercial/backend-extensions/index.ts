@@ -7,13 +7,15 @@ import hostAppRoutes from './src/routes/host-app';
 import guestMessagingRoutes from './src/routes/guest-messaging';
 import internalMessagingRoutes from './src/routes/internal-messaging';
 import aiSuggestionsRoutes from './src/routes/ai-suggestions';
+import { analyzeIssueAsync } from './src/lib/ai-analyzer';
 
 export function register(app: Express, server: http.Server, allowedOrigins: string[]) {
   // Set up Socket.IO for real-time messaging (host, guest, worker namespaces)
   const io = setupSocketIO(server, allowedOrigins);
 
-  // Make io available to route handlers via app.locals
+  // Make io and AI analysis available to route handlers via app.locals
   app.locals.io = io;
+  app.locals.analyzeIssue = analyzeIssueAsync;
 
   // Mount commercial routes
   app.use('/api/conversations', conversationsRoutes);
