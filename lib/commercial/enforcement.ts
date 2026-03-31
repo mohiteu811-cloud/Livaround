@@ -21,12 +21,52 @@ export function requirePlan(minimumPlan: 'pro' | 'agency', prisma: PrismaClient)
     const userId = req.user?.id;
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
+    let organizationId: string | null = null;
+
+    // Check if user is a host
     const host = await prisma.host.findUnique({
       where: { userId },
       select: { organizationId: true },
     });
 
-    if (!host?.organizationId) {
+    if (host?.organizationId) {
+      organizationId = host.organizationId;
+    } else {
+      // Check if user is a worker — use their host's organization
+      const worker = await (prisma as any).worker.findUnique({
+        where: { userId },
+        select: {
+          id: true,
+          host: { select: { organizationId: true } },
+        },
+      });
+      if (worker?.host?.organizationId) {
+        organizationId = worker.host.organizationId;
+      } else if (worker?.id) {
+        // Fallback 1: resolve org through property staff assignments
+        const staffAssignment = await (prisma as any).propertyStaff.findFirst({
+          where: { workerId: worker.id },
+          select: { property: { select: { host: { select: { organizationId: true } } } } },
+        });
+        if (staffAssignment?.property?.host?.organizationId) {
+          organizationId = staffAssignment.property.host.organizationId;
+        }
+
+        // Fallback 2: resolve org through assigned jobs
+        if (!organizationId) {
+          const job = await (prisma as any).job.findFirst({
+            where: { workerId: worker.id },
+            select: { property: { select: { host: { select: { organizationId: true } } } } },
+            orderBy: { createdAt: 'desc' },
+          });
+          if (job?.property?.host?.organizationId) {
+            organizationId = job.property.host.organizationId;
+          }
+        }
+      }
+    }
+
+    if (!organizationId) {
       // No org linked — treat as community (free) tier
       return res.status(403).json({
         error: 'upgrade_required',
@@ -36,7 +76,7 @@ export function requirePlan(minimumPlan: 'pro' | 'agency', prisma: PrismaClient)
     }
 
     const subscription = await prisma.subscription.findUnique({
-      where: { organizationId: host.organizationId },
+      where: { organizationId },
       include: { plan: true },
     });
 

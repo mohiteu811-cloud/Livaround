@@ -70,10 +70,7 @@ export default function WorkerConversationPage() {
       if (!silent || data.messages.length > messages.length) {
         setMessages(data.messages);
       }
-      const unread = isGuest
-        ? data.conversation.unreadByWorker
-        : data.conversation.unreadByWorker;
-      if (unread > 0) {
+      if (data.conversation.unreadByWorker > 0) {
         convApi.markRead(id).catch(() => {});
       }
     } catch {}

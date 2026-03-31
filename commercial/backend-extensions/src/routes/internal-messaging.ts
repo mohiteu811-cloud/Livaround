@@ -183,11 +183,37 @@ router.post('/', async (req: AuthRequest, res: Response) => {
         include: { user: { select: { name: true } } },
       });
       if (!worker) return res.status(403).json({ error: 'Worker not found' });
-      if (!worker.hostId) return res.status(400).json({ error: 'Worker has no assigned host' });
+
+      let resolvedHostId = worker.hostId;
+
+      // Fallback 1: resolve host through property staff assignments
+      if (!resolvedHostId) {
+        const staffAssignment = await prisma.propertyStaff.findFirst({
+          where: { workerId: worker.id },
+          select: { property: { select: { hostId: true } } },
+        });
+        if (staffAssignment?.property?.hostId) {
+          resolvedHostId = staffAssignment.property.hostId;
+        }
+      }
+
+      // Fallback 2: resolve host through assigned jobs
+      if (!resolvedHostId) {
+        const job = await prisma.job.findFirst({
+          where: { workerId: worker.id },
+          select: { property: { select: { hostId: true } } },
+          orderBy: { createdAt: 'desc' },
+        });
+        if (job?.property?.hostId) {
+          resolvedHostId = job.property.hostId;
+        }
+      }
+
+      if (!resolvedHostId) return res.status(400).json({ error: 'Worker has no assigned host' });
 
       // Return existing conversation if one exists
       const existing = await prisma.conversation.findFirst({
-        where: { hostId: worker.hostId, workerId: worker.id, channelType: 'HOST_WORKER' },
+        where: { hostId: resolvedHostId, workerId: worker.id, channelType: 'HOST_WORKER' },
         include: {
           worker: { select: { id: true, user: { select: { name: true, email: true } } } },
           property: { select: { id: true, name: true } },
@@ -200,7 +226,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       const conversation = await prisma.conversation.create({
         data: {
           channelType: 'HOST_WORKER',
-          hostId: worker.hostId,
+          hostId: resolvedHostId,
           workerId: worker.id,
           propertyId: propertyId || null,
         },

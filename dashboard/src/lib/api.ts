@@ -432,6 +432,23 @@ export const api = {
       request<{ ok: boolean }>(`/api/conversations/${id}/read`, { method: 'PATCH' }),
   },
 
+  guestConversations: {
+    list: () => request<any[]>('/api/conversations/worker-guest'),
+    get: (id: string, before?: string) => {
+      const qs = before ? `?before=${before}` : '';
+      return request<{ conversation: any; messages: any[]; hasMore: boolean }>(
+        `/api/conversations/${id}${qs}`
+      );
+    },
+    sendMessage: (id: string, data: { content: string; imageUrl?: string; voiceUrl?: string; voiceDuration?: number }) =>
+      request<any>(`/api/conversations/${id}/messages`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    markRead: (id: string) =>
+      request<{ ok: boolean }>(`/api/conversations/${id}/read`, { method: 'PATCH' }),
+  },
+
   internalConversations: {
     list: () =>
       request<any[]>('/api/internal-conversations'),

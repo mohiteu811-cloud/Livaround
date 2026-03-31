@@ -40,6 +40,7 @@ export default function WorkerMessagesPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [creatingChat, setCreatingChat] = useState(false);
   const [guestPickerOpen, setGuestPickerOpen] = useState(false);
+  const [error, setError] = useState('');
   const menuRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
@@ -76,21 +77,37 @@ export default function WorkerMessagesPage() {
   async function handleMessageHost() {
     setMenuOpen(false);
     setCreatingChat(true);
+    setError('');
     try {
       const conv = await api.internalConversations.createAsWorker();
+      if (!conv?.id) {
+        setError('Failed to create conversation — no conversation returned');
+        setCreatingChat(false);
+        return;
+      }
       router.push(`/worker/messages/${conv.id}`);
-    } catch {
-      // silently fail
+    } catch (err: any) {
+      console.error('Failed to create conversation:', err);
+      const msg = err?.message || 'Failed to create conversation';
+      setError(msg === 'upgrade_required'
+        ? 'Your host needs a Pro plan to enable messaging.'
+        : msg === 'Worker has no assigned host'
+        ? 'You are not linked to a host yet. Please ask your host to add you to their team.'
+        : msg);
     }
     setCreatingChat(false);
   }
 
   function handleMessageGuest() {
     setMenuOpen(false);
+    setError('');
     if (guestConversations.length === 0) {
       api.guestConversations.list().then((guests) => {
         setGuestConversations(guests);
-        if (guests.length === 0) return;
+        if (guests.length === 0) {
+          setError('No active guest conversations available.');
+          return;
+        }
         setGuestPickerOpen(true);
       }).catch(() => {});
     } else {
@@ -178,6 +195,14 @@ export default function WorkerMessagesPage() {
           )}
         </div>
       </div>
+
+      {/* Error banner */}
+      {error && (
+        <div className="px-4 py-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-sm flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={() => setError('')} className="ml-3 text-red-400/60 hover:text-red-300 font-bold">x</button>
+        </div>
+      )}
 
       {/* Tab Switcher */}
       <div className="flex bg-slate-800 rounded-lg p-1">
