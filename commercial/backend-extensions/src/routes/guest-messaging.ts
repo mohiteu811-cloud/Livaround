@@ -60,6 +60,7 @@ router.get('/:code/messages', async (req: Request, res: Response) => {
     const messages = await prisma.message.findMany({
       where: {
         conversationId: conversation.id,
+        visibility: 'ALL', // Guests never see TEAM_ONLY messages
         ...(before ? { createdAt: { lt: new Date(before) } } : {}),
       },
       orderBy: { createdAt: 'desc' },
@@ -173,8 +174,9 @@ router.post('/:code/messages', async (req: Request, res: Response) => {
       where: { id: conversation.id },
       data: {
         lastMessageAt: message.createdAt,
-        lastMessagePreview: sanitizedContent.slice(0, 100) || 'Image',
+        lastMessagePreview: (sanitizedContent || (voiceUrl ? 'Voice message' : 'Image')).slice(0, 100),
         unreadByHost: { increment: 1 },
+        unreadByWorker: { increment: 1 }, // 3-way: notify assigned workers
       },
     });
 
@@ -183,13 +185,14 @@ router.post('/:code/messages', async (req: Request, res: Response) => {
     if (io) {
       io.of('/host').to(`conv:${conversation.id}`).emit('new_message', message);
       io.of('/guest').to(`conv:${conversation.id}`).emit('new_message', message);
+      io.of('/worker').to(`conv:${conversation.id}`).emit('new_message', message); // 3-way: workers see guest messages
     }
 
     // Send push notification to host
     if (booking.property.host.pushToken) {
       await sendPushNotification(booking.property.host.pushToken, {
         title: `Message from ${booking.guestName}`,
-        body: sanitizedContent.slice(0, 100) || 'Sent an image',
+        body: (sanitizedContent || (voiceUrl ? 'Voice message' : 'Sent an image')).slice(0, 100),
         data: { conversationId: conversation.id, type: 'guest_message' },
         sound: 'default',
         priority: 'high',

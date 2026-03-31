@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   RefreshControl, Modal, Alert, ActivityIndicator,
@@ -6,8 +6,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { api } from '../../src/lib/api';
-
-type Tab = 'guests' | 'team';
 
 interface Conversation {
   id: string;
@@ -24,8 +22,11 @@ interface Conversation {
   unreadByWorker: number;
 }
 
+interface TaggedConversation extends Conversation {
+  _source: 'guest' | 'internal';
+}
+
 export default function MessagesScreen() {
-  const [activeTab, setActiveTab] = useState<Tab>('guests');
   const [teamConversations, setTeamConversations] = useState<Conversation[]>([]);
   const [guestConversations, setGuestConversations] = useState<Conversation[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -59,6 +60,19 @@ export default function MessagesScreen() {
     await load();
     setRefreshing(false);
   };
+
+  // Merge and sort all conversations by lastMessageAt
+  const allConversations = useMemo<TaggedConversation[]>(() => {
+    const merged: TaggedConversation[] = [
+      ...guestConversations.map((c) => ({ ...c, _source: 'guest' as const })),
+      ...teamConversations.map((c) => ({ ...c, _source: 'internal' as const })),
+    ];
+    return merged.sort((a, b) => {
+      const aTime = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0;
+      const bTime = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0;
+      return bTime - aTime;
+    });
+  }, [guestConversations, teamConversations]);
 
   function timeAgo(dateStr?: string) {
     if (!dateStr) return '';
@@ -107,22 +121,30 @@ export default function MessagesScreen() {
     router.push(`/conversation/${conv.id}?type=guest`);
   }
 
-  const conversations = activeTab === 'team' ? teamConversations : guestConversations;
-
-  function getDisplayName(item: Conversation): string {
-    if (activeTab === 'guests') {
+  function getDisplayName(item: TaggedConversation): string {
+    if (item._source === 'guest') {
       return item.guestName || item.guest?.name || 'Guest';
     }
     return item.host?.name || 'Host';
   }
 
-  function getBadgeLabel(item: Conversation): string {
-    if (activeTab === 'guests') return 'Guest';
-    return item.channelType === 'HOST_WORKER' ? 'Host' : 'Supervisor';
+  function getBadgeLabel(item: TaggedConversation): string {
+    if (item._source === 'guest') return 'Guest';
+    return item.channelType === 'SUPERVISOR_WORKER' ? 'Supervisor' : 'Host';
   }
 
-  function navigateToConversation(item: Conversation) {
-    const type = activeTab === 'guests' ? 'guest' : 'internal';
+  function getBadgeStyle(item: TaggedConversation) {
+    if (item._source === 'guest') return styles.guestBadge;
+    return styles.hostBadge;
+  }
+
+  function getBadgeTextStyle(item: TaggedConversation) {
+    if (item._source === 'guest') return styles.guestBadgeText;
+    return styles.hostBadgeText;
+  }
+
+  function navigateToConversation(item: TaggedConversation) {
+    const type = item._source === 'guest' ? 'guest' : 'internal';
     router.push(`/conversation/${item.id}?type=${type}`);
   }
 
@@ -130,25 +152,9 @@ export default function MessagesScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <Text style={styles.header}>Messages</Text>
 
-      {/* Tab Switcher */}
-      <View style={styles.tabBar}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'guests' && styles.tabActive]}
-          onPress={() => setActiveTab('guests')}
-        >
-          <Text style={[styles.tabText, activeTab === 'guests' && styles.tabTextActive]}>Guests</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'team' && styles.tabActive]}
-          onPress={() => setActiveTab('team')}
-        >
-          <Text style={[styles.tabText, activeTab === 'team' && styles.tabTextActive]}>Team</Text>
-        </TouchableOpacity>
-      </View>
-
       <FlatList
-        data={conversations}
-        keyExtractor={(item) => item.id}
+        data={allConversations}
+        keyExtractor={(item) => `${item._source}-${item.id}`}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#3b82f6" />}
         contentContainerStyle={styles.list}
         renderItem={({ item }) => (
@@ -159,8 +165,8 @@ export default function MessagesScreen() {
             <View style={styles.cardHeader}>
               <View style={styles.nameRow}>
                 <Text style={styles.contactName}>{getDisplayName(item)}</Text>
-                <View style={styles.typeBadge}>
-                  <Text style={styles.typeBadgeText}>{getBadgeLabel(item)}</Text>
+                <View style={getBadgeStyle(item)}>
+                  <Text style={getBadgeTextStyle(item)}>{getBadgeLabel(item)}</Text>
                 </View>
                 {item.unreadByWorker > 0 && (
                   <View style={styles.unreadBadge}>
@@ -180,11 +186,9 @@ export default function MessagesScreen() {
           !loading ? (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyEmoji}>💬</Text>
-              <Text style={styles.emptyTitle}>No {activeTab === 'guests' ? 'guest' : 'team'} messages yet</Text>
+              <Text style={styles.emptyTitle}>No messages yet</Text>
               <Text style={styles.emptySubtitle}>
-                {activeTab === 'guests'
-                  ? 'Guest conversations will appear here'
-                  : 'Messages from your host will appear here'}
+                Guest and team conversations will appear here
               </Text>
             </View>
           ) : null
@@ -261,19 +265,18 @@ export default function MessagesScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0f172a' },
   header: { fontSize: 24, fontWeight: '700', color: '#f8fafc', paddingHorizontal: 16, paddingTop: 8, paddingBottom: 12 },
-  tabBar: { flexDirection: 'row', marginHorizontal: 16, marginBottom: 12, backgroundColor: '#1e293b', borderRadius: 10, padding: 3 },
-  tab: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 8 },
-  tabActive: { backgroundColor: '#3b82f6' },
-  tabText: { fontSize: 14, fontWeight: '600', color: '#94a3b8' },
-  tabTextActive: { color: '#fff' },
   list: { paddingHorizontal: 16, paddingBottom: 100 },
   card: { backgroundColor: '#1e293b', borderRadius: 12, padding: 16, marginBottom: 8, borderWidth: 1, borderColor: '#334155' },
   unreadCard: { borderColor: '#3b82f6', borderWidth: 1.5 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
   contactName: { fontSize: 15, fontWeight: '600', color: '#f8fafc' },
-  typeBadge: { backgroundColor: '#334155', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2 },
-  typeBadgeText: { fontSize: 10, color: '#94a3b8', fontWeight: '600' },
+  // Guest badge — green
+  guestBadge: { backgroundColor: 'rgba(16, 185, 129, 0.15)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2 },
+  guestBadgeText: { fontSize: 10, color: '#10b981', fontWeight: '600' },
+  // Host badge — blue
+  hostBadge: { backgroundColor: 'rgba(59, 130, 246, 0.15)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2 },
+  hostBadgeText: { fontSize: 10, color: '#3b82f6', fontWeight: '600' },
   unreadBadge: { backgroundColor: '#3b82f6', borderRadius: 10, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 },
   unreadText: { color: '#fff', fontSize: 11, fontWeight: '700' },
   time: { fontSize: 12, color: '#64748b' },

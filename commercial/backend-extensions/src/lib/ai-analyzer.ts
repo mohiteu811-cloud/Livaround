@@ -281,7 +281,9 @@ ${bookingContext ? `\n${bookingContext}` : ''}`;
       io.of('/host').to(`conv:${conversation.id}`).emit('ai_suggestion', suggestion);
       io.of('/worker').to(`conv:${conversation.id}`).emit('ai_suggestion', suggestion);
     }
-  } catch {}
+  } catch (err) {
+    console.error('Failed to emit AI suggestion via socket:', err);
+  }
 
   // Send push notification for HIGH/CRITICAL urgency
   if (['HIGH', 'CRITICAL'].includes(analysis.urgency)) {
@@ -301,6 +303,8 @@ ${bookingContext ? `\n${bookingContext}` : ''}`;
           channelId: 'messages',
         });
       }
-    } catch {}
+    } catch (err) {
+      console.error('Failed to send AI push notification:', err);
+    }
   }
 }

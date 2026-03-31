@@ -26,6 +26,7 @@ interface AiSuggestion {
 
 interface MessageWithAi extends Message {
   aiSuggestion?: AiSuggestion;
+  visibility?: string;
 }
 
 export default function ConversationScreen() {
@@ -41,6 +42,7 @@ export default function ConversationScreen() {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
+  const [visibility, setVisibility] = useState<'ALL' | 'TEAM_ONLY'>('ALL');
   const recordingRef = useRef<Audio.Recording | null>(null);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const voiceSoundRef = useRef<Audio.Sound | null>(null);
@@ -124,8 +126,8 @@ export default function ConversationScreen() {
         setMediaPreview(null);
       }
       const msg = isInternal
-        ? await api.internalConversations.sendMessage(id, text, imageUrl)
-        : await api.conversations.sendMessage(id, text, imageUrl);
+        ? await api.internalConversations.sendMessage(id, text, imageUrl, undefined, undefined, visibility)
+        : await api.conversations.sendMessage(id, text, imageUrl, undefined, undefined, visibility);
       setMessages((prev) => {
         if (prev.some((m) => m.id === msg.id)) return prev;
         return [...prev, msg];
@@ -190,8 +192,8 @@ export default function ConversationScreen() {
       setSending(true);
       const uploaded = await api.upload.file(uri, 'audio/mp4');
       const msg = isInternal
-        ? await api.internalConversations.sendMessage(id, '', undefined, uploaded.url, duration)
-        : await api.conversations.sendMessage(id, '', undefined, uploaded.url, duration);
+        ? await api.internalConversations.sendMessage(id, '', undefined, uploaded.url, duration, visibility)
+        : await api.conversations.sendMessage(id, '', undefined, uploaded.url, duration, visibility);
       setMessages((prev) => {
         if (prev.some((m) => m.id === msg.id)) return prev;
         return [...prev, msg];
@@ -277,11 +279,18 @@ export default function ConversationScreen() {
       );
     }
 
+    const isTeamOnly = item.visibility === 'TEAM_ONLY';
+
     return (
       <View>
-        <View style={[styles.messageBubble, isHost ? styles.hostBubble : styles.otherBubble]}>
+        <View style={[styles.messageBubble, isHost ? styles.hostBubble : styles.otherBubble, isTeamOnly && styles.teamOnlyBubble]}>
           <View style={styles.senderRow}>
             <Text style={styles.senderName}>{item.senderName}</Text>
+            {isTeamOnly && (
+              <View style={styles.teamOnlyBadge}>
+                <Text style={styles.teamOnlyBadgeText}>Team only</Text>
+              </View>
+            )}
             {!isInternal && item.senderType === 'WORKER' && (
               <View style={styles.workerBadge}>
                 <Text style={styles.workerBadgeText}>Worker</Text>
@@ -443,7 +452,19 @@ export default function ConversationScreen() {
           </View>
         )}
 
-        <View style={styles.inputBar}>
+        {/* Visibility toggle — only for GUEST_HOST conversations */}
+        {!isInternal && (
+          <TouchableOpacity
+            style={[styles.visibilityToggle, visibility === 'TEAM_ONLY' && styles.visibilityToggleActive]}
+            onPress={() => setVisibility((v) => v === 'ALL' ? 'TEAM_ONLY' : 'ALL')}
+          >
+            <Text style={styles.visibilityToggleText}>
+              {visibility === 'TEAM_ONLY' ? '🔒 Team only — guest won\'t see this' : '🌐 Everyone'}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        <View style={[styles.inputBar, visibility === 'TEAM_ONLY' && styles.inputBarTeamOnly]}>
           <TouchableOpacity onPress={takePhoto} style={styles.mediaButton}>
             <Text style={styles.mediaButtonText}>📷</Text>
           </TouchableOpacity>
@@ -451,11 +472,11 @@ export default function ConversationScreen() {
             <Text style={styles.mediaButtonText}>🖼</Text>
           </TouchableOpacity>
           <TextInput
-            style={styles.textInput}
+            style={[styles.textInput, visibility === 'TEAM_ONLY' && styles.textInputTeamOnly]}
             value={input}
             onChangeText={setInput}
-            placeholder="Type a message..."
-            placeholderTextColor="#64748b"
+            placeholder={visibility === 'TEAM_ONLY' ? 'Internal note...' : 'Type a message...'}
+            placeholderTextColor={visibility === 'TEAM_ONLY' ? '#92400e' : '#64748b'}
             multiline
             maxLength={2000}
           />
@@ -467,7 +488,11 @@ export default function ConversationScreen() {
             <Text style={styles.micButtonText}>🎙</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.sendButton, (!input.trim() && !mediaPreview || sending) && styles.sendDisabled]}
+            style={[
+              styles.sendButton,
+              visibility === 'TEAM_ONLY' && styles.sendButtonTeamOnly,
+              (!input.trim() && !mediaPreview || sending) && styles.sendDisabled,
+            ]}
             onPress={handleSend}
             disabled={(!input.trim() && !mediaPreview) || sending}
           >
@@ -527,6 +552,16 @@ const styles = StyleSheet.create({
   aiDismissBtn: { backgroundColor: '#334155', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
   aiDismissBtnText: { color: '#94a3b8', fontSize: 12, fontWeight: '600' },
   aiApprovedText: { fontSize: 11, color: '#22c55e', fontWeight: '600' },
+  // Team-only (internal notes) styles
+  teamOnlyBubble: { borderWidth: 1, borderColor: '#d97706', backgroundColor: 'rgba(217, 119, 6, 0.1)' },
+  teamOnlyBadge: { backgroundColor: '#d97706', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1 },
+  teamOnlyBadgeText: { color: '#fff', fontSize: 9, fontWeight: '700' },
+  visibilityToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 6, backgroundColor: '#1e293b' },
+  visibilityToggleActive: { backgroundColor: 'rgba(217, 119, 6, 0.15)' },
+  visibilityToggleText: { fontSize: 12, color: '#94a3b8', fontWeight: '600' },
+  inputBarTeamOnly: { borderTopColor: '#d97706' },
+  textInputTeamOnly: { borderColor: '#d97706' },
+  sendButtonTeamOnly: { backgroundColor: '#d97706' },
   // Sender row & Worker badge
   senderRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 },
   workerBadge: { backgroundColor: '#f59e0b', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1 },

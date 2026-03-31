@@ -101,14 +101,8 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
         include: {
           booking: {
             select: {
-              id: true,
-              guestName: true,
-              guestEmail: true,
-              guestPhone: true,
-              checkIn: true,
-              checkOut: true,
-              status: true,
-              propertyId: true,
+              id: true, guestName: true, guestEmail: true, guestPhone: true,
+              checkIn: true, checkOut: true, status: true, propertyId: true,
               property: { select: { id: true, name: true } },
             },
           },
@@ -257,9 +251,10 @@ router.post('/:id/messages', async (req: AuthRequest, res: Response) => {
 
     if (!conversation) return res.status(404).json({ error: 'Conversation not found' });
 
-    const { content, imageUrl, voiceUrl, voiceDuration } = req.body;
+    const { content, imageUrl, voiceUrl, voiceDuration, visibility: rawVisibility } = req.body;
     if (!content && !imageUrl && !voiceUrl) return res.status(400).json({ error: 'content, imageUrl, or voiceUrl required' });
 
+    const visibility = rawVisibility === 'TEAM_ONLY' ? 'TEAM_ONLY' : 'ALL';
     const isWorker = senderType === 'WORKER';
     const message = await prisma.message.create({
       data: {
@@ -270,15 +265,22 @@ router.post('/:id/messages', async (req: AuthRequest, res: Response) => {
         imageUrl: imageUrl || null,
         voiceUrl: voiceUrl || null,
         voiceDuration: voiceDuration || null,
+        visibility,
         readByHost: !isWorker,
         readByGuest: false,
       },
     });
 
-    // For worker messages, increment both unreadByHost and unreadByGuest
-    const unreadUpdates = isWorker
-      ? { unreadByHost: { increment: 1 }, unreadByGuest: { increment: 1 } }
-      : { unreadByGuest: { increment: 1 } };
+    // Build unread updates — TEAM_ONLY messages don't increment guest unread
+    const unreadUpdates: Record<string, any> = {};
+    if (isWorker) {
+      unreadUpdates.unreadByHost = { increment: 1 };
+      if (visibility === 'ALL') unreadUpdates.unreadByGuest = { increment: 1 };
+    } else {
+      if (visibility === 'ALL') unreadUpdates.unreadByGuest = { increment: 1 };
+      // Host messages in GUEST_HOST also notify workers
+      unreadUpdates.unreadByWorker = { increment: 1 };
+    }
 
     await prisma.conversation.update({
       where: { id: conversation.id },
@@ -293,10 +295,12 @@ router.post('/:id/messages', async (req: AuthRequest, res: Response) => {
     const io = req.app.locals.io;
     if (io) {
       io.of('/host').to(`conv:${conversation.id}`).emit('new_message', message);
-      io.of('/guest').to(`conv:${conversation.id}`).emit('new_message', message);
-      if (isWorker) {
-        io.of('/worker').to(`conv:${conversation.id}`).emit('new_message', message);
+      // Only emit to guest if message is visible to all
+      if (visibility === 'ALL') {
+        io.of('/guest').to(`conv:${conversation.id}`).emit('new_message', message);
       }
+      // Workers always see messages in GUEST_HOST conversations
+      io.of('/worker').to(`conv:${conversation.id}`).emit('new_message', message);
     }
 
     // Trigger voice translation if voice message (non-blocking)

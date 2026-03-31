@@ -41,9 +41,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     }
 
     if (role === 'WORKER' || workerRecord) {
-      const worker = workerRecord
-        ? await prisma.worker.findUnique({ where: { userId: req.user!.id } })
-        : await prisma.worker.findUnique({ where: { userId: req.user!.id } });
+      const worker = await prisma.worker.findUnique({ where: { userId: req.user!.id } });
       if (!worker) return res.status(403).json({ error: 'Worker not found' });
 
       const conversations = await prisma.conversation.findMany({
@@ -297,9 +295,10 @@ router.post('/:id/messages', async (req: AuthRequest, res: Response) => {
     const conversation = await getAuthorizedConversation(req);
     if (!conversation) return res.status(404).json({ error: 'Conversation not found' });
 
-    const { content, imageUrl, voiceUrl, voiceDuration } = req.body;
+    const { content, imageUrl, voiceUrl, voiceDuration, visibility: rawVisibility } = req.body;
     if (!content && !imageUrl && !voiceUrl) return res.status(400).json({ error: 'content, imageUrl, or voiceUrl required' });
 
+    const visibility = rawVisibility === 'TEAM_ONLY' ? 'TEAM_ONLY' : 'ALL';
     const role = req.user!.role;
     const workerRec = await prisma.worker.findUnique({
       where: { userId: req.user!.id },
@@ -317,7 +316,6 @@ router.post('/:id/messages', async (req: AuthRequest, res: Response) => {
       // Worker — determine if they're supervisor in this context
       const worker = workerRec;
       if (conversation.channelType === 'SUPERVISOR_WORKER' && actingAsWorker) {
-        // Check if sender is the supervisor (not the worker) in this conversation
         const isSupervisor = await prisma.propertyStaff.findFirst({
           where: { workerId: worker!.id, role: 'SUPERVISOR' },
         });
@@ -338,6 +336,7 @@ router.post('/:id/messages', async (req: AuthRequest, res: Response) => {
         imageUrl: imageUrl || null,
         voiceUrl: voiceUrl || null,
         voiceDuration: voiceDuration || null,
+        visibility,
         readByHost: isHost,
         readByWorker: !isHost,
       },
