@@ -16,7 +16,10 @@ router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const role = req.user!.role;
 
-    if (role === 'HOST') {
+    // Check if user has a worker record (handles users whose JWT role may not be WORKER)
+    const workerRecord = await prisma.worker.findUnique({ where: { userId: req.user!.id }, select: { id: true } });
+
+    if (role === 'HOST' && !workerRecord) {
       const host = await prisma.host.findUnique({ where: { userId: req.user!.id } });
       if (!host) return res.status(403).json({ error: 'Host not found' });
 
@@ -37,8 +40,10 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       return res.json(conversations);
     }
 
-    if (role === 'WORKER') {
-      const worker = await prisma.worker.findUnique({ where: { userId: req.user!.id } });
+    if (role === 'WORKER' || workerRecord) {
+      const worker = workerRecord
+        ? await prisma.worker.findUnique({ where: { userId: req.user!.id } })
+        : await prisma.worker.findUnique({ where: { userId: req.user!.id } });
       if (!worker) return res.status(403).json({ error: 'Worker not found' });
 
       const conversations = await prisma.conversation.findMany({
@@ -76,8 +81,11 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 
     const role = req.user!.role;
 
-    // workerId is required unless a WORKER is creating a HOST_WORKER conversation (they use their own id)
-    if (!workerId && !(type === 'HOST_WORKER' && role === 'WORKER')) {
+    // If no workerId, check if user has a worker record (handles workers whose JWT role may differ)
+    const isWorkerUser = role === 'WORKER' || (!workerId && await prisma.worker.findUnique({ where: { userId: req.user!.id }, select: { id: true } }));
+
+    // workerId is required unless a worker is creating a HOST_WORKER conversation (they use their own id)
+    if (!workerId && !(type === 'HOST_WORKER' && isWorkerUser)) {
       return res.status(400).json({ error: 'workerId is required' });
     }
 
@@ -177,7 +185,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
     }
 
     // Worker initiating a conversation with their host
-    if (type === 'HOST_WORKER' && role === 'WORKER') {
+    if (type === 'HOST_WORKER' && isWorkerUser) {
       const worker = await prisma.worker.findUnique({
         where: { userId: req.user!.id },
         include: { user: { select: { name: true } } },
@@ -293,20 +301,22 @@ router.post('/:id/messages', async (req: AuthRequest, res: Response) => {
     if (!content && !imageUrl && !voiceUrl) return res.status(400).json({ error: 'content, imageUrl, or voiceUrl required' });
 
     const role = req.user!.role;
+    const workerRec = await prisma.worker.findUnique({
+      where: { userId: req.user!.id },
+      include: { user: { select: { name: true } } },
+    });
+    const actingAsWorker = role === 'WORKER' || !!workerRec;
     let senderType: string;
     let senderName: string;
 
-    if (role === 'HOST') {
+    if (role === 'HOST' && !workerRec) {
       const host = await prisma.host.findUnique({ where: { userId: req.user!.id } });
       senderType = 'HOST';
       senderName = host?.name || 'Host';
     } else {
       // Worker — determine if they're supervisor in this context
-      const worker = await prisma.worker.findUnique({
-        where: { userId: req.user!.id },
-        include: { user: { select: { name: true } } },
-      });
-      if (conversation.channelType === 'SUPERVISOR_WORKER' && role === 'WORKER') {
+      const worker = workerRec;
+      if (conversation.channelType === 'SUPERVISOR_WORKER' && actingAsWorker) {
         // Check if sender is the supervisor (not the worker) in this conversation
         const isSupervisor = await prisma.propertyStaff.findFirst({
           where: { workerId: worker!.id, role: 'SUPERVISOR' },
@@ -416,7 +426,8 @@ router.patch('/:id/read', async (req: AuthRequest, res: Response) => {
     if (!conversation) return res.status(404).json({ error: 'Conversation not found' });
 
     const role = req.user!.role;
-    const isHost = role === 'HOST';
+    const hasWorkerRecord = await prisma.worker.findUnique({ where: { userId: req.user!.id }, select: { id: true } });
+    const isHost = role === 'HOST' && !hasWorkerRecord;
 
     await prisma.conversation.update({
       where: { id: conversation.id },
@@ -441,6 +452,30 @@ async function getAuthorizedConversation(req: AuthRequest) {
   const role = req.user!.role;
   const conversationId = req.params.id;
 
+  // Check if user has a worker record (handles users whose JWT role may differ)
+  const workerRecord = await prisma.worker.findUnique({ where: { userId: req.user!.id } });
+
+  // Try worker access first if user has a worker record
+  if (role === 'WORKER' || workerRecord) {
+    const worker = workerRecord;
+    if (worker) {
+      const conv = await prisma.conversation.findFirst({
+        where: {
+          id: conversationId,
+          workerId: worker.id,
+          channelType: { in: ['HOST_WORKER', 'SUPERVISOR_WORKER'] },
+        },
+        include: {
+          worker: { select: { id: true, user: { select: { name: true } } } },
+          property: { select: { id: true, name: true } },
+          host: { select: { id: true, name: true } },
+        },
+      });
+      if (conv) return conv;
+    }
+  }
+
+  // Try host access
   if (role === 'HOST') {
     const host = await prisma.host.findUnique({ where: { userId: req.user!.id } });
     if (!host) return null;
@@ -448,23 +483,6 @@ async function getAuthorizedConversation(req: AuthRequest) {
       where: {
         id: conversationId,
         hostId: host.id,
-        channelType: { in: ['HOST_WORKER', 'SUPERVISOR_WORKER'] },
-      },
-      include: {
-        worker: { select: { id: true, user: { select: { name: true } } } },
-        property: { select: { id: true, name: true } },
-        host: { select: { id: true, name: true } },
-      },
-    });
-  }
-
-  if (role === 'WORKER') {
-    const worker = await prisma.worker.findUnique({ where: { userId: req.user!.id } });
-    if (!worker) return null;
-    return prisma.conversation.findFirst({
-      where: {
-        id: conversationId,
-        workerId: worker.id,
         channelType: { in: ['HOST_WORKER', 'SUPERVISOR_WORKER'] },
       },
       include: {
