@@ -314,6 +314,8 @@ export default function ConversationPage() {
               }
 
               const isHost = msg.senderType === 'HOST';
+              const isWorker = msg.senderType === 'WORKER';
+              const isVideo = msg.imageUrl && /\.(mp4|mov|webm|avi)$/i.test(msg.imageUrl);
               return (
                 <div key={msg.id}>
                   <div className={`flex ${isHost ? 'justify-end' : 'justify-start'}`}>
@@ -324,10 +326,38 @@ export default function ConversationPage() {
                           : 'bg-slate-800 text-slate-100 rounded-bl-md'
                       }`}
                     >
-                      <p className="text-[11px] text-slate-300/70 font-medium mb-0.5">{msg.senderName}</p>
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <p className="text-[11px] text-slate-300/70 font-medium">{msg.senderName}</p>
+                        {isWorker && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 bg-amber-500/20 text-amber-400 rounded-full border border-amber-500/30">Worker</span>
+                        )}
+                        {isHost && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded-full border border-blue-500/30">Host</span>
+                        )}
+                      </div>
                       {msg.content && <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>}
                       {msg.imageUrl && (
-                        <img src={msg.imageUrl} alt="" className="mt-2 rounded-lg max-w-full max-h-48 object-cover" />
+                        isVideo ? (
+                          <video src={msg.imageUrl} controls playsInline className="mt-2 rounded-lg max-w-full max-h-48" />
+                        ) : (
+                          <img src={msg.imageUrl} alt="" className="mt-2 rounded-lg max-w-full max-h-48 object-cover" />
+                        )
+                      )}
+                      {msg.voiceUrl && (
+                        <div className="mt-2">
+                          <audio src={msg.voiceUrl} controls className="max-w-full h-8" style={{ minWidth: '180px' }} />
+                          {msg.voiceDuration && (
+                            <p className="text-[10px] text-slate-300/50 mt-0.5">
+                              {Math.floor(msg.voiceDuration / 60)}:{String(msg.voiceDuration % 60).padStart(2, '0')}
+                            </p>
+                          )}
+                          {msg.voiceTranslation && (
+                            <p className="text-sm mt-1 leading-relaxed text-slate-200">{msg.voiceTranslation}</p>
+                          )}
+                          {msg.voiceTranscript && (
+                            <p className="text-[11px] mt-0.5 italic text-slate-400">{msg.voiceTranscript}</p>
+                          )}
+                        </div>
                       )}
                       <p className="text-[10px] text-slate-300/50 mt-1 text-right">
                         {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -342,25 +372,75 @@ export default function ConversationPage() {
           <div ref={messagesEndRef} />
         </div>
 
+        {/* Media preview */}
+        {mediaPreview && (
+          <div className="flex items-center gap-3 pt-3 px-1">
+            {mediaPreview.type === 'video' ? (
+              <div className="w-16 h-16 bg-slate-800 rounded-lg flex items-center justify-center border border-slate-700">
+                <span className="text-xs text-slate-400">Video</span>
+              </div>
+            ) : (
+              <img src={mediaPreview.url} alt="" className="w-16 h-16 rounded-lg object-cover border border-slate-700" />
+            )}
+            {uploading && <div className="w-4 h-4 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />}
+            <button onClick={() => setMediaPreview(null)} className="p-1 text-slate-500 hover:text-slate-300">
+              <X size={16} />
+            </button>
+          </div>
+        )}
+
         {/* Input */}
         <div className="flex items-end gap-3 pt-3 border-t border-slate-800">
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSend();
-              }
-            }}
-            placeholder="Type a message..."
-            rows={1}
-            className="flex-1 px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 placeholder-slate-500 resize-none focus:outline-none focus:ring-2 focus:ring-brand-500"
-            style={{ maxHeight: '120px' }}
-          />
+          <input ref={fileInputRef} type="file" accept="image/*,video/*" onChange={handleFileSelect} className="hidden" />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="p-2.5 text-slate-500 hover:text-slate-300 transition-colors"
+            title="Attach image or video"
+          >
+            <Paperclip size={18} />
+          </button>
+
+          {isRecording ? (
+            <div className="flex-1 flex items-center gap-2 px-4 py-2.5 bg-red-500/10 border border-red-500/30 rounded-xl">
+              <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
+              <span className="text-sm text-red-400 font-medium">
+                Recording {Math.floor(recordingDuration / 60)}:{String(recordingDuration % 60).padStart(2, '0')}
+              </span>
+            </div>
+          ) : (
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
+              placeholder="Type a message..."
+              rows={1}
+              className="flex-1 px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-slate-100 placeholder-slate-500 resize-none focus:outline-none focus:ring-2 focus:ring-brand-500"
+              style={{ maxHeight: '120px' }}
+            />
+          )}
+
+          <button
+            onMouseDown={(e) => { e.preventDefault(); startRecording(); }}
+            onMouseUp={() => stopRecording()}
+            onTouchStart={(e) => { e.preventDefault(); startRecording(); }}
+            onTouchEnd={() => stopRecording()}
+            className={`p-2.5 rounded-xl transition-colors ${
+              isRecording
+                ? 'bg-red-500 text-white'
+                : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
+            }`}
+            title="Hold to record voice"
+          >
+            <Mic size={18} />
+          </button>
           <button
             onClick={handleSend}
-            disabled={!input.trim() || sending}
+            disabled={(!input.trim() && !mediaPreview) || sending}
             className="p-2.5 bg-brand-600 hover:bg-brand-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-colors"
           >
             <Send size={18} />
