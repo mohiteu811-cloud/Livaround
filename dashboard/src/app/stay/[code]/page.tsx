@@ -6,7 +6,7 @@ import {
   Wifi, Lock, MapPin, Phone, Home, BookOpen, HelpCircle, Key,
   ChevronDown, ChevronRight, Copy, Check, ExternalLink, Bed, Bath, Users,
   AlertTriangle, X, ConciergeBell, Sparkles, ChefHat, Car, ShoppingBag,
-  Shield, Upload, UserPlus, MessageSquare, Send, Camera, Image as ImageIcon, Play,
+  Shield, Upload, UserPlus, MessageSquare, Send, Camera, Image as ImageIcon, Play, Mic,
 } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://livaroundbackend-production.up.railway.app';
@@ -1247,10 +1247,15 @@ function useVoiceInput(onTranscript: (t: string) => void) {
 
 interface GuestMessage {
   id: string;
-  senderType: 'HOST' | 'GUEST' | 'SYSTEM';
+  senderType: 'HOST' | 'GUEST' | 'SYSTEM' | 'WORKER';
   senderName: string;
   content: string;
   imageUrl?: string;
+  voiceUrl?: string;
+  voiceDuration?: number;
+  voiceTranscript?: string;
+  voiceTranslation?: string;
+  voiceLanguage?: string;
   createdAt: string;
 }
 

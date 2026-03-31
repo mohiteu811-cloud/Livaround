@@ -282,11 +282,50 @@ export default function ConversationScreen() {
     return (
       <View>
         <View style={[styles.messageBubble, isHost ? styles.hostBubble : styles.otherBubble]}>
-          <Text style={styles.senderName}>{item.senderName}</Text>
-          {item.imageUrl && (
+          <View style={styles.senderRow}>
+            <Text style={styles.senderName}>{item.senderName}</Text>
+            {!isInternal && item.senderType === 'WORKER' && (
+              <View style={styles.workerBadge}>
+                <Text style={styles.workerBadgeText}>Worker</Text>
+              </View>
+            )}
+          </View>
+          {item.imageUrl && !isVideoUrl(item.imageUrl) && (
             <Image source={{ uri: item.imageUrl }} style={styles.messageImage} resizeMode="cover" />
           )}
-          {item.content ? (
+          {item.imageUrl && isVideoUrl(item.imageUrl) && (
+            <Video
+              source={{ uri: item.imageUrl }}
+              style={styles.messageVideo}
+              resizeMode={ResizeMode.CONTAIN}
+              useNativeControls
+              isLooping={false}
+            />
+          )}
+          {item.voiceUrl ? (
+            <View style={styles.voicePlayer}>
+              <TouchableOpacity onPress={() => playVoice(item.id, item.voiceUrl!)} style={styles.voicePlayBtn}>
+                <Text style={styles.voicePlayBtnText}>{playingVoiceId === item.id ? '⏸' : '▶'}</Text>
+              </TouchableOpacity>
+              <View style={styles.voiceInfo}>
+                <View style={styles.voiceWaveform} />
+                <Text style={styles.voiceDurationText}>
+                  {item.voiceDuration ? formatDuration(item.voiceDuration) : '0:00'}
+                </Text>
+              </View>
+            </View>
+          ) : null}
+          {item.voiceUrl && item.voiceTranslation ? (
+            <View style={styles.voiceTranscriptContainer}>
+              <Text style={styles.voiceTranslationText}>Translation: {item.voiceTranslation}</Text>
+              {item.voiceTranscript ? (
+                <Text style={styles.voiceTranscriptText}>{item.voiceTranscript}</Text>
+              ) : null}
+            </View>
+          ) : item.voiceUrl && item.voiceTranscript ? (
+            <Text style={styles.voiceTranscriptText}>{item.voiceTranscript}</Text>
+          ) : null}
+          {!item.voiceUrl && item.content ? (
             <Text style={[styles.messageText, isHost ? styles.hostText : styles.otherText]}>
               {item.content}
             </Text>
@@ -399,6 +438,13 @@ export default function ConversationScreen() {
           </View>
         )}
 
+        {isRecording && (
+          <View style={styles.recordingIndicator}>
+            <View style={styles.recordingDot} />
+            <Text style={styles.recordingText}>Recording... {formatDuration(recordingDuration)}</Text>
+          </View>
+        )}
+
         <View style={styles.inputBar}>
           <TouchableOpacity onPress={takePhoto} style={styles.mediaButton}>
             <Text style={styles.mediaButtonText}>📷</Text>
@@ -415,6 +461,13 @@ export default function ConversationScreen() {
             multiline
             maxLength={2000}
           />
+          <TouchableOpacity
+            style={[styles.micButton, isRecording && styles.micButtonActive]}
+            onPressIn={startRecording}
+            onPressOut={stopRecording}
+          >
+            <Text style={styles.micButtonText}>🎙</Text>
+          </TouchableOpacity>
           <TouchableOpacity
             style={[styles.sendButton, (!input.trim() && !mediaPreview || sending) && styles.sendDisabled]}
             onPress={handleSend}
