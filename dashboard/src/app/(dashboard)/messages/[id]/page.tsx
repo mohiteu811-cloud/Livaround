@@ -91,11 +91,7 @@ export default function ConversationPage() {
   }
 
   async function uploadFile(file: File): Promise<string> {
-    const formData = new FormData();
-    formData.append('file', file);
-    const res = await fetch('/api/upload', { method: 'POST', body: formData });
-    if (!res.ok) throw new Error('Upload failed');
-    const data = await res.json();
+    const data = await api.upload.file(file);
     return data.url;
   }
 
@@ -116,11 +112,8 @@ export default function ConversationPage() {
 
         try {
           setSending(true);
-          const formData = new FormData();
-          formData.append('file', blob, 'voice.webm');
-          const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
-          if (!uploadRes.ok) throw new Error('Upload failed');
-          const { url: voiceUrl } = await uploadRes.json();
+          const voiceFile = new File([blob], 'voice.webm', { type: blob.type });
+          const { url: voiceUrl } = await api.upload.file(voiceFile);
 
           const msg = await api.conversations.sendMessage(id, {
             content: '',
