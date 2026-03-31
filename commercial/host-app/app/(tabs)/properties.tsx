@@ -26,7 +26,7 @@ export default function PropertiesScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <Text style={styles.header}>Properties</Text>
       <FlatList
         data={properties}

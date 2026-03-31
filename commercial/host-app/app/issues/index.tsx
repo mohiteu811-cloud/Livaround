@@ -32,7 +32,7 @@ export default function IssuesScreen() {
   const SEVERITY_COLORS: Record<string, string> = { HIGH: '#ef4444', MEDIUM: '#f59e0b', LOW: '#3b82f6' };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.headerBar}>
         <TouchableOpacity onPress={() => router.back()}>
           <Text style={styles.backText}>‹ Back</Text>

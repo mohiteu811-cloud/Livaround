@@ -35,7 +35,7 @@ export default function JobsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <Text style={styles.header}>Jobs</Text>
       <FlatList
         data={jobs}
@@ -61,6 +61,14 @@ export default function JobsScreen() {
           !loading ? <Text style={styles.empty}>No jobs found</Text> : null
         }
       />
+
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => router.push('/job/create')}
+        activeOpacity={0.8}
+      >
+        <Text style={styles.fabText}>+</Text>
+      </TouchableOpacity>
     </SafeAreaView>
   );
 }
@@ -77,4 +85,21 @@ const styles = StyleSheet.create({
   propertyName: { fontSize: 13, color: '#3b82f6', marginBottom: 4 },
   meta: { fontSize: 12, color: '#94a3b8' },
   empty: { color: '#64748b', textAlign: 'center', marginTop: 40, fontSize: 14 },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#3b82f6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+  },
+  fabText: { color: '#fff', fontSize: 28, fontWeight: '600', marginTop: -2 },
 });

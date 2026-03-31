@@ -15,7 +15,7 @@ export default function PropertyDetailScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
         <ActivityIndicator color="#3b82f6" size="large" style={{ marginTop: 40 }} />
       </SafeAreaView>
     );
@@ -23,14 +23,14 @@ export default function PropertyDetailScreen() {
 
   if (!property) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
         <Text style={styles.errorText}>Property not found</Text>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.headerBar}>
         <TouchableOpacity onPress={() => router.back()}>
           <Text style={styles.backText}>‹ Back</Text>

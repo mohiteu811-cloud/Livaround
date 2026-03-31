@@ -37,7 +37,7 @@ export default function BookingsScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <Text style={styles.header}>Bookings</Text>
       <FlatList
         data={bookings}
@@ -60,6 +60,14 @@ export default function BookingsScreen() {
           !loading ? <Text style={styles.empty}>No bookings found</Text> : null
         }
       />
+
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => router.push('/booking/create')}
+        activeOpacity={0.8}
+      >
+        <Text style={styles.fabText}>+</Text>
+      </TouchableOpacity>
     </SafeAreaView>
   );
 }
@@ -76,4 +84,21 @@ const styles = StyleSheet.create({
   propertyName: { fontSize: 13, color: '#3b82f6', marginBottom: 4 },
   dates: { fontSize: 12, color: '#94a3b8' },
   empty: { color: '#64748b', textAlign: 'center', marginTop: 40, fontSize: 14 },
+  fab: {
+    position: 'absolute',
+    bottom: 24,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#3b82f6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  fabText: { color: '#fff', fontSize: 28, fontWeight: '600', marginTop: -2 },
 });

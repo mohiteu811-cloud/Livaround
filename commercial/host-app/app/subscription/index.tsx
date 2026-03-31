@@ -20,14 +20,14 @@ export default function SubscriptionScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
         <ActivityIndicator color="#3b82f6" size="large" style={{ marginTop: 40 }} />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.headerBar}>
         <TouchableOpacity onPress={() => router.back()}>
           <Text style={styles.backText}>‹ Back</Text>
