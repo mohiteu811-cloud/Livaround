@@ -127,8 +127,8 @@ async function processTranslation(
     if (!transcript) return;
 
     // 3. Determine target language
-    // Workers → translate to English for host/guest
-    // Host/Guest → translate to Hindi (most common worker language) as default
+    // Workers \u2192 translate to English for host/guest
+    // Host/Guest \u2192 translate to Hindi (most common worker language) as default
     const isWorkerSender = message.senderType === 'WORKER' || message.senderType === 'SUPERVISOR';
     const sourceLang = detectedLanguage.split('-')[0]; // e.g., 'hi' from 'hi-IN'
     const targetLang = isWorkerSender ? 'en' : 'hi';
