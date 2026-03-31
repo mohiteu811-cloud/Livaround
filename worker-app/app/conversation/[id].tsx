@@ -100,11 +100,11 @@ export default function ConversationScreen() {
       }
     };
 
-    const handleVoiceTranslated = (data: { messageId: string; voiceTranscript?: string; voiceTranslation?: string }) => {
+    const handleVoiceTranslated = (data: { messageId: string; voiceTranscript?: string; voiceTranslation?: string; voiceLanguage?: string }) => {
       setMessages((prev) =>
         prev.map((m) =>
           m.id === data.messageId
-            ? { ...m, voiceTranscript: data.voiceTranscript, voiceTranslation: data.voiceTranslation }
+            ? { ...m, voiceTranscript: data.voiceTranscript, voiceTranslation: data.voiceTranslation, voiceLanguage: data.voiceLanguage }
             : m
         )
       );
@@ -362,12 +362,16 @@ export default function ConversationScreen() {
           {item.voiceUrl ? (
             <>
               {renderVoicePlayer(item)}
-              {item.voiceTranscript && (
+              {item.voiceTranslation ? (
+                <>
+                  <Text style={styles.voiceTranslation}>Translation: {item.voiceTranslation}</Text>
+                  {item.voiceTranscript && (
+                    <Text style={styles.voiceTranscriptSmall}>{item.voiceTranscript}</Text>
+                  )}
+                </>
+              ) : item.voiceTranscript ? (
                 <Text style={styles.voiceTranscript}>{item.voiceTranscript}</Text>
-              )}
-              {item.voiceTranslation && (
-                <Text style={styles.voiceTranslation}>{item.voiceTranslation}</Text>
-              )}
+              ) : null}
             </>
           ) : null}
           {item.imageUrl && (
@@ -559,7 +563,8 @@ const styles = StyleSheet.create({
   voiceBar: { width: 3, backgroundColor: '#94a3b8', borderRadius: 1.5 },
   voiceDuration: { fontSize: 11, color: '#94a3b8' },
   voiceTranscript: { fontSize: 13, color: '#cbd5e1', marginTop: 4, fontStyle: 'italic' },
-  voiceTranslation: { fontSize: 13, color: '#3b82f6', marginTop: 2 },
+  voiceTranscriptSmall: { fontSize: 11, color: '#94a3b8', marginTop: 2, fontStyle: 'italic' },
+  voiceTranslation: { fontSize: 14, color: '#3b82f6', marginTop: 4, fontWeight: '600' },
   recordingIndicator: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 8, backgroundColor: '#1e293b' },
   recordingDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#ef4444' },
   recordingText: { fontSize: 14, color: '#ef4444', fontWeight: '600' },

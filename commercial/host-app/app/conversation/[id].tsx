@@ -155,6 +155,92 @@ export default function ConversationScreen() {
     }
   }
 
+  async function startRecording() {
+    try {
+      const permission = await Audio.requestPermissionsAsync();
+      if (!permission.granted) return;
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+      const recording = new Audio.Recording();
+      await recording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+      await recording.startAsync();
+      recordingRef.current = recording;
+      setIsRecording(true);
+      setRecordingDuration(0);
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingDuration((d) => d + 1);
+      }, 1000);
+    } catch {}
+  }
+
+  async function stopRecording() {
+    if (!recordingRef.current) return;
+    setIsRecording(false);
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    try {
+      await recordingRef.current.stopAndUnloadAsync();
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
+      const uri = recordingRef.current.getURI();
+      recordingRef.current = null;
+      if (!uri) return;
+      const status = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+      // Use the duration we tracked
+      const duration = recordingDuration;
+
+      setSending(true);
+      const uploaded = await api.upload.file(uri, 'audio/m4a');
+      const msg = isInternal
+        ? await api.internalConversations.sendMessage(id, '', undefined, uploaded.url, duration)
+        : await api.conversations.sendMessage(id, '', undefined, uploaded.url, duration);
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === msg.id)) return prev;
+        return [...prev, msg];
+      });
+      setSending(false);
+    } catch {
+      recordingRef.current = null;
+      setSending(false);
+    }
+  }
+
+  async function playVoice(messageId: string, voiceUrl: string) {
+    try {
+      if (voiceSoundRef.current) {
+        await voiceSoundRef.current.unloadAsync();
+        voiceSoundRef.current = null;
+      }
+      if (playingVoiceId === messageId) {
+        setPlayingVoiceId(null);
+        return;
+      }
+      const { sound } = await Audio.Sound.createAsync({ uri: voiceUrl });
+      voiceSoundRef.current = sound;
+      setPlayingVoiceId(messageId);
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded && status.didJustFinish) {
+          setPlayingVoiceId(null);
+          sound.unloadAsync();
+          voiceSoundRef.current = null;
+        }
+      });
+      await sound.playAsync();
+    } catch {
+      setPlayingVoiceId(null);
+    }
+  }
+
+  function isVideoUrl(url: string): boolean {
+    return /\.(mp4|mov|webm|avi)(\?.*)?$/i.test(url);
+  }
+
+  function formatDuration(seconds: number): string {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  }
+
   async function approveSuggestion(suggestion: AiSuggestion) {
     try {
       await api.aiSuggestions.approve(suggestion.id);
