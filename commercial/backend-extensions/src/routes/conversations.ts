@@ -17,7 +17,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     if (!host) return res.status(403).json({ error: 'Host not found' });
 
     const conversations = await prisma.conversation.findMany({
-      where: { hostId: host.id },
+      where: { hostId: host.id, channelType: 'GUEST_HOST' },
       orderBy: { lastMessageAt: { sort: 'desc', nulls: 'last' } },
       include: {
         booking: {

@@ -348,7 +348,7 @@ router.post('/:id/messages', async (req: AuthRequest, res: Response) => {
       where: { id: conversation.id },
       data: {
         lastMessageAt: message.createdAt,
-        lastMessagePreview: (content || 'Image').slice(0, 100),
+        lastMessagePreview: (content || (voiceUrl ? 'Voice message' : 'Image')).slice(0, 100),
         ...(isHost
           ? { unreadByWorker: { increment: 1 } }
           : { unreadByHost: { increment: 1 } }),
@@ -372,7 +372,7 @@ router.post('/:id/messages', async (req: AuthRequest, res: Response) => {
         const { sendPushNotification } = require('../../../../backend/src/lib/pushNotifications');
         await sendPushNotification(worker.pushToken, {
           title: `Message from ${senderName}`,
-          body: (content || 'Sent an image').slice(0, 100),
+          body: (content || (voiceUrl ? 'Voice message' : 'Sent an image')).slice(0, 100),
           data: { conversationId: conversation.id, type: 'internal_message' },
           sound: 'default',
           priority: 'high',
@@ -384,11 +384,12 @@ router.post('/:id/messages', async (req: AuthRequest, res: Response) => {
         where: { id: conversation.hostId },
         select: { pushToken: true },
       });
+      console.log('Push to host:', { hostId: conversation.hostId, hasPushToken: !!host?.pushToken });
       if (host?.pushToken) {
         const { sendPushNotification } = require('../../../../backend/src/lib/pushNotifications');
         await sendPushNotification(host.pushToken, {
           title: `Message from ${senderName}`,
-          body: (content || 'Sent an image').slice(0, 100),
+          body: (content || (voiceUrl ? 'Voice message' : 'Sent an image')).slice(0, 100),
           data: { conversationId: conversation.id, type: 'internal_message' },
           sound: 'default',
           priority: 'high',

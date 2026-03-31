@@ -1,5 +1,6 @@
 import { prisma } from '../../../../backend/src/lib/prisma';
 import { Server } from 'socket.io';
+import { analyzeMessageAsync } from './ai-analyzer';
 
 // Google Cloud clients - lazy initialized
 let speechClient: any = null;
@@ -171,6 +172,21 @@ async function processTranslation(
     io.of('/host').to(room).emit('voice_translated', translationData);
     io.of('/guest').to(room).emit('voice_translated', translationData);
     io.of('/worker').to(room).emit('voice_translated', translationData);
+
+    // 6. Trigger AI analysis on the transcript (now that we have text to analyze)
+    const analyzableText = translation || transcript;
+    if (analyzableText) {
+      const conversation = await prisma.conversation.findUnique({
+        where: { id: message.conversationId },
+        select: { id: true, channelType: true, hostId: true, propertyId: true, bookingId: true },
+      });
+      if (conversation) {
+        analyzeMessageAsync(
+          { id: message.id, conversationId: message.conversationId, content: analyzableText, senderType: message.senderType },
+          conversation as any
+        ).catch((err) => console.error('AI analysis after voice translation failed:', err));
+      }
+    }
 
   } catch (err: any) {
     console.error('Voice translation error:', err.message);
