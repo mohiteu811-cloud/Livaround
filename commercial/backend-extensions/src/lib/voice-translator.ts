@@ -78,16 +78,42 @@ async function processTranslation(
     const audioContent = audioBuffer.toString('base64');
 
     // 2. Speech-to-Text with auto language detection
-    const [sttResponse] = await speech.recognize({
-      audio: { content: audioContent },
-      config: {
-        encoding: 'WEBM_OPUS', // Most common from MediaRecorder/expo-av
-        languageCode: 'en-US',
-        alternativeLanguageCodes: ['hi-IN', 'mr-IN', 'kn-IN', 'ta-IN', 'te-IN', 'bn-IN', 'gu-IN', 'pa-IN', 'ml-IN', 'ur-IN'],
-        enableAutomaticPunctuation: true,
-        model: 'latest_long',
-      },
-    });
+    // Determine encoding from the file URL extension
+    const urlLower = message.voiceUrl.toLowerCase();
+    const isWebm = urlLower.includes('.webm');
+    const isOgg = urlLower.includes('.ogg');
+    // expo-av on mobile records AAC/M4A; web MediaRecorder uses WEBM_OPUS
+    const encoding = isWebm ? 'WEBM_OPUS' : isOgg ? 'OGG_OPUS' : 'AMR_WB';
+
+    // For AAC/M4A files, use longRunningRecognize with auto-detect encoding
+    const useAutoDetect = !isWebm && !isOgg;
+
+    const recognizeConfig: any = {
+      languageCode: 'en-US',
+      alternativeLanguageCodes: ['hi-IN', 'mr-IN', 'kn-IN', 'ta-IN', 'te-IN', 'bn-IN', 'gu-IN', 'pa-IN', 'ml-IN', 'ur-IN'],
+      enableAutomaticPunctuation: true,
+      model: 'latest_long',
+    };
+
+    if (!useAutoDetect) {
+      recognizeConfig.encoding = encoding;
+    }
+
+    // Try direct recognition first; if it fails (wrong encoding), retry with URI-based recognition
+    let sttResponse: any;
+    try {
+      [sttResponse] = await speech.recognize({
+        audio: { content: audioContent },
+        config: recognizeConfig,
+      });
+    } catch (recognizeError: any) {
+      // Fallback: use the audio URI directly (Google can auto-detect format from URL)
+      console.warn('Direct recognition failed, trying URI-based:', recognizeError.message);
+      [sttResponse] = await speech.recognize({
+        audio: { uri: message.voiceUrl },
+        config: recognizeConfig,
+      });
+    }
 
     if (!sttResponse.results?.length) {
       console.warn('No transcription results for message', message.id);
