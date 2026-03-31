@@ -426,7 +426,7 @@ export const api = {
         `/api/conversations/${id}${qs}`
       );
     },
-    sendMessage: (id: string, data: { content: string; imageUrl?: string }) =>
+    sendMessage: (id: string, data: { content: string; imageUrl?: string; voiceUrl?: string; voiceDuration?: number }) =>
       request<MessageItem>(`/api/conversations/${id}/messages`, { method: 'POST', body: JSON.stringify(data) }),
     markRead: (id: string) =>
       request<{ ok: boolean }>(`/api/conversations/${id}/read`, { method: 'PATCH' }),
@@ -1203,10 +1203,15 @@ export interface ConversationDetail extends ConversationListItem {
 export interface MessageItem {
   id: string;
   conversationId: string;
-  senderType: 'HOST' | 'GUEST' | 'SYSTEM';
+  senderType: 'HOST' | 'GUEST' | 'SYSTEM' | 'WORKER';
   senderName: string;
   content: string;
   imageUrl: string | null;
+  voiceUrl?: string | null;
+  voiceDuration?: number | null;
+  voiceTranscript?: string | null;
+  voiceTranslation?: string | null;
+  voiceLanguage?: string | null;
   isSystemMessage: boolean;
   readByHost: boolean;
   readByGuest: boolean;

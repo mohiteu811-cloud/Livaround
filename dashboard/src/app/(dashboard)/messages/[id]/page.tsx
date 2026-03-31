@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { api, ConversationDetail, MessageItem } from '@/lib/api';
 import { FeatureGate } from '@/components/FeatureGate';
-import { ArrowLeft, Send, Sparkles, Check, X } from 'lucide-react';
+import { ArrowLeft, Send, Sparkles, Check, X, Mic, Paperclip } from 'lucide-react';
 
 interface AiSuggestion {
   id: string;
@@ -40,6 +40,13 @@ export default function ConversationPage() {
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const [mediaPreview, setMediaPreview] = useState<{ file: File; url: string; type: string } | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -75,17 +82,103 @@ export default function ConversationPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    setMediaPreview({ file, url, type: file.type.startsWith('video') ? 'video' : 'image' });
+    e.target.value = '';
+  }
+
+  async function uploadFile(file: File): Promise<string> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await fetch('/api/upload', { method: 'POST', body: formData });
+    if (!res.ok) throw new Error('Upload failed');
+    const data = await res.json();
+    return data.url;
+  }
+
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4',
+      });
+      const chunks: BlobPart[] = [];
+      mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
+      mediaRecorder.onstop = async () => {
+        const blob = new Blob(chunks, { type: mediaRecorder.mimeType });
+        stream.getTracks().forEach((t) => t.stop());
+        const duration = recordingDuration;
+        setRecordingDuration(0);
+        if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+
+        try {
+          setSending(true);
+          const formData = new FormData();
+          formData.append('file', blob, 'voice.webm');
+          const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
+          if (!uploadRes.ok) throw new Error('Upload failed');
+          const { url: voiceUrl } = await uploadRes.json();
+
+          const msg = await api.conversations.sendMessage(id, {
+            content: '',
+            voiceUrl,
+            voiceDuration: duration,
+          });
+          setMessages((prev) => [...prev, msg]);
+        } catch {
+          // Voice send failed silently
+        }
+        setSending(false);
+      };
+      mediaRecorderRef.current = mediaRecorder;
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingDuration(0);
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingDuration((d) => d + 1);
+      }, 1000);
+    } catch {
+      // Microphone access denied
+    }
+  }
+
+  function stopRecording() {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecording(false);
+    if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+  }
+
   async function handleSend() {
     const text = input.trim();
-    if (!text || sending) return;
+    if (!text && !mediaPreview) return;
+    if (sending || uploading) return;
 
     setSending(true);
     setInput('');
+    const currentMedia = mediaPreview;
+    setMediaPreview(null);
+
     try {
-      const msg = await api.conversations.sendMessage(id, { content: text });
+      let imageUrl: string | undefined;
+      if (currentMedia) {
+        setUploading(true);
+        imageUrl = await uploadFile(currentMedia.file);
+        setUploading(false);
+      }
+      const msg = await api.conversations.sendMessage(id, {
+        content: text || '',
+        imageUrl,
+      });
       setMessages((prev) => [...prev, msg]);
     } catch {
       setInput(text);
+      setMediaPreview(currentMedia);
+      setUploading(false);
     }
     setSending(false);
   }

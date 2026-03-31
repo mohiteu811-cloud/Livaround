@@ -1471,6 +1471,7 @@ function MessagesTab({ data, guestCode }: { data: StayData; guestCode: string })
               );
             }
             const isGuest = msg.senderType === 'GUEST';
+            const isWorker = msg.senderType === 'WORKER';
             return (
               <div key={msg.id} className={`flex ${isGuest ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[80%] rounded-2xl px-3.5 py-2.5 ${
@@ -1478,22 +1479,47 @@ function MessagesTab({ data, guestCode }: { data: StayData; guestCode: string })
                     ? 'bg-indigo-600 text-white rounded-br-md'
                     : 'bg-slate-100 text-slate-800 rounded-bl-md'
                 }`}>
-                  <p className={`text-[11px] font-medium mb-0.5 ${isGuest ? 'text-indigo-200' : 'text-slate-500'}`}>
-                    {msg.senderName}
-                  </p>
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <p className={`text-[11px] font-medium ${isGuest ? 'text-indigo-200' : 'text-slate-500'}`}>
+                      {msg.senderName}
+                    </p>
+                    {isWorker && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded-full">Worker</span>
+                    )}
+                    {msg.senderType === 'HOST' && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded-full">Host</span>
+                    )}
+                  </div>
                   {msg.imageUrl && (
-                    msg.imageUrl.match(/\.(mp4|mov|webm)$/i) ? (
-                      <a href={msg.imageUrl} target="_blank" rel="noopener noreferrer" className="block my-1 relative rounded-lg overflow-hidden">
-                        <div className={`flex items-center justify-center w-48 h-32 rounded-lg ${isGuest ? 'bg-indigo-700' : 'bg-slate-200'}`}>
-                          <Play size={28} className={isGuest ? 'text-white' : 'text-slate-600'} />
-                          <span className={`ml-1 text-xs ${isGuest ? 'text-indigo-200' : 'text-slate-500'}`}>Video</span>
-                        </div>
-                      </a>
+                    msg.imageUrl.match(/\.(mp4|mov|webm|avi)$/i) ? (
+                      <div className="my-1 rounded-lg overflow-hidden">
+                        <video src={msg.imageUrl} controls playsInline className="max-w-[240px] rounded-lg" />
+                      </div>
                     ) : (
                       <a href={msg.imageUrl} target="_blank" rel="noopener noreferrer" className="block my-1">
                         <img src={msg.imageUrl} alt="" className="max-w-[240px] rounded-lg" />
                       </a>
                     )
+                  )}
+                  {msg.voiceUrl && (
+                    <div className="my-1">
+                      <audio src={msg.voiceUrl} controls className="max-w-full h-8" style={{ minWidth: '180px' }} />
+                      {msg.voiceDuration && (
+                        <p className={`text-[10px] mt-0.5 ${isGuest ? 'text-indigo-200/70' : 'text-slate-400'}`}>
+                          {Math.floor(msg.voiceDuration / 60)}:{String(msg.voiceDuration % 60).padStart(2, '0')}
+                        </p>
+                      )}
+                      {msg.voiceTranslation && (
+                        <p className={`text-sm mt-1 leading-relaxed ${isGuest ? 'text-white' : 'text-slate-800'}`}>
+                          {msg.voiceTranslation}
+                        </p>
+                      )}
+                      {msg.voiceTranscript && (
+                        <p className={`text-[11px] mt-0.5 italic ${isGuest ? 'text-indigo-200/60' : 'text-slate-400'}`}>
+                          {msg.voiceTranscript}
+                        </p>
+                      )}
+                    </div>
                   )}
                   {msg.content && <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>}
                   <p className={`text-[10px] mt-1 text-right ${isGuest ? 'text-indigo-200/60' : 'text-slate-400'}`}>
@@ -1542,14 +1568,37 @@ function MessagesTab({ data, guestCode }: { data: StayData; guestCode: string })
           <ImageIcon size={18} />
         </button>
 
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSend(); } }}
-          placeholder="Type a message..."
-          className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-        />
+        {isRecording ? (
+          <div className="flex-1 flex items-center gap-2 px-4 py-2.5 bg-red-50 border border-red-200 rounded-xl">
+            <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
+            <span className="text-sm text-red-600 font-medium">
+              Recording {Math.floor(recordingDuration / 60)}:{String(recordingDuration % 60).padStart(2, '0')}
+            </span>
+          </div>
+        ) : (
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSend(); } }}
+            placeholder="Type a message..."
+            className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        )}
+        <button
+          onMouseDown={(e) => { e.preventDefault(); startRecording(); }}
+          onMouseUp={() => stopRecording()}
+          onTouchStart={(e) => { e.preventDefault(); startRecording(); }}
+          onTouchEnd={() => stopRecording()}
+          className={`p-2.5 rounded-xl transition-colors ${
+            isRecording
+              ? 'bg-red-500 hover:bg-red-600 text-white'
+              : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'
+          }`}
+          title="Hold to record voice"
+        >
+          <Mic size={16} />
+        </button>
         <button
           onClick={handleSend}
           disabled={(!input.trim() && !mediaPreview) || sending}
