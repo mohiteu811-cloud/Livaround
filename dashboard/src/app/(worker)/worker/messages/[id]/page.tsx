@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { ArrowLeft, Send } from 'lucide-react';
 
@@ -18,6 +18,8 @@ interface Message {
 
 export default function WorkerConversationPage() {
   const { id } = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
+  const isGuest = searchParams.get('type') === 'guest';
   const router = useRouter();
   const [conversation, setConversation] = useState<any>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -27,9 +29,23 @@ export default function WorkerConversationPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const convApi = isGuest
+    ? {
+        get: (convId: string) => api.conversations.get(convId),
+        sendMessage: (convId: string, data: { content: string }) =>
+          api.conversations.sendMessage(convId, data),
+        markRead: (convId: string) => api.conversations.markRead(convId),
+      }
+    : {
+        get: (convId: string) => api.internalConversations.get(convId),
+        sendMessage: (convId: string, data: { content: string }) =>
+          api.internalConversations.sendMessage(convId, data),
+        markRead: (convId: string) => api.internalConversations.markRead(convId),
+      };
+
   useEffect(() => {
     loadConversation();
-    api.internalConversations.markRead(id).catch(() => {});
+    convApi.markRead(id).catch(() => {});
 
     pollRef.current = setInterval(() => {
       loadConversation(true);
@@ -42,13 +58,13 @@ export default function WorkerConversationPage() {
 
   async function loadConversation(silent = false) {
     try {
-      const data = await api.internalConversations.get(id);
+      const data = await convApi.get(id);
       setConversation(data.conversation);
       if (!silent || data.messages.length > messages.length) {
         setMessages(data.messages);
       }
       if (data.conversation.unreadByWorker > 0) {
-        api.internalConversations.markRead(id).catch(() => {});
+        convApi.markRead(id).catch(() => {});
       }
     } catch {}
     if (!silent) setLoading(false);
@@ -65,7 +81,7 @@ export default function WorkerConversationPage() {
     setSending(true);
     setInput('');
     try {
-      const msg = await api.internalConversations.sendMessage(id, { content: text });
+      const msg = await convApi.sendMessage(id, { content: text });
       setMessages((prev) => [...prev, msg]);
     } catch {
       setInput(text);
@@ -77,7 +93,9 @@ export default function WorkerConversationPage() {
     return <div className="text-center py-12 text-slate-500">Loading...</div>;
   }
 
-  const headerName = conversation?.host?.name || 'Host';
+  const headerName = isGuest
+    ? (conversation?.guestName || conversation?.guest?.name || 'Guest')
+    : (conversation?.host?.name || 'Host');
 
   return (
     <div className="flex flex-col h-[calc(100vh-5rem)]">
@@ -92,6 +110,11 @@ export default function WorkerConversationPage() {
             <p className="text-xs text-blue-400">{conversation.property.name}</p>
           )}
         </div>
+        {isGuest && (
+          <span className="ml-auto px-2 py-0.5 text-xs bg-green-600/20 text-green-400 rounded-full font-semibold">
+            Guest
+          </span>
+        )}
       </div>
 
       {/* Messages */}

@@ -420,6 +420,8 @@ export const api = {
   conversations: {
     list: () =>
       request<ConversationListItem[]>('/api/conversations'),
+    workerGuestList: () =>
+      request<any[]>('/api/conversations/worker-guest'),
     get: (id: string, before?: string) => {
       const qs = before ? `?before=${before}` : '';
       return request<{ conversation: ConversationDetail; messages: MessageItem[]; hasMore: boolean }>(
@@ -441,10 +443,10 @@ export const api = {
         `/api/internal-conversations/${id}${qs}`
       );
     },
-    create: (workerId: string, propertyId?: string) =>
+    create: (workerId?: string, propertyId?: string) =>
       request<any>('/api/internal-conversations', {
         method: 'POST',
-        body: JSON.stringify({ workerId, propertyId, channelType: 'HOST_WORKER' }),
+        body: JSON.stringify({ ...(workerId ? { workerId } : {}), propertyId, channelType: 'HOST_WORKER' }),
       }),
     sendMessage: (id: string, data: { content: string; imageUrl?: string }) =>
       request<any>(`/api/internal-conversations/${id}/messages`, {
