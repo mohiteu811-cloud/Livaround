@@ -8,7 +8,7 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 200 * 1024 * 1024 }, // 200 MB
   fileFilter: (_req, file, cb) => {
-    const allowed = /image\/(jpeg|jpg|png|webp|gif)|video\/(mp4|quicktime|webm|3gpp)|application\/(pdf)|text\/(csv|plain)/;
+    const allowed = /image\/(jpeg|jpg|png|webp|gif)|video\/(mp4|quicktime|webm|3gpp)|audio\/(aac|mp4|mpeg|ogg|webm|wav|x-m4a)|application\/(pdf)|text\/(csv|plain)/;
     cb(null, allowed.test(file.mimetype));
   },
 });
@@ -25,6 +25,7 @@ router.post('/', upload.single('file'), async (req: AuthRequest, res: Response) 
     const url = await uploadToFirebase(req.file.buffer, filename, req.file.mimetype);
 
     const type = req.file.mimetype.startsWith('video/') ? 'video'
+      : req.file.mimetype.startsWith('audio/') ? 'audio'
       : req.file.mimetype === 'application/pdf' ? 'pdf'
       : req.file.mimetype.startsWith('text/') ? 'document'
       : 'image';

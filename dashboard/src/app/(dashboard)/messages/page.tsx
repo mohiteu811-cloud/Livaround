@@ -158,7 +158,7 @@ export default function MessagesPage() {
                         </span>
                       )}
                     </div>
-                    <span className="text-xs text-slate-500">{timeAgo(conv.lastMessageAt)}</span>
+                    <span className="text-xs text-slate-500">{timeAgo(conv.lastMessageAt ?? null)}</span>
                   </div>
                   {conv.booking?.property && (
                     <p className="text-xs text-brand-400 mb-1">{conv.booking.property.name}</p>
@@ -201,7 +201,7 @@ export default function MessagesPage() {
                         </span>
                       )}
                     </div>
-                    <span className="text-xs text-slate-500">{timeAgo(conv.lastMessageAt)}</span>
+                    <span className="text-xs text-slate-500">{timeAgo(conv.lastMessageAt ?? null)}</span>
                   </div>
                   {conv.property && (
                     <p className="text-xs text-brand-400 mb-1">{conv.property.name}</p>

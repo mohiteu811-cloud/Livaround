@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import { Audio, Video, ResizeMode } from 'expo-av';
 import { api, Message, Conversation } from '../../src/lib/api';
 import { joinConversation, leaveConversation, getSocket } from '../../src/lib/socket';
 
@@ -37,6 +38,12 @@ export default function ConversationScreen() {
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(false);
   const [mediaPreview, setMediaPreview] = useState<{ uri: string; type: string } | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
+  const recordingRef = useRef<Audio.Recording | null>(null);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const voiceSoundRef = useRef<Audio.Sound | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
   const load = useCallback(async () => {
@@ -80,13 +87,25 @@ export default function ConversationScreen() {
       );
     };
 
+    const handleVoiceTranslated = (data: any) => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === data.messageId
+            ? { ...m, voiceTranscript: data.voiceTranscript, voiceTranslation: data.voiceTranslation, voiceLanguage: data.voiceLanguage }
+            : m
+        )
+      );
+    };
+
     socket?.on('new_message', handleNewMessage);
     socket?.on('ai_suggestion', handleAiSuggestion);
+    socket?.on('voice_translated', handleVoiceTranslated);
 
     return () => {
       leaveConversation(id);
       socket?.off('new_message', handleNewMessage);
       socket?.off('ai_suggestion', handleAiSuggestion);
+      socket?.off('voice_translated', handleVoiceTranslated);
     };
   }, [id, load, isInternal]);
 
@@ -136,6 +155,90 @@ export default function ConversationScreen() {
     }
   }
 
+  async function startRecording() {
+    try {
+      const permission = await Audio.requestPermissionsAsync();
+      if (!permission.granted) return;
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+      const recording = new Audio.Recording();
+      await recording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+      await recording.startAsync();
+      recordingRef.current = recording;
+      setIsRecording(true);
+      setRecordingDuration(0);
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingDuration((d) => d + 1);
+      }, 1000);
+    } catch {}
+  }
+
+  async function stopRecording() {
+    if (!recordingRef.current) return;
+    setIsRecording(false);
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    try {
+      await recordingRef.current.stopAndUnloadAsync();
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
+      const uri = recordingRef.current.getURI();
+      recordingRef.current = null;
+      if (!uri) return;
+      const duration = recordingDuration;
+
+      setSending(true);
+      const uploaded = await api.upload.file(uri, 'audio/m4a');
+      const msg = isInternal
+        ? await api.internalConversations.sendMessage(id, '', undefined, uploaded.url, duration)
+        : await api.conversations.sendMessage(id, '', undefined, uploaded.url, duration);
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === msg.id)) return prev;
+        return [...prev, msg];
+      });
+      setSending(false);
+    } catch {
+      recordingRef.current = null;
+      setSending(false);
+    }
+  }
+
+  async function playVoice(messageId: string, voiceUrl: string) {
+    try {
+      if (voiceSoundRef.current) {
+        await voiceSoundRef.current.unloadAsync();
+        voiceSoundRef.current = null;
+      }
+      if (playingVoiceId === messageId) {
+        setPlayingVoiceId(null);
+        return;
+      }
+      const { sound } = await Audio.Sound.createAsync({ uri: voiceUrl });
+      voiceSoundRef.current = sound;
+      setPlayingVoiceId(messageId);
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded && status.didJustFinish) {
+          setPlayingVoiceId(null);
+          sound.unloadAsync();
+          voiceSoundRef.current = null;
+        }
+      });
+      await sound.playAsync();
+    } catch {
+      setPlayingVoiceId(null);
+    }
+  }
+
+  function isVideoUrl(url: string): boolean {
+    return /\.(mp4|mov|webm|avi)(\?.*)?$/i.test(url);
+  }
+
+  function formatDuration(seconds: number): string {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  }
+
   async function approveSuggestion(suggestion: AiSuggestion) {
     try {
       await api.aiSuggestions.approve(suggestion.id);
@@ -177,11 +280,50 @@ export default function ConversationScreen() {
     return (
       <View>
         <View style={[styles.messageBubble, isHost ? styles.hostBubble : styles.otherBubble]}>
-          <Text style={styles.senderName}>{item.senderName}</Text>
-          {item.imageUrl && (
+          <View style={styles.senderRow}>
+            <Text style={styles.senderName}>{item.senderName}</Text>
+            {!isInternal && item.senderType === 'WORKER' && (
+              <View style={styles.workerBadge}>
+                <Text style={styles.workerBadgeText}>Worker</Text>
+              </View>
+            )}
+          </View>
+          {item.imageUrl && !isVideoUrl(item.imageUrl) && (
             <Image source={{ uri: item.imageUrl }} style={styles.messageImage} resizeMode="cover" />
           )}
-          {item.content ? (
+          {item.imageUrl && isVideoUrl(item.imageUrl) && (
+            <Video
+              source={{ uri: item.imageUrl }}
+              style={styles.messageVideo}
+              resizeMode={ResizeMode.CONTAIN}
+              useNativeControls
+              isLooping={false}
+            />
+          )}
+          {item.voiceUrl ? (
+            <View style={styles.voicePlayer}>
+              <TouchableOpacity onPress={() => playVoice(item.id, item.voiceUrl!)} style={styles.voicePlayBtn}>
+                <Text style={styles.voicePlayBtnText}>{playingVoiceId === item.id ? '⏸' : '▶'}</Text>
+              </TouchableOpacity>
+              <View style={styles.voiceInfo}>
+                <View style={styles.voiceWaveform} />
+                <Text style={styles.voiceDurationText}>
+                  {item.voiceDuration ? formatDuration(item.voiceDuration) : '0:00'}
+                </Text>
+              </View>
+            </View>
+          ) : null}
+          {item.voiceUrl && item.voiceTranslation ? (
+            <View style={styles.voiceTranscriptContainer}>
+              <Text style={styles.voiceTranslationText}>Translation: {item.voiceTranslation}</Text>
+              {item.voiceTranscript ? (
+                <Text style={styles.voiceTranscriptText}>{item.voiceTranscript}</Text>
+              ) : null}
+            </View>
+          ) : item.voiceUrl && item.voiceTranscript ? (
+            <Text style={styles.voiceTranscriptText}>{item.voiceTranscript}</Text>
+          ) : null}
+          {!item.voiceUrl && item.content ? (
             <Text style={[styles.messageText, isHost ? styles.hostText : styles.otherText]}>
               {item.content}
             </Text>
@@ -294,6 +436,13 @@ export default function ConversationScreen() {
           </View>
         )}
 
+        {isRecording && (
+          <View style={styles.recordingIndicator}>
+            <View style={styles.recordingDot} />
+            <Text style={styles.recordingText}>Recording... {formatDuration(recordingDuration)}</Text>
+          </View>
+        )}
+
         <View style={styles.inputBar}>
           <TouchableOpacity onPress={takePhoto} style={styles.mediaButton}>
             <Text style={styles.mediaButtonText}>📷</Text>
@@ -310,6 +459,13 @@ export default function ConversationScreen() {
             multiline
             maxLength={2000}
           />
+          <TouchableOpacity
+            style={[styles.micButton, isRecording && styles.micButtonActive]}
+            onPressIn={startRecording}
+            onPressOut={stopRecording}
+          >
+            <Text style={styles.micButtonText}>🎙</Text>
+          </TouchableOpacity>
           <TouchableOpacity
             style={[styles.sendButton, (!input.trim() && !mediaPreview || sending) && styles.sendDisabled]}
             onPress={handleSend}
@@ -371,6 +527,30 @@ const styles = StyleSheet.create({
   aiDismissBtn: { backgroundColor: '#334155', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
   aiDismissBtnText: { color: '#94a3b8', fontSize: 12, fontWeight: '600' },
   aiApprovedText: { fontSize: 11, color: '#22c55e', fontWeight: '600' },
+  // Sender row & Worker badge
+  senderRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 },
+  workerBadge: { backgroundColor: '#f59e0b', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1 },
+  workerBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
+  // Voice player
+  voicePlayer: { flexDirection: 'row', alignItems: 'center', gap: 8, marginVertical: 4 },
+  voicePlayBtn: { backgroundColor: '#3b82f6', borderRadius: 16, width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  voicePlayBtnText: { color: '#fff', fontSize: 14 },
+  voiceInfo: { flex: 1, gap: 2 },
+  voiceWaveform: { height: 4, backgroundColor: '#475569', borderRadius: 2 },
+  voiceDurationText: { fontSize: 11, color: '#94a3b8' },
+  voiceTranscriptContainer: { marginTop: 4 },
+  voiceTranslationText: { fontSize: 14, color: '#e2e8f0', fontWeight: '600', marginBottom: 2 },
+  voiceTranscriptText: { fontSize: 12, color: '#94a3b8', fontStyle: 'italic' },
+  // Video
+  messageVideo: { width: 200, height: 150, borderRadius: 8, marginBottom: 4, backgroundColor: '#000' },
+  // Recording indicator
+  recordingIndicator: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 8, backgroundColor: '#1e293b', gap: 8 },
+  recordingDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#ef4444' },
+  recordingText: { color: '#ef4444', fontSize: 13, fontWeight: '600' },
+  // Mic button
+  micButton: { padding: 8 },
+  micButtonActive: { backgroundColor: '#ef4444', borderRadius: 20 },
+  micButtonText: { fontSize: 20 },
   // Media
   mediaPreview: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, backgroundColor: '#1e293b' },
   previewImage: { width: 60, height: 60, borderRadius: 8 },
