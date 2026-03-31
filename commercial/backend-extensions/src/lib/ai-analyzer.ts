@@ -308,3 +308,192 @@ ${bookingContext ? `\n${bookingContext}` : ''}`;
     }
   }
 }
+
+// ── Issue Analysis ───────────────────────────────────────────────────────────
+
+export async function analyzeIssueAsync(
+  issue: { id: string; description: string; photoUrl?: string | null; videoUrl?: string | null; severity: string; propertyId?: string | null },
+  hostId: string
+) {
+  if (process.env.AI_ANALYSIS_ENABLED?.toLowerCase() !== 'true') {
+    console.log('AI issue analysis skipped: AI_ANALYSIS_ENABLED =', process.env.AI_ANALYSIS_ENABLED);
+    return;
+  }
+  if (!process.env.ANTHROPIC_API_KEY) {
+    console.log('AI issue analysis skipped: ANTHROPIC_API_KEY not set');
+    return;
+  }
+
+  try {
+    await performIssueAnalysis(issue, hostId);
+  } catch (err) {
+    console.error('AI issue analysis error:', err);
+  }
+}
+
+async function performIssueAnalysis(
+  issue: { id: string; description: string; photoUrl?: string | null; videoUrl?: string | null; severity: string; propertyId?: string | null },
+  hostId: string
+) {
+  const client = new Anthropic();
+
+  let propertyContext = '';
+  if (issue.propertyId) {
+    const property = await prisma.property.findUnique({
+      where: { id: issue.propertyId },
+      select: { name: true, type: true, address: true },
+    });
+    if (property) {
+      propertyContext = `Property: "${property.name}" (${property.type}) at ${property.address}`;
+    }
+  }
+
+  const systemPrompt = `You are an AI assistant for LivAround, a property management platform. A worker has reported an issue. Analyze the report and provide actionable suggestions for the property host.
+
+The issue was reported with severity: ${issue.severity}
+
+Available categories:
+- MAINTENANCE: broken items, leaks, damage, locks not working
+- CLEANING: dirty areas, stains, trash, hygiene issues
+- SAFETY: gas smell, flooding, fire, electrical, security concerns
+- APPLIANCE: TV, WiFi, AC, oven, washing machine, remote control
+- PEST: insects, rodents, bugs
+- SUPPLY_REQUEST: cleaning supplies, tools needed
+- QUALITY_CONCERN: work quality, audit findings
+- GENERAL: other issues
+
+${propertyContext ? `\n${propertyContext}` : ''}`;
+
+  const userContent: Anthropic.MessageCreateParams['messages'][0]['content'] = [];
+
+  userContent.push({
+    type: 'text',
+    text: `Issue report:\n"${issue.description}"\n\nSeverity reported: ${issue.severity}${issue.photoUrl ? '\n[Photo attached]' : ''}${issue.videoUrl ? '\n[Video attached]' : ''}\n\nAnalyze this issue report and provide your assessment.`,
+  });
+
+  // Include photo for vision analysis if available
+  if (issue.photoUrl) {
+    try {
+      const response = await fetch(issue.photoUrl);
+      const buffer = await response.arrayBuffer();
+      const base64 = Buffer.from(buffer).toString('base64');
+      const contentType = response.headers.get('content-type') || 'image/jpeg';
+      userContent.push({
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: contentType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
+          data: base64,
+        },
+      });
+    } catch {
+      // If image fetch fails, continue without it
+    }
+  }
+
+  const model = issue.photoUrl ? 'claude-sonnet-4-6' : 'claude-haiku-4-5-20251001';
+
+  const result = await client.messages.create({
+    model,
+    max_tokens: 1024,
+    system: systemPrompt,
+    messages: [{ role: 'user', content: userContent }],
+    tools: [
+      {
+        name: 'analyze_issue',
+        description: 'Analyze a reported issue and provide structured assessment',
+        input_schema: {
+          type: 'object' as const,
+          properties: {
+            category: {
+              type: 'string',
+              enum: [
+                'MAINTENANCE', 'CLEANING', 'SAFETY', 'APPLIANCE', 'PEST',
+                'SUPPLY_REQUEST', 'QUALITY_CONCERN', 'GENERAL',
+              ],
+            },
+            urgency: { type: 'string', enum: ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] },
+            sentiment: { type: 'string', enum: ['NEUTRAL', 'NEGATIVE', 'DISTRESSED'] },
+            summary: { type: 'string', description: 'One-line summary of the issue' },
+            suggestedAction: {
+              type: 'string',
+              enum: ['CREATE_JOB', 'DISPATCH_WORKER', 'NOTIFY_ONLY'],
+            },
+            suggestedReply: { type: 'string', description: 'Suggested next steps for the host' },
+            jobData: {
+              type: 'object',
+              properties: {
+                type: { type: 'string', enum: ['CLEANING', 'COOKING', 'DRIVING', 'MAINTENANCE'] },
+                notes: { type: 'string' },
+              },
+            },
+          },
+          required: ['category', 'urgency', 'sentiment', 'summary', 'suggestedAction'],
+        },
+      },
+    ],
+    tool_choice: { type: 'tool', name: 'analyze_issue' },
+  });
+
+  const toolUse = result.content.find((block) => block.type === 'tool_use');
+  if (!toolUse || toolUse.type !== 'tool_use') return;
+
+  const analysis = toolUse.input as AiAnalysis & { jobData?: any };
+
+  const actionPayload: any = {};
+  if (analysis.jobData) {
+    actionPayload.jobData = {
+      type: analysis.jobData.type || 'MAINTENANCE',
+      propertyId: issue.propertyId || analysis.jobData.propertyId,
+      notes: analysis.jobData.notes || analysis.summary,
+    };
+  }
+
+  const suggestion = await prisma.aiSuggestion.create({
+    data: {
+      issueId: issue.id,
+      category: analysis.category,
+      urgency: analysis.urgency,
+      sentiment: analysis.sentiment,
+      summary: analysis.summary,
+      suggestedAction: analysis.suggestedAction,
+      suggestedReply: analysis.suggestedReply,
+      actionPayload: Object.keys(actionPayload).length > 0 ? actionPayload : undefined,
+      status: 'PENDING',
+    },
+  });
+
+  // Emit via Socket.IO to host
+  try {
+    const { getIO } = require('./socket');
+    const io = getIO();
+    if (io) {
+      io.of('/host').emit('ai_issue_suggestion', suggestion);
+    }
+  } catch (err) {
+    console.error('Failed to emit AI issue suggestion via socket:', err);
+  }
+
+  // Push notification for HIGH/CRITICAL
+  if (['HIGH', 'CRITICAL'].includes(analysis.urgency)) {
+    try {
+      const host = await prisma.host.findUnique({
+        where: { id: hostId },
+        select: { pushToken: true },
+      });
+      if (host?.pushToken) {
+        const { sendPushNotification } = require('../../../../backend/src/lib/pushNotifications');
+        await sendPushNotification(host.pushToken, {
+          title: `Issue Alert: ${analysis.category}`,
+          body: analysis.summary,
+          data: { issueId: issue.id, suggestionId: suggestion.id, type: 'ai_issue_suggestion' },
+          sound: 'default',
+          priority: 'high',
+          channelId: 'messages',
+        });
+      }
+    } catch (err) {
+      console.error('Failed to send AI issue push notification:', err);
+    }
+  }
+}

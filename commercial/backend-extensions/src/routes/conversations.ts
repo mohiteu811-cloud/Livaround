@@ -3,6 +3,7 @@ import { prisma } from '../../../../backend/src/lib/prisma';
 import { authenticate, AuthRequest } from '../../../../backend/src/middleware/auth';
 import { requirePlan } from '../../../../backend/src/lib/commercial/enforcement';
 import { translateVoiceAsync } from '../lib/voice-translator';
+import { analyzeMessageAsync } from '../lib/ai-analyzer';
 
 const router = Router();
 router.use(authenticate);
@@ -278,8 +279,10 @@ router.post('/:id/messages', async (req: AuthRequest, res: Response) => {
       if (visibility === 'ALL') unreadUpdates.unreadByGuest = { increment: 1 };
     } else {
       if (visibility === 'ALL') unreadUpdates.unreadByGuest = { increment: 1 };
-      // Host messages in GUEST_HOST also notify workers
-      unreadUpdates.unreadByWorker = { increment: 1 };
+      // Only notify worker if looped in
+      if (conversation.workerId) {
+        unreadUpdates.unreadByWorker = { increment: 1 };
+      }
     }
 
     await prisma.conversation.update({
@@ -299,8 +302,10 @@ router.post('/:id/messages', async (req: AuthRequest, res: Response) => {
       if (visibility === 'ALL') {
         io.of('/guest').to(`conv:${conversation.id}`).emit('new_message', message);
       }
-      // Workers always see messages in GUEST_HOST conversations
-      io.of('/worker').to(`conv:${conversation.id}`).emit('new_message', message);
+      // Only broadcast to workers if looped in
+      if (conversation.workerId) {
+        io.of('/worker').to(`conv:${conversation.id}`).emit('new_message', message);
+      }
     }
 
     // Trigger voice translation if voice message (non-blocking)
@@ -311,6 +316,11 @@ router.post('/:id/messages', async (req: AuthRequest, res: Response) => {
         console.error('Voice translation failed:', err);
       }
     }
+
+    // Trigger AI analysis (non-blocking)
+    analyzeMessageAsync(message, conversation).catch((err) =>
+      console.error('AI analysis failed:', err)
+    );
 
     return res.status(201).json(message);
   } catch (err) {
@@ -375,6 +385,47 @@ router.patch('/:id/read', async (req: AuthRequest, res: Response) => {
     });
 
     return res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ── PATCH /api/conversations/:id/loop-in-worker ─────────────────────────────
+// Host loops a worker into a GUEST_HOST conversation
+
+router.patch('/:id/loop-in-worker', async (req: AuthRequest, res: Response) => {
+  try {
+    const host = await prisma.host.findUnique({ where: { userId: req.user!.id } });
+    if (!host) return res.status(403).json({ error: 'Host not found' });
+
+    const conversation = await prisma.conversation.findFirst({
+      where: { id: req.params.id, hostId: host.id, channelType: 'GUEST_HOST' },
+      include: { booking: { select: { propertyId: true } } },
+    });
+    if (!conversation) return res.status(404).json({ error: 'Conversation not found' });
+
+    const { workerId } = req.body;
+    if (!workerId) return res.status(400).json({ error: 'workerId required' });
+
+    // Verify worker is assigned to this property
+    if (conversation.booking?.propertyId) {
+      const staff = await prisma.propertyStaff.findFirst({
+        where: { workerId, propertyId: conversation.booking.propertyId },
+      });
+      if (!staff) return res.status(403).json({ error: 'Worker not assigned to this property' });
+    }
+
+    const updated = await prisma.conversation.update({
+      where: { id: conversation.id },
+      data: { workerId },
+      include: {
+        worker: { include: { user: { select: { name: true } } } },
+        booking: { select: { id: true, property: { select: { id: true, name: true } } } },
+      },
+    });
+
+    return res.json(updated);
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Internal server error' });

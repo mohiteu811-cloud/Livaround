@@ -52,10 +52,19 @@ router.post('/', validate(createIssueSchema), async (req: AuthRequest, res: Resp
       },
       include: {
         job: { select: { id: true, type: true, scheduledAt: true } },
-        property: { select: { id: true, name: true } },
+        property: { select: { id: true, name: true, hostId: true } },
         reportedBy: { include: { user: { select: { name: true } } } },
       },
     });
+
+    // Trigger AI analysis if commercial extension is available
+    const hostId = (issue as any).property?.hostId;
+    if (req.app.locals.analyzeIssue && hostId) {
+      req.app.locals.analyzeIssue(issue, hostId).catch((err: any) =>
+        console.error('AI issue analysis failed:', err)
+      );
+    }
+
     return res.status(201).json(issue);
   } catch (err) {
     console.error(err);
