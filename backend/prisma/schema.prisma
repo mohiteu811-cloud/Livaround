@@ -824,6 +824,7 @@ model Message {
   voiceTranscript  String?
   voiceTranslation String?
   voiceLanguage    String?
+  visibility      String        @default("ALL")    // "ALL" | "TEAM_ONLY"
   isSystemMessage  Boolean       @default(false)
   readByHost      Boolean       @default(false)
   readByGuest     Boolean       @default(false)

@@ -17,7 +17,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     if (!host) return res.status(403).json({ error: 'Host not found' });
 
     const conversations = await prisma.conversation.findMany({
-      where: { hostId: host.id },
+      where: { hostId: host.id, channelType: 'GUEST_HOST' },
       orderBy: { lastMessageAt: { sort: 'desc', nulls: 'last' } },
       include: {
         booking: {
@@ -90,7 +90,44 @@ router.get('/worker-guest', async (req: any, res: Response) => {
 router.get('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const host = await prisma.host.findUnique({ where: { userId: req.user!.id } });
-    if (!host) return res.status(403).json({ error: 'Host not found' });
+    if (!host) {
+      // Check if user is a worker (handles users whose JWT role may differ)
+      const worker = await prisma.worker.findUnique({ where: { userId: req.user!.id } });
+      if (!worker) return res.status(403).json({ error: 'Host not found' });
+
+      // Worker access: check if assigned to the property
+      const conv = await prisma.conversation.findFirst({
+        where: { id: req.params.id },
+        include: {
+          booking: {
+            select: {
+              id: true, guestName: true, guestEmail: true, guestPhone: true,
+              checkIn: true, checkOut: true, status: true, propertyId: true,
+              property: { select: { id: true, name: true } },
+            },
+          },
+        },
+      });
+      if (conv?.booking) {
+        const assigned = await prisma.propertyStaff.findFirst({
+          where: { workerId: worker.id, propertyId: conv.booking.propertyId },
+        });
+        if (assigned) {
+          const before = req.query.before as string | undefined;
+          const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
+          const messages = await prisma.message.findMany({
+            where: {
+              conversationId: conv.id,
+              ...(before ? { createdAt: { lt: new Date(before) } } : {}),
+            },
+            orderBy: { createdAt: 'desc' },
+            take: limit,
+          });
+          return res.json({ conversation: conv, messages: messages.reverse(), hasMore: messages.length === limit });
+        }
+      }
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
 
     let conversation: any = await prisma.conversation.findFirst({
       where: { id: req.params.id, hostId: host.id },
@@ -214,9 +251,10 @@ router.post('/:id/messages', async (req: AuthRequest, res: Response) => {
 
     if (!conversation) return res.status(404).json({ error: 'Conversation not found' });
 
-    const { content, imageUrl, voiceUrl, voiceDuration } = req.body;
+    const { content, imageUrl, voiceUrl, voiceDuration, visibility: rawVisibility } = req.body;
     if (!content && !imageUrl && !voiceUrl) return res.status(400).json({ error: 'content, imageUrl, or voiceUrl required' });
 
+    const visibility = rawVisibility === 'TEAM_ONLY' ? 'TEAM_ONLY' : 'ALL';
     const isWorker = senderType === 'WORKER';
     const message = await prisma.message.create({
       data: {
@@ -227,15 +265,22 @@ router.post('/:id/messages', async (req: AuthRequest, res: Response) => {
         imageUrl: imageUrl || null,
         voiceUrl: voiceUrl || null,
         voiceDuration: voiceDuration || null,
+        visibility,
         readByHost: !isWorker,
         readByGuest: false,
       },
     });
 
-    // For worker messages, increment both unreadByHost and unreadByGuest
-    const unreadUpdates = isWorker
-      ? { unreadByHost: { increment: 1 }, unreadByGuest: { increment: 1 } }
-      : { unreadByGuest: { increment: 1 } };
+    // Build unread updates — TEAM_ONLY messages don't increment guest unread
+    const unreadUpdates: Record<string, any> = {};
+    if (isWorker) {
+      unreadUpdates.unreadByHost = { increment: 1 };
+      if (visibility === 'ALL') unreadUpdates.unreadByGuest = { increment: 1 };
+    } else {
+      if (visibility === 'ALL') unreadUpdates.unreadByGuest = { increment: 1 };
+      // Host messages in GUEST_HOST also notify workers
+      unreadUpdates.unreadByWorker = { increment: 1 };
+    }
 
     await prisma.conversation.update({
       where: { id: conversation.id },
@@ -250,10 +295,12 @@ router.post('/:id/messages', async (req: AuthRequest, res: Response) => {
     const io = req.app.locals.io;
     if (io) {
       io.of('/host').to(`conv:${conversation.id}`).emit('new_message', message);
-      io.of('/guest').to(`conv:${conversation.id}`).emit('new_message', message);
-      if (isWorker) {
-        io.of('/worker').to(`conv:${conversation.id}`).emit('new_message', message);
+      // Only emit to guest if message is visible to all
+      if (visibility === 'ALL') {
+        io.of('/guest').to(`conv:${conversation.id}`).emit('new_message', message);
       }
+      // Workers always see messages in GUEST_HOST conversations
+      io.of('/worker').to(`conv:${conversation.id}`).emit('new_message', message);
     }
 
     // Trigger voice translation if voice message (non-blocking)

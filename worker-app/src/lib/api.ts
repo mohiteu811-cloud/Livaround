@@ -151,10 +151,10 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ channelType: 'HOST_WORKER' }),
       }),
-    sendMessage: (id: string, content: string, imageUrl?: string, voiceUrl?: string, voiceDuration?: number) =>
+    sendMessage: (id: string, content: string, imageUrl?: string, voiceUrl?: string, voiceDuration?: number, visibility?: string) =>
       request<any>(`/api/internal-conversations/${id}/messages`, {
         method: 'POST',
-        body: JSON.stringify({ content, imageUrl, voiceUrl, voiceDuration }),
+        body: JSON.stringify({ content, imageUrl, voiceUrl, voiceDuration, visibility }),
       }),
     markRead: (id: string) =>
       request<{ ok: boolean }>(`/api/internal-conversations/${id}/read`, { method: 'PATCH' }),
@@ -168,10 +168,10 @@ export const api = {
         `/api/conversations/${id}${qs}`
       );
     },
-    sendMessage: (id: string, content: string, imageUrl?: string, voiceUrl?: string, voiceDuration?: number) =>
+    sendMessage: (id: string, content: string, imageUrl?: string, voiceUrl?: string, voiceDuration?: number, visibility?: string) =>
       request<any>(`/api/conversations/${id}/messages`, {
         method: 'POST',
-        body: JSON.stringify({ content, imageUrl, voiceUrl, voiceDuration }),
+        body: JSON.stringify({ content, imageUrl, voiceUrl, voiceDuration, visibility }),
       }),
     markRead: (id: string) =>
       request<{ ok: boolean }>(`/api/conversations/${id}/read`, { method: 'PATCH' }),

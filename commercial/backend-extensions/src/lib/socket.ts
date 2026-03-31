@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../../../../backend/src/lib/prisma';
 import { sendPushNotification } from '../../../../backend/src/lib/pushNotifications';
 import { translateVoiceAsync } from './voice-translator';
+import { analyzeMessageAsync } from './ai-analyzer';
 
 let io: Server;
 
@@ -57,7 +58,7 @@ export function setupSocketIO(server: http.Server, allowedOrigins: string[]): Se
       socket.leave(`conv:${conversationId}`);
     });
 
-    socket.on('send_message', async (data: { conversationId: string; content: string; imageUrl?: string; voiceUrl?: string; voiceDuration?: number }) => {
+    socket.on('send_message', async (data: { conversationId: string; content: string; imageUrl?: string; voiceUrl?: string; voiceDuration?: number; visibility?: string }) => {
       try {
         const conversation = await prisma.conversation.findFirst({
           where: { id: data.conversationId, hostId },
@@ -65,6 +66,7 @@ export function setupSocketIO(server: http.Server, allowedOrigins: string[]): Se
         });
         if (!conversation) return;
 
+        const visibility = data.visibility === 'TEAM_ONLY' ? 'TEAM_ONLY' : 'ALL';
         const message = await prisma.message.create({
           data: {
             conversationId: data.conversationId,
@@ -74,16 +76,22 @@ export function setupSocketIO(server: http.Server, allowedOrigins: string[]): Se
             imageUrl: data.imageUrl || null,
             voiceUrl: data.voiceUrl || null,
             voiceDuration: data.voiceDuration || null,
+            visibility,
             readByHost: true,
             readByGuest: false,
           },
         });
 
+        const preview = (data.content || (data.voiceUrl ? 'Voice message' : (data.imageUrl ? 'Image' : ''))).slice(0, 100);
         const updateData: any = {
           lastMessageAt: message.createdAt,
-          lastMessagePreview: data.content.slice(0, 100),
-          unreadByGuest: { increment: 1 },
+          lastMessagePreview: preview,
         };
+
+        // TEAM_ONLY messages don't increment guest unread
+        if (visibility === 'ALL') {
+          updateData.unreadByGuest = { increment: 1 };
+        }
 
         // If GUEST_HOST conversation, also increment unreadByWorker
         if (conversation.channelType === 'GUEST_HOST') {
@@ -95,11 +103,15 @@ export function setupSocketIO(server: http.Server, allowedOrigins: string[]): Se
           data: updateData,
         });
 
-        // Emit to all clients in the conversation room
+        // Emit to host always
         hostNs.to(`conv:${data.conversationId}`).emit('new_message', message);
-        guestNs.to(`conv:${data.conversationId}`).emit('new_message', message);
 
-        // If GUEST_HOST conversation, also broadcast to workers
+        // Only emit to guest if visible to all
+        if (visibility === 'ALL') {
+          guestNs.to(`conv:${data.conversationId}`).emit('new_message', message);
+        }
+
+        // If GUEST_HOST conversation, also broadcast to workers (they always see)
         if (conversation.channelType === 'GUEST_HOST') {
           workerNs.to(`conv:${data.conversationId}`).emit('new_message', message);
         }
@@ -189,6 +201,7 @@ export function setupSocketIO(server: http.Server, allowedOrigins: string[]): Se
         });
         if (!conversation) return;
 
+        // Guests always send visible messages (no TEAM_ONLY option)
         const message = await prisma.message.create({
           data: {
             conversationId: data.conversationId,
@@ -198,18 +211,20 @@ export function setupSocketIO(server: http.Server, allowedOrigins: string[]): Se
             imageUrl: data.imageUrl || null,
             voiceUrl: data.voiceUrl || null,
             voiceDuration: data.voiceDuration || null,
+            visibility: 'ALL',
             readByHost: false,
             readByGuest: true,
           },
         });
 
+        const preview = (data.content || (data.voiceUrl ? 'Voice message' : (data.imageUrl ? 'Image' : ''))).slice(0, 100);
         const updateData: any = {
           lastMessageAt: message.createdAt,
-          lastMessagePreview: data.content.slice(0, 100),
+          lastMessagePreview: preview,
           unreadByHost: { increment: 1 },
         };
 
-        // If GUEST_HOST conversation, also increment unreadByWorker
+        // If GUEST_HOST conversation, also increment unreadByWorker (3-way)
         if (conversation.channelType === 'GUEST_HOST') {
           updateData.unreadByWorker = { increment: 1 };
         }
@@ -219,7 +234,7 @@ export function setupSocketIO(server: http.Server, allowedOrigins: string[]): Se
           data: updateData,
         });
 
-        // Emit to room
+        // Emit to all namespaces (3-way)
         hostNs.to(`conv:${data.conversationId}`).emit('new_message', message);
         guestNs.to(`conv:${data.conversationId}`).emit('new_message', message);
 
@@ -236,7 +251,7 @@ export function setupSocketIO(server: http.Server, allowedOrigins: string[]): Se
         if (host?.pushToken) {
           await sendPushNotification(host.pushToken, {
             title: `Message from ${guestName}`,
-            body: data.content.slice(0, 100),
+            body: (data.content || (data.voiceUrl ? 'Voice message' : 'Sent an image')).slice(0, 100),
             data: { conversationId: data.conversationId, type: 'guest_message' },
             sound: 'default',
             priority: 'high',
@@ -335,7 +350,7 @@ export function setupSocketIO(server: http.Server, allowedOrigins: string[]): Se
       socket.leave(`conv:${conversationId}`);
     });
 
-    socket.on('send_message', async (data: { conversationId: string; content: string; imageUrl?: string; voiceUrl?: string; voiceDuration?: number }) => {
+    socket.on('send_message', async (data: { conversationId: string; content: string; imageUrl?: string; voiceUrl?: string; voiceDuration?: number; visibility?: string }) => {
       try {
         // First try: worker is directly assigned to conversation (internal)
         let conversation = await prisma.conversation.findFirst({
@@ -365,6 +380,7 @@ export function setupSocketIO(server: http.Server, allowedOrigins: string[]): Se
           isGuestHostConversation = true;
         }
 
+        const visibility = data.visibility === 'TEAM_ONLY' ? 'TEAM_ONLY' : 'ALL';
         const worker = await prisma.worker.findUnique({
           where: { id: workerId },
           include: { user: { select: { name: true } } },
@@ -385,19 +401,21 @@ export function setupSocketIO(server: http.Server, allowedOrigins: string[]): Se
             imageUrl: data.imageUrl || null,
             voiceUrl: data.voiceUrl || null,
             voiceDuration: data.voiceDuration || null,
+            visibility,
             readByHost: false,
             readByWorker: true,
           },
         });
 
+        const preview = (data.content || (data.voiceUrl ? 'Voice message' : (data.imageUrl ? 'Image' : ''))).slice(0, 100);
         const updateData: any = {
           lastMessageAt: message.createdAt,
-          lastMessagePreview: data.content.slice(0, 100),
+          lastMessagePreview: preview,
           unreadByHost: { increment: 1 },
         };
 
-        // If GUEST_HOST conversation, also increment guest unread count
-        if (isGuestHostConversation) {
+        // If GUEST_HOST conversation, only increment guest unread for visible messages
+        if (isGuestHostConversation && visibility === 'ALL') {
           updateData.unreadByGuest = { increment: 1 };
         }
 
@@ -406,12 +424,12 @@ export function setupSocketIO(server: http.Server, allowedOrigins: string[]): Se
           data: updateData,
         });
 
-        // Emit to all namespaces in the conversation room
+        // Emit to host and worker always
         hostNs.to(`conv:${data.conversationId}`).emit('new_message', message);
         workerNs.to(`conv:${data.conversationId}`).emit('new_message', message);
 
-        // If GUEST_HOST conversation, also broadcast to guests
-        if (isGuestHostConversation) {
+        // If GUEST_HOST and visible to all, also broadcast to guests
+        if (isGuestHostConversation && visibility === 'ALL') {
           guestNs.to(`conv:${data.conversationId}`).emit('new_message', message);
         }
 
@@ -423,7 +441,7 @@ export function setupSocketIO(server: http.Server, allowedOrigins: string[]): Se
         if (host?.pushToken) {
           await sendPushNotification(host.pushToken, {
             title: `Message from ${worker?.user?.name || 'Worker'}`,
-            body: data.content.slice(0, 100),
+            body: (data.content || (data.voiceUrl ? 'Voice message' : 'Sent an image')).slice(0, 100),
             data: { conversationId: data.conversationId, type: 'internal_message' },
             sound: 'default',
             priority: 'high',
@@ -431,8 +449,7 @@ export function setupSocketIO(server: http.Server, allowedOrigins: string[]): Se
           });
         }
 
-        // Trigger AI analysis
-        const { analyzeMessageAsync } = require('./ai-analyzer');
+        // Trigger AI analysis (top-level import)
         analyzeMessageAsync(message, conversation).catch((err: any) =>
           console.error('AI analysis failed:', err)
         );

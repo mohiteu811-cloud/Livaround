@@ -27,8 +27,14 @@ export async function analyzeMessageAsync(
   conversation: { id: string; channelType?: string; hostId: string; propertyId?: string | null; bookingId?: string | null }
 ) {
   // Skip if AI is disabled
-  if (process.env.AI_ANALYSIS_ENABLED !== 'true') return;
-  if (!process.env.ANTHROPIC_API_KEY) return;
+  if (process.env.AI_ANALYSIS_ENABLED?.toLowerCase() !== 'true') {
+    console.log('AI analysis skipped: AI_ANALYSIS_ENABLED =', process.env.AI_ANALYSIS_ENABLED);
+    return;
+  }
+  if (!process.env.ANTHROPIC_API_KEY) {
+    console.log('AI analysis skipped: ANTHROPIC_API_KEY not set');
+    return;
+  }
 
   // Skip host/system/AI messages — only analyze incoming messages
   if (['HOST', 'SYSTEM', 'AI'].includes(message.senderType)) return;
@@ -275,7 +281,9 @@ ${bookingContext ? `\n${bookingContext}` : ''}`;
       io.of('/host').to(`conv:${conversation.id}`).emit('ai_suggestion', suggestion);
       io.of('/worker').to(`conv:${conversation.id}`).emit('ai_suggestion', suggestion);
     }
-  } catch {}
+  } catch (err) {
+    console.error('Failed to emit AI suggestion via socket:', err);
+  }
 
   // Send push notification for HIGH/CRITICAL urgency
   if (['HIGH', 'CRITICAL'].includes(analysis.urgency)) {
@@ -295,6 +303,8 @@ ${bookingContext ? `\n${bookingContext}` : ''}`;
           channelId: 'messages',
         });
       }
-    } catch {}
+    } catch (err) {
+      console.error('Failed to send AI push notification:', err);
+    }
   }
 }

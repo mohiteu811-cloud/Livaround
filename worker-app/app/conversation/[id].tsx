@@ -22,6 +22,7 @@ interface Message {
   voiceTranscript?: string;
   voiceTranslation?: string;
   voiceLanguage?: string;
+  visibility?: string;
   createdAt: string;
   aiSuggestion?: AiSuggestion;
 }
@@ -56,6 +57,9 @@ export default function ConversationScreen() {
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(false);
   const [mediaPreview, setMediaPreview] = useState<{ uri: string; type: string } | null>(null);
+
+  // Visibility toggle for guest conversations (internal notes)
+  const [visibility, setVisibility] = useState<'ALL' | 'TEAM_ONLY'>('ALL');
 
   // Voice recording state
   const [isRecording, setIsRecording] = useState(false);
@@ -138,7 +142,7 @@ export default function ConversationScreen() {
         imageUrl = uploaded.url;
         setMediaPreview(null);
       }
-      const msg = await convApi.sendMessage(id, text, imageUrl);
+      const msg = await convApi.sendMessage(id, text, imageUrl, undefined, undefined, visibility);
       setMessages((prev) => {
         if (prev.some((m) => m.id === msg.id)) return prev;
         return [...prev, msg];
@@ -224,8 +228,8 @@ export default function ConversationScreen() {
 
       setSending(true);
       try {
-        const uploaded = await api.upload.file(uri, 'audio/m4a');
-        const msg = await convApi.sendMessage(id, '', undefined, uploaded.url, durationSec);
+        const uploaded = await api.upload.file(uri, 'audio/mp4');
+        const msg = await convApi.sendMessage(id, '', undefined, uploaded.url, durationSec, visibility);
         setMessages((prev) => {
           if (prev.some((m) => m.id === msg.id)) return prev;
           return [...prev, msg];
@@ -352,11 +356,18 @@ export default function ConversationScreen() {
       );
     }
 
+    const isTeamOnly = item.visibility === 'TEAM_ONLY';
+
     return (
       <View>
-        <View style={[styles.messageBubble, isOwn ? styles.ownBubble : styles.otherBubble]}>
+        <View style={[styles.messageBubble, isOwn ? styles.ownBubble : styles.otherBubble, isTeamOnly && styles.teamOnlyBubble]}>
           <View style={styles.senderRow}>
             <Text style={styles.senderName}>{item.senderName}</Text>
+            {isTeamOnly && (
+              <View style={styles.teamOnlyBadge}>
+                <Text style={styles.teamOnlyBadgeText}>Team only</Text>
+              </View>
+            )}
             {renderSenderBadge(item)}
           </View>
           {item.voiceUrl ? (
@@ -480,7 +491,19 @@ export default function ConversationScreen() {
           </View>
         )}
 
-        <View style={styles.inputBar}>
+        {/* Visibility toggle — only for GUEST_HOST conversations */}
+        {isGuest && (
+          <TouchableOpacity
+            style={[styles.visibilityToggle, visibility === 'TEAM_ONLY' && styles.visibilityToggleActive]}
+            onPress={() => setVisibility((v) => v === 'ALL' ? 'TEAM_ONLY' : 'ALL')}
+          >
+            <Text style={styles.visibilityToggleText}>
+              {visibility === 'TEAM_ONLY' ? '🔒 Team only — guest won\'t see this' : '🌐 Everyone'}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        <View style={[styles.inputBar, visibility === 'TEAM_ONLY' && styles.inputBarTeamOnly]}>
           <TouchableOpacity onPress={takePhoto} style={styles.mediaButton}>
             <Text style={styles.mediaButtonText}>📷</Text>
           </TouchableOpacity>
@@ -488,11 +511,11 @@ export default function ConversationScreen() {
             <Text style={styles.mediaButtonText}>🖼</Text>
           </TouchableOpacity>
           <TextInput
-            style={styles.textInput}
+            style={[styles.textInput, visibility === 'TEAM_ONLY' && styles.textInputTeamOnly]}
             value={input}
             onChangeText={setInput}
-            placeholder="Type a message..."
-            placeholderTextColor="#64748b"
+            placeholder={visibility === 'TEAM_ONLY' ? 'Internal note...' : 'Type a message...'}
+            placeholderTextColor={visibility === 'TEAM_ONLY' ? '#92400e' : '#64748b'}
             multiline
             maxLength={2000}
           />
@@ -504,7 +527,11 @@ export default function ConversationScreen() {
             <Text style={[styles.micIcon, isRecording && styles.micRecording]}>🎙</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.sendButton, (!input.trim() && !mediaPreview || sending) && styles.sendDisabled]}
+            style={[
+              styles.sendButton,
+              visibility === 'TEAM_ONLY' && styles.sendButtonTeamOnly,
+              (!input.trim() && !mediaPreview || sending) && styles.sendDisabled,
+            ]}
             onPress={handleSend}
             disabled={(!input.trim() && !mediaPreview) || sending}
           >
@@ -571,6 +598,16 @@ const styles = StyleSheet.create({
   micButton: { padding: 8 },
   micIcon: { fontSize: 20 },
   micRecording: { opacity: 0.5 },
+  // Team-only (internal notes) styles
+  teamOnlyBubble: { borderWidth: 1, borderColor: '#d97706', backgroundColor: 'rgba(217, 119, 6, 0.1)' },
+  teamOnlyBadge: { backgroundColor: '#d97706', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 },
+  teamOnlyBadgeText: { color: '#fff', fontSize: 9, fontWeight: '700' },
+  visibilityToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 6, backgroundColor: '#1e293b' },
+  visibilityToggleActive: { backgroundColor: 'rgba(217, 119, 6, 0.15)' },
+  visibilityToggleText: { fontSize: 12, color: '#94a3b8', fontWeight: '600' },
+  inputBarTeamOnly: { borderTopColor: '#d97706' },
+  textInputTeamOnly: { borderColor: '#d97706' },
+  sendButtonTeamOnly: { backgroundColor: '#d97706' },
   // AI suggestion card (read-only for workers)
   aiCard: { backgroundColor: '#1e293b', borderRadius: 12, padding: 12, marginBottom: 8, marginLeft: 8, borderLeftWidth: 3, borderLeftColor: '#3b82f6' },
   aiHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
