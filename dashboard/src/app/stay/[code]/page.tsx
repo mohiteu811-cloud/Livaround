@@ -1268,6 +1268,10 @@ function MessagesTab({ data, guestCode }: { data: StayData; guestCode: string })
   const [error, setError] = useState('');
   const [mediaPreview, setMediaPreview] = useState<{ file: File; url: string; type: string } | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);

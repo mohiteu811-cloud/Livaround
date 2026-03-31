@@ -185,8 +185,6 @@ export default function ConversationScreen() {
       const uri = recordingRef.current.getURI();
       recordingRef.current = null;
       if (!uri) return;
-      const status = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-      // Use the duration we tracked
       const duration = recordingDuration;
 
       setSending(true);
@@ -529,6 +527,30 @@ const styles = StyleSheet.create({
   aiDismissBtn: { backgroundColor: '#334155', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
   aiDismissBtnText: { color: '#94a3b8', fontSize: 12, fontWeight: '600' },
   aiApprovedText: { fontSize: 11, color: '#22c55e', fontWeight: '600' },
+  // Sender row & Worker badge
+  senderRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 },
+  workerBadge: { backgroundColor: '#f59e0b', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1 },
+  workerBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
+  // Voice player
+  voicePlayer: { flexDirection: 'row', alignItems: 'center', gap: 8, marginVertical: 4 },
+  voicePlayBtn: { backgroundColor: '#3b82f6', borderRadius: 16, width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  voicePlayBtnText: { color: '#fff', fontSize: 14 },
+  voiceInfo: { flex: 1, gap: 2 },
+  voiceWaveform: { height: 4, backgroundColor: '#475569', borderRadius: 2 },
+  voiceDurationText: { fontSize: 11, color: '#94a3b8' },
+  voiceTranscriptContainer: { marginTop: 4 },
+  voiceTranslationText: { fontSize: 14, color: '#e2e8f0', fontWeight: '600', marginBottom: 2 },
+  voiceTranscriptText: { fontSize: 12, color: '#94a3b8', fontStyle: 'italic' },
+  // Video
+  messageVideo: { width: 200, height: 150, borderRadius: 8, marginBottom: 4, backgroundColor: '#000' },
+  // Recording indicator
+  recordingIndicator: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 8, backgroundColor: '#1e293b', gap: 8 },
+  recordingDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#ef4444' },
+  recordingText: { color: '#ef4444', fontSize: 13, fontWeight: '600' },
+  // Mic button
+  micButton: { padding: 8 },
+  micButtonActive: { backgroundColor: '#ef4444', borderRadius: 20 },
+  micButtonText: { fontSize: 20 },
   // Media
   mediaPreview: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, backgroundColor: '#1e293b' },
   previewImage: { width: 60, height: 60, borderRadius: 8 },
