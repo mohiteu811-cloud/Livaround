@@ -68,7 +68,7 @@ export default function MessagesScreen() {
       setShowWorkerPicker(true);
     } catch (err: any) {
       console.error('Failed to load workers:', err);
-      Alert.alert('Error', 'Failed to load workers. Please try again.');
+      Alert.alert('Error', err.message || 'Failed to load workers. Please try again.');
     }
   }
 
@@ -79,7 +79,7 @@ export default function MessagesScreen() {
       router.push(`/conversation/${conv.id}?type=internal`);
     } catch (err: any) {
       console.error('Failed to create conversation:', err);
-      Alert.alert('Error', 'Failed to start conversation. Please try again.');
+      Alert.alert('Error', err.message || 'Failed to start conversation. Please try again.');
     }
   }
 
