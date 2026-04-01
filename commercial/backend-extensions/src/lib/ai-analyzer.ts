@@ -1,5 +1,9 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { prisma } from '../../../../backend/src/lib/prisma';
+import { execSync } from 'child_process';
+import { writeFileSync, readFileSync, unlinkSync, mkdirSync, readdirSync } from 'fs';
+import { randomUUID } from 'crypto';
+import { join } from 'path';
 
 const SKIP_PATTERNS = /^(ok|yes|no|sure|thanks|thank you|got it|cool|great|bye|hi|hello|hey|good|fine|np|k|yep|nope|ty|thx)$/i;
 const MIN_ANALYSIS_LENGTH = 10;
@@ -331,6 +335,72 @@ export async function analyzeIssueAsync(
   }
 }
 
+interface ExtractedFrame {
+  base64: string;
+  mediaType: 'image/jpeg';
+}
+
+async function extractVideoFrames(videoUrl: string): Promise<ExtractedFrame[]> {
+  const sessionId = randomUUID();
+  const tmpDir = `/tmp/frames-${sessionId}`;
+  const videoPath = `/tmp/video-${sessionId}.mp4`;
+
+  try {
+    const response = await fetch(videoUrl);
+    if (!response.ok) {
+      console.warn('Video fetch failed:', response.status);
+      return [];
+    }
+    const videoBuffer = Buffer.from(await response.arrayBuffer());
+    writeFileSync(videoPath, videoBuffer);
+
+    // Get video duration
+    let duration = 0;
+    try {
+      const probeOutput = execSync(
+        `ffprobe -v error -show_entries format=duration -of csv=p=0 ${videoPath}`,
+        { timeout: 15000, encoding: 'utf-8' }
+      ).trim();
+      duration = parseFloat(probeOutput);
+      if (isNaN(duration) || duration <= 0) duration = 0;
+    } catch {
+      console.warn('ffprobe failed, extracting single frame');
+    }
+
+    // 1 frame per 10s, min 1, max 10
+    const frameCount = duration > 0
+      ? Math.min(10, Math.max(1, Math.ceil(duration / 10)))
+      : 1;
+    const fps = duration > 0 ? frameCount / duration : 1;
+
+    mkdirSync(tmpDir, { recursive: true });
+    execSync(
+      `ffmpeg -i ${videoPath} -vf "fps=${fps},scale='min(1280,iw)':-2" -frames:v ${frameCount} -q:v 5 ${tmpDir}/frame_%03d.jpg -y`,
+      { timeout: 60000, stdio: 'pipe' }
+    );
+
+    const frameFiles = readdirSync(tmpDir).filter(f => f.endsWith('.jpg')).sort();
+    const frames: ExtractedFrame[] = [];
+    for (const file of frameFiles) {
+      const frameBuffer = readFileSync(join(tmpDir, file));
+      frames.push({ base64: frameBuffer.toString('base64'), mediaType: 'image/jpeg' });
+    }
+
+    console.log(`Extracted ${frames.length} frames from video (duration: ${duration}s)`);
+    return frames;
+  } catch (err: any) {
+    console.error('Video frame extraction failed:', err.message);
+    return [];
+  } finally {
+    try { unlinkSync(videoPath); } catch {}
+    try {
+      const files = readdirSync(tmpDir);
+      for (const f of files) { try { unlinkSync(join(tmpDir, f)); } catch {} }
+      execSync(`rmdir ${tmpDir}`, { stdio: 'pipe' });
+    } catch {}
+  }
+}
+
 async function performIssueAnalysis(
   issue: { id: string; description: string; photoUrl?: string | null; videoUrl?: string | null; severity: string; propertyId?: string | null },
   hostId: string
@@ -348,7 +418,16 @@ async function performIssueAnalysis(
     }
   }
 
-  const systemPrompt = `You are an AI assistant for LivAround, a property management platform. A worker has reported an issue. Analyze the report and provide actionable suggestions for the property host.
+  const systemPrompt = `You are an AI assistant for LivAround, a property management platform. An issue has been reported at a short-term rental property — either by a worker or by a guest staying at the property.
+
+Workers have basic skills and capture evidence (photos, videos, voice notes) but rely on the host or supervisor to decide next steps. Guests report issues they encounter during their stay.
+
+Your analysis should help the host:
+1. Understand exactly what the issue is from the visual/text evidence
+2. Assess urgency — especially if it impacts a current guest's stay
+3. Recommend specific next steps (e.g. "Call a plumber immediately", "Send a cleaner", "Inform the guest about the situation")
+
+If video frames are provided, examine ALL frames carefully — they show different moments from a video walkthrough of the issue.
 
 The issue was reported with severity: ${issue.severity}
 
@@ -364,11 +443,17 @@ Available categories:
 
 ${propertyContext ? `\n${propertyContext}` : ''}`;
 
+  // Extract frames from video if available
+  let videoFrames: ExtractedFrame[] = [];
+  if (issue.videoUrl) {
+    videoFrames = await extractVideoFrames(issue.videoUrl);
+  }
+
   const userContent: Anthropic.MessageCreateParams['messages'][0]['content'] = [];
 
   userContent.push({
     type: 'text',
-    text: `Issue report:\n"${issue.description}"\n\nSeverity reported: ${issue.severity}${issue.photoUrl ? '\n[Photo attached]' : ''}${issue.videoUrl ? '\n[Video attached]' : ''}\n\nAnalyze this issue report and provide your assessment.`,
+    text: `Issue report:\n"${issue.description}"\n\nSeverity reported: ${issue.severity}${issue.photoUrl ? '\n[Photo attached]' : ''}${videoFrames.length > 0 ? `\n[Video attached — ${videoFrames.length} frames extracted at regular intervals]` : issue.videoUrl ? '\n[Video attached but frames could not be extracted]' : ''}\n\nAnalyze this issue report and provide your assessment.`,
   });
 
   // Include photo for vision analysis if available
@@ -391,11 +476,24 @@ ${propertyContext ? `\n${propertyContext}` : ''}`;
     }
   }
 
-  const model = issue.photoUrl ? 'claude-sonnet-4-6' : 'claude-haiku-4-5-20251001';
+  // Include video frames for vision analysis
+  for (const frame of videoFrames) {
+    userContent.push({
+      type: 'image',
+      source: {
+        type: 'base64',
+        media_type: frame.mediaType,
+        data: frame.base64,
+      },
+    });
+  }
+
+  const hasVisualContent = issue.photoUrl || videoFrames.length > 0;
+  const model = hasVisualContent ? 'claude-sonnet-4-6' : 'claude-haiku-4-5-20251001';
 
   const result = await client.messages.create({
     model,
-    max_tokens: 1024,
+    max_tokens: 1500,
     system: systemPrompt,
     messages: [{ role: 'user', content: userContent }],
     tools: [
