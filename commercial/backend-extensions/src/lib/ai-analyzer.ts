@@ -427,7 +427,7 @@ Workers have basic skills and capture evidence (photos, videos, voice notes) but
 Your analysis should help the host:
 1. Understand exactly what the issue is from the visual/text evidence
 2. Assess urgency — especially if it impacts a current guest's stay
-3. Recommend specific next steps (e.g. "Call a plumber immediately", "Send a cleaner", "Inform the guest about the situation")
+3. Recommend specific next steps
 
 If video frames are provided, examine ALL frames carefully — they show different moments from a video walkthrough of the issue.
 
@@ -442,6 +442,12 @@ Available categories:
 - SUPPLY_REQUEST: cleaning supplies, tools needed
 - QUALITY_CONCERN: work quality, audit findings
 - GENERAL: other issues
+
+When recommending next steps, choose the right action:
+- Use DISPATCH_WORKER when a regular worker can handle it (cleaning, basic maintenance, cooking). Specify the role needed: CLEANER, COOK, CARETAKER, or SUPERVISOR.
+- Use CALL_TRADESMAN when the issue requires a specialized trade professional (plumber, electrician, pest control, carpenter, locksmith, AC technician, painter, mason, etc.). Specify the trade needed.
+- Use CREATE_JOB when a job should be created but not immediately dispatched.
+- Use NOTIFY_ONLY for informational issues that don't need immediate action.
 
 ${propertyContext ? `\n${propertyContext}` : ''}`;
 
@@ -517,7 +523,7 @@ ${propertyContext ? `\n${propertyContext}` : ''}`;
             summary: { type: 'string', description: 'One-line summary of the issue' },
             suggestedAction: {
               type: 'string',
-              enum: ['CREATE_JOB', 'DISPATCH_WORKER', 'NOTIFY_ONLY'],
+              enum: ['CREATE_JOB', 'DISPATCH_WORKER', 'CALL_TRADESMAN', 'NOTIFY_ONLY'],
             },
             suggestedReply: { type: 'string', description: 'Suggested next steps for the host' },
             jobData: {
@@ -525,6 +531,22 @@ ${propertyContext ? `\n${propertyContext}` : ''}`;
               properties: {
                 type: { type: 'string', enum: ['CLEANING', 'COOKING', 'DRIVING', 'MAINTENANCE'] },
                 notes: { type: 'string' },
+              },
+            },
+            dispatchData: {
+              type: 'object',
+              description: 'When suggestedAction is DISPATCH_WORKER, specify the worker role needed',
+              properties: {
+                suggestedRole: { type: 'string', enum: ['CLEANER', 'COOK', 'CARETAKER', 'SUPERVISOR'] },
+                reason: { type: 'string' },
+              },
+            },
+            tradesmanData: {
+              type: 'object',
+              description: 'When suggestedAction is CALL_TRADESMAN, specify the trade needed',
+              properties: {
+                suggestedTrade: { type: 'string', description: 'Trade type e.g. Plumber, Electrician, Pest Control, Carpenter, Locksmith, AC Technician, Painter, Mason' },
+                reason: { type: 'string' },
               },
             },
           },
@@ -538,9 +560,9 @@ ${propertyContext ? `\n${propertyContext}` : ''}`;
   const toolUse = result.content.find((block) => block.type === 'tool_use');
   if (!toolUse || toolUse.type !== 'tool_use') return;
 
-  const analysis = toolUse.input as AiAnalysis & { jobData?: any };
+  const analysis = toolUse.input as AiAnalysis & { jobData?: any; dispatchData?: any; tradesmanData?: any };
 
-  console.log('AI issue analysis result:', JSON.stringify({ category: analysis.category, urgency: analysis.urgency, sentiment: analysis.sentiment, summary: analysis.summary, suggestedAction: analysis.suggestedAction, suggestedReply: analysis.suggestedReply }));
+  console.log('AI issue analysis result:', JSON.stringify({ category: analysis.category, urgency: analysis.urgency, sentiment: analysis.sentiment, summary: analysis.summary, suggestedAction: analysis.suggestedAction, suggestedReply: analysis.suggestedReply, dispatchData: analysis.dispatchData, tradesmanData: analysis.tradesmanData }));
 
   const actionPayload: any = {};
   if (analysis.jobData) {
@@ -549,6 +571,28 @@ ${propertyContext ? `\n${propertyContext}` : ''}`;
       propertyId: issue.propertyId || analysis.jobData.propertyId,
       notes: analysis.jobData.notes || analysis.summary,
     };
+  }
+  if (analysis.dispatchData) {
+    actionPayload.dispatchData = analysis.dispatchData;
+    // Auto-fill jobData if not already set
+    if (!actionPayload.jobData) {
+      actionPayload.jobData = {
+        type: analysis.jobData?.type || 'MAINTENANCE',
+        propertyId: issue.propertyId,
+        notes: analysis.dispatchData.reason || analysis.summary,
+      };
+    }
+  }
+  if (analysis.tradesmanData) {
+    actionPayload.tradesmanData = analysis.tradesmanData;
+    // Auto-fill jobData for tradesman dispatch
+    if (!actionPayload.jobData) {
+      actionPayload.jobData = {
+        type: 'MAINTENANCE',
+        propertyId: issue.propertyId,
+        notes: analysis.tradesmanData.reason || analysis.summary,
+      };
+    }
   }
 
   const suggestion = await prisma.aiSuggestion.create({

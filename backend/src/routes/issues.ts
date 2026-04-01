@@ -156,4 +156,76 @@ router.get('/my-properties', async (req: AuthRequest, res: Response) => {
   }
 });
 
+// GET /api/issues/:id — single issue detail
+router.get('/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    const issue = await prisma.issue.findUnique({
+      where: { id: req.params.id },
+      include: {
+        job: {
+          select: {
+            id: true, type: true, status: true, scheduledAt: true,
+            worker: { include: { user: { select: { name: true } } } },
+          },
+        },
+        property: { select: { id: true, name: true, hostId: true } },
+        reportedBy: { include: { user: { select: { name: true } } } },
+        aiSuggestions: { orderBy: { createdAt: 'desc' } },
+      },
+    });
+    if (!issue) return res.status(404).json({ error: 'Issue not found' });
+
+    // Verify access: host owns the property
+    if (req.user!.role === 'HOST') {
+      const host = await prisma.host.findUnique({ where: { userId: req.user!.id } });
+      if (!host || (issue as any).property?.hostId !== host.id) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+    }
+
+    return res.json(issue);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /api/issues/:id/status — update issue status
+router.patch('/:id/status', async (req: AuthRequest, res: Response) => {
+  try {
+    const { status } = req.body;
+    if (!['OPEN', 'IN_REVIEW', 'RESOLVED'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status. Must be OPEN, IN_REVIEW, or RESOLVED' });
+    }
+
+    const issue = await prisma.issue.findUnique({
+      where: { id: req.params.id },
+      include: { property: { select: { hostId: true } } },
+    });
+    if (!issue) return res.status(404).json({ error: 'Issue not found' });
+
+    // Verify host owns the property
+    const host = await prisma.host.findUnique({ where: { userId: req.user!.id } });
+    if (!host || issue.property?.hostId !== host.id) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const updateData: any = { status };
+    if (status === 'RESOLVED') {
+      updateData.resolvedAt = new Date();
+    } else if (status === 'OPEN') {
+      updateData.resolvedAt = null;
+    }
+
+    const updated = await prisma.issue.update({
+      where: { id: req.params.id },
+      data: updateData,
+    });
+    return res.json(updated);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export default router;

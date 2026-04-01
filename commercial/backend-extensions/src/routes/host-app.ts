@@ -159,4 +159,37 @@ router.post('/register-push-token', async (req: AuthRequest, res: Response) => {
   }
 });
 
+// ── GET /api/host-app/settings ─────────────────────────────────────────────────
+
+router.get('/settings', async (req: AuthRequest, res: Response) => {
+  try {
+    const host = await prisma.host.findUnique({ where: { userId: req.user!.id } });
+    if (!host) return res.status(403).json({ error: 'Host not found' });
+    return res.json({ autoDispatch: host.autoDispatch });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ── PATCH /api/host-app/settings ──────────────────────────────────────────────
+
+router.patch('/settings', async (req: AuthRequest, res: Response) => {
+  try {
+    const host = await prisma.host.findUnique({ where: { userId: req.user!.id } });
+    if (!host) return res.status(403).json({ error: 'Host not found' });
+
+    const updateData: any = {};
+    if (typeof req.body.autoDispatch === 'boolean') {
+      updateData.autoDispatch = req.body.autoDispatch;
+    }
+
+    await prisma.host.update({ where: { id: host.id }, data: updateData });
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export default router;

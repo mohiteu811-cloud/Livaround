@@ -23,18 +23,20 @@ function BadgeIcon({ emoji, focused, count }: { emoji: string; focused: boolean;
 
 export default function TabsLayout() {
   const [unreadMessages, setUnreadMessages] = useState(0);
+  const [openIssues, setOpenIssues] = useState(0);
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
-    loadUnread();
-    const interval = setInterval(loadUnread, 30000);
+    loadCounts();
+    const interval = setInterval(loadCounts, 30000);
     return () => clearInterval(interval);
   }, []);
 
-  async function loadUnread() {
+  async function loadCounts() {
     try {
       const summary = await api.hostApp.dashboard();
       setUnreadMessages(summary.unreadMessages);
+      setOpenIssues(summary.openIssues || 0);
     } catch {}
   }
 
@@ -62,10 +64,12 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="properties"
+        name="issues"
         options={{
-          title: 'Properties',
-          tabBarIcon: ({ focused }) => <Icon emoji="🏠" focused={focused} />,
+          title: 'Issues',
+          tabBarIcon: ({ focused }) => (
+            <BadgeIcon emoji="🚨" focused={focused} count={openIssues} />
+          ),
         }}
       />
       <Tabs.Screen
@@ -97,6 +101,10 @@ export default function TabsLayout() {
           title: 'Profile',
           tabBarIcon: ({ focused }) => <Icon emoji="👤" focused={focused} />,
         }}
+      />
+      <Tabs.Screen
+        name="properties"
+        options={{ href: null }}
       />
     </Tabs>
   );

@@ -194,6 +194,12 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ pushToken }),
       }),
+    updateSettings: (data: { autoDispatch?: boolean }) =>
+      request<{ ok: boolean }>('/api/host-app/settings', {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    getSettings: () => request<{ autoDispatch: boolean }>('/api/host-app/settings'),
   },
 
   properties: {
@@ -308,15 +314,23 @@ export const api = {
   },
 
   issues: {
-    list: (params?: { severity?: string; status?: string }) => {
+    list: (params?: { severity?: string; status?: string; propertyId?: string }) => {
       const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
-      return request<Issue[]>(`/api/jobs/issues${qs}`);
+      return request<Issue[]>(`/api/issues${qs}`);
     },
-    update: (id: string, data: { status: string }) =>
-      request<Issue>(`/api/jobs/issues/${id}`, {
+    get: (id: string) => request<Issue & { aiSuggestions?: any[]; job?: any; property?: any; reportedBy?: any }>(`/api/issues/${id}`),
+    updateStatus: (id: string, status: string) =>
+      request<Issue>(`/api/issues/${id}/status`, {
         method: 'PATCH',
-        body: JSON.stringify(data),
+        body: JSON.stringify({ status }),
       }),
+  },
+
+  tradesmen: {
+    list: (params?: { trade?: string; propertyId?: string }) => {
+      const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
+      return request<any[]>(`/api/tradesmen${qs}`);
+    },
   },
 
   conversations: {
