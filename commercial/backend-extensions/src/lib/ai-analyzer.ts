@@ -241,6 +241,8 @@ ${bookingContext ? `\n${bookingContext}` : ''}`;
 
   const analysis = toolUse.input as AiAnalysis & { issueData?: any; jobData?: any };
 
+  console.log('AI message analysis result:', JSON.stringify({ category: analysis.category, urgency: analysis.urgency, sentiment: analysis.sentiment, summary: analysis.summary, suggestedAction: analysis.suggestedAction, suggestedReply: analysis.suggestedReply }));
+
   // Don't create suggestions for compliments or general messages with NOTIFY_ONLY
   if (analysis.category === 'COMPLIMENT' && analysis.suggestedAction === 'NOTIFY_ONLY') return;
 
@@ -537,6 +539,8 @@ ${propertyContext ? `\n${propertyContext}` : ''}`;
   if (!toolUse || toolUse.type !== 'tool_use') return;
 
   const analysis = toolUse.input as AiAnalysis & { jobData?: any };
+
+  console.log('AI issue analysis result:', JSON.stringify({ category: analysis.category, urgency: analysis.urgency, sentiment: analysis.sentiment, summary: analysis.summary, suggestedAction: analysis.suggestedAction, suggestedReply: analysis.suggestedReply }));
 
   const actionPayload: any = {};
   if (analysis.jobData) {
