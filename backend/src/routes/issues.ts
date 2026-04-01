@@ -52,10 +52,19 @@ router.post('/', validate(createIssueSchema), async (req: AuthRequest, res: Resp
       },
       include: {
         job: { select: { id: true, type: true, scheduledAt: true } },
-        property: { select: { id: true, name: true } },
+        property: { select: { id: true, name: true, hostId: true } },
         reportedBy: { include: { user: { select: { name: true } } } },
       },
     });
+
+    // Trigger AI analysis if commercial extension is available
+    const hostId = (issue as any).property?.hostId;
+    if (req.app.locals.analyzeIssue && hostId) {
+      req.app.locals.analyzeIssue(issue, hostId).catch((err: any) =>
+        console.error('AI issue analysis failed:', err)
+      );
+    }
+
     return res.status(201).json(issue);
   } catch (err) {
     console.error(err);
@@ -63,37 +72,52 @@ router.post('/', validate(createIssueSchema), async (req: AuthRequest, res: Resp
   }
 });
 
-// GET /api/issues?propertyId= — list issues for a property (host or supervisor)
+// GET /api/issues?propertyId= — list issues for a property (or all host properties if omitted)
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const { propertyId, severity, status } = req.query;
-    if (!propertyId) return res.status(400).json({ error: 'propertyId required' });
+
+    let propertyFilter: { propertyId: string } | { propertyId: { in: string[] } };
 
     if (req.user!.role === 'WORKER') {
-      // Supervisor must be assigned to the property
+      if (!propertyId) return res.status(400).json({ error: 'propertyId required for workers' });
       const worker = await prisma.worker.findUnique({ where: { userId: req.user!.id } });
       if (!worker) return res.json([]);
       const assignment = await prisma.propertyStaff.findFirst({
         where: { propertyId: propertyId as string, workerId: worker.id, role: 'SUPERVISOR' },
       });
       if (!assignment) return res.status(403).json({ error: 'Not a supervisor for this property' });
+      propertyFilter = { propertyId: propertyId as string };
     } else {
-      // Host must own the property
-      const prop = await prisma.property.findFirst({
-        where: { id: propertyId as string, host: { userId: req.user!.id } },
-      });
-      if (!prop) return res.status(403).json({ error: 'Property not found or access denied' });
+      // Host: if propertyId given, verify ownership; otherwise fetch all host properties
+      if (propertyId) {
+        const prop = await prisma.property.findFirst({
+          where: { id: propertyId as string, host: { userId: req.user!.id } },
+        });
+        if (!prop) return res.status(403).json({ error: 'Property not found or access denied' });
+        propertyFilter = { propertyId: propertyId as string };
+      } else {
+        const host = await prisma.host.findUnique({ where: { userId: req.user!.id } });
+        if (!host) return res.json([]);
+        const properties = await prisma.property.findMany({
+          where: { hostId: host.id },
+          select: { id: true },
+        });
+        propertyFilter = { propertyId: { in: properties.map(p => p.id) } };
+      }
     }
 
     const issues = await prisma.issue.findMany({
       where: {
-        propertyId: propertyId as string,
+        ...propertyFilter,
         ...(severity ? { severity: severity as string } : {}),
         ...(status ? { status: status as string } : {}),
       },
       include: {
         job: { select: { id: true, type: true, scheduledAt: true } },
+        property: { select: { id: true, name: true } },
         reportedBy: { include: { user: { select: { name: true } } } },
+        aiSuggestions: { where: { status: 'PENDING' }, orderBy: { createdAt: 'desc' }, take: 1 },
       },
       orderBy: { createdAt: 'desc' },
     });

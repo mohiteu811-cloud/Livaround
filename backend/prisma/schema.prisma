@@ -224,6 +224,7 @@ model Issue {
   status       String    @default("OPEN")
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+  aiSuggestions AiSuggestion[]
 }
 
 model InventoryItem {
@@ -836,22 +837,25 @@ model Message {
 }
 
 model AiSuggestion {
-  id              String       @id @default(cuid())
-  conversationId  String
-  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  messageId       String       @unique
-  message         Message      @relation(fields: [messageId], references: [id], onDelete: Cascade)
-  category        String       // MAINTENANCE, CLEANING, SAFETY, APPLIANCE, PEST, etc.
-  urgency         String       // LOW, MEDIUM, HIGH, CRITICAL
-  sentiment       String       // POSITIVE, NEUTRAL, NEGATIVE, DISTRESSED
+  id              String        @id @default(cuid())
+  conversationId  String?
+  conversation    Conversation? @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  messageId       String?       @unique
+  message         Message?      @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  issueId         String?
+  issue           Issue?        @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  category        String        // MAINTENANCE, CLEANING, SAFETY, APPLIANCE, PEST, etc.
+  urgency         String        // LOW, MEDIUM, HIGH, CRITICAL
+  sentiment       String        // POSITIVE, NEUTRAL, NEGATIVE, DISTRESSED
   summary         String
-  suggestedAction String       // CREATE_ISSUE, CREATE_JOB, DISPATCH_WORKER, AUTO_REPLY, NOTIFY_ONLY
+  suggestedAction String        // CREATE_ISSUE, CREATE_JOB, DISPATCH_WORKER, AUTO_REPLY, NOTIFY_ONLY
   suggestedReply  String?
   actionPayload   Json?
-  status          String       @default("PENDING") // PENDING, APPROVED, DISMISSED
+  status          String        @default("PENDING") // PENDING, APPROVED, DISMISSED
   createdIssueId  String?
   createdJobId    String?
-  createdAt       DateTime     @default(now())
+  createdAt       DateTime      @default(now())
 
   @@index([conversationId, status])
+  @@index([issueId])
 }

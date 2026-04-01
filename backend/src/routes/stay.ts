@@ -187,7 +187,7 @@ router.post('/:code/issue', async (req: Request, res: Response) => {
     });
     if (!booking) return res.status(404).json({ error: 'Stay not found' });
 
-    const { description, photoUrl } = req.body;
+    const { description, photoUrl, videoUrl } = req.body;
     if (!description) return res.status(400).json({ error: 'description is required' });
 
     const issue = await prisma.issue.create({
@@ -195,10 +195,24 @@ router.post('/:code/issue', async (req: Request, res: Response) => {
         propertyId: booking.propertyId,
         description,
         photoUrl: photoUrl || null,
+        videoUrl: videoUrl || null,
         severity: 'LOW',
         status: 'OPEN',
       },
     });
+
+    // Trigger AI analysis if commercial extension is available
+    if (req.app.locals.analyzeIssue) {
+      const property = await prisma.property.findUnique({
+        where: { id: booking.propertyId },
+        select: { hostId: true },
+      });
+      if (property?.hostId) {
+        req.app.locals.analyzeIssue(issue, property.hostId).catch((err: any) =>
+          console.error('AI guest issue analysis failed:', err)
+        );
+      }
+    }
 
     return res.status(201).json({ id: issue.id });
   } catch (err) {

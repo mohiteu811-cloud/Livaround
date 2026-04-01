@@ -1,5 +1,9 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { prisma } from '../../../../backend/src/lib/prisma';
+import { execSync } from 'child_process';
+import { writeFileSync, readFileSync, unlinkSync, mkdirSync, readdirSync } from 'fs';
+import { randomUUID } from 'crypto';
+import { join } from 'path';
 
 const SKIP_PATTERNS = /^(ok|yes|no|sure|thanks|thank you|got it|cool|great|bye|hi|hello|hey|good|fine|np|k|yep|nope|ty|thx)$/i;
 const MIN_ANALYSIS_LENGTH = 10;
@@ -305,6 +309,289 @@ ${bookingContext ? `\n${bookingContext}` : ''}`;
       }
     } catch (err) {
       console.error('Failed to send AI push notification:', err);
+    }
+  }
+}
+
+// ── Issue Analysis (worker/guest reported issues) ──────────────────────────
+
+export async function analyzeIssue(
+  issue: { id: string; description: string; photoUrl?: string | null; videoUrl?: string | null; severity: string; propertyId?: string | null },
+  hostId: string
+) {
+  if (process.env.AI_ANALYSIS_ENABLED?.toLowerCase() !== 'true') {
+    console.log('AI issue analysis skipped: AI_ANALYSIS_ENABLED =', process.env.AI_ANALYSIS_ENABLED);
+    return;
+  }
+  if (!process.env.ANTHROPIC_API_KEY) {
+    console.log('AI issue analysis skipped: ANTHROPIC_API_KEY not set');
+    return;
+  }
+
+  try {
+    await performIssueAnalysis(issue, hostId);
+  } catch (err) {
+    console.error('AI issue analysis error:', err);
+  }
+}
+
+interface ExtractedFrame {
+  base64: string;
+  mediaType: 'image/jpeg';
+}
+
+async function extractVideoFrames(videoUrl: string): Promise<ExtractedFrame[]> {
+  const sessionId = randomUUID();
+  const tmpDir = `/tmp/frames-${sessionId}`;
+  const videoPath = `/tmp/video-${sessionId}.mp4`;
+
+  try {
+    const response = await fetch(videoUrl);
+    if (!response.ok) {
+      console.warn('Video fetch failed:', response.status);
+      return [];
+    }
+    const videoBuffer = Buffer.from(await response.arrayBuffer());
+    writeFileSync(videoPath, videoBuffer);
+
+    // Get video duration
+    let duration = 0;
+    try {
+      const probeOutput = execSync(
+        `ffprobe -v error -show_entries format=duration -of csv=p=0 ${videoPath}`,
+        { timeout: 15000, encoding: 'utf-8' }
+      ).trim();
+      duration = parseFloat(probeOutput);
+      if (isNaN(duration) || duration <= 0) duration = 0;
+    } catch {
+      console.warn('ffprobe failed, extracting single frame');
+    }
+
+    // 1 frame per 10s, min 1, max 10
+    const frameCount = duration > 0
+      ? Math.min(10, Math.max(1, Math.ceil(duration / 10)))
+      : 1;
+    const fps = duration > 0 ? frameCount / duration : 1;
+
+    mkdirSync(tmpDir, { recursive: true });
+    execSync(
+      `ffmpeg -i ${videoPath} -vf "fps=${fps},scale='min(1280,iw)':-2" -frames:v ${frameCount} -q:v 5 ${tmpDir}/frame_%03d.jpg -y`,
+      { timeout: 60000, stdio: 'pipe' }
+    );
+
+    const frameFiles = readdirSync(tmpDir).filter(f => f.endsWith('.jpg')).sort();
+    const frames: ExtractedFrame[] = [];
+    for (const file of frameFiles) {
+      const frameBuffer = readFileSync(join(tmpDir, file));
+      frames.push({ base64: frameBuffer.toString('base64'), mediaType: 'image/jpeg' });
+    }
+
+    console.log(`Extracted ${frames.length} frames from video (duration: ${duration}s)`);
+    return frames;
+  } catch (err: any) {
+    console.error('Video frame extraction failed:', err.message);
+    return [];
+  } finally {
+    try { unlinkSync(videoPath); } catch {}
+    try {
+      const files = readdirSync(tmpDir);
+      for (const f of files) { try { unlinkSync(join(tmpDir, f)); } catch {} }
+      execSync(`rmdir ${tmpDir}`, { stdio: 'pipe' });
+    } catch {}
+  }
+}
+
+async function performIssueAnalysis(
+  issue: { id: string; description: string; photoUrl?: string | null; videoUrl?: string | null; severity: string; propertyId?: string | null },
+  hostId: string
+) {
+  const client = new Anthropic();
+
+  let propertyContext = '';
+  if (issue.propertyId) {
+    const property = await prisma.property.findUnique({
+      where: { id: issue.propertyId },
+      select: { name: true, type: true, address: true },
+    });
+    if (property) {
+      propertyContext = `Property: "${property.name}" (${property.type}) at ${property.address}`;
+    }
+  }
+
+  const systemPrompt = `You are an AI assistant for LivAround, a property management platform. An issue has been reported at a short-term rental property — either by a worker or by a guest staying at the property.
+
+Workers have basic skills and capture evidence (photos, videos, voice notes) but rely on the host or supervisor to decide next steps. Guests report issues they encounter during their stay.
+
+Your analysis should help the host:
+1. Understand exactly what the issue is from the visual/text evidence
+2. Assess urgency — especially if it impacts a current guest's stay
+3. Recommend specific next steps (e.g. "Call a plumber immediately", "Send a cleaner", "Inform the guest about the situation")
+
+If video frames are provided, examine ALL frames carefully — they show different moments from a video walkthrough of the issue.
+
+The issue was reported with severity: ${issue.severity}
+
+Available categories:
+- MAINTENANCE: broken items, leaks, damage, locks not working
+- CLEANING: dirty areas, stains, trash, hygiene issues
+- SAFETY: gas smell, flooding, fire, electrical, security concerns
+- APPLIANCE: TV, WiFi, AC, oven, washing machine, remote control
+- PEST: insects, rodents, bugs
+- SUPPLY_REQUEST: cleaning supplies, tools needed
+- QUALITY_CONCERN: work quality, audit findings
+- GENERAL: other issues
+
+${propertyContext ? `\n${propertyContext}` : ''}`;
+
+  // Extract frames from video if available
+  let videoFrames: ExtractedFrame[] = [];
+  if (issue.videoUrl) {
+    videoFrames = await extractVideoFrames(issue.videoUrl);
+  }
+
+  const userContent: Anthropic.MessageCreateParams['messages'][0]['content'] = [];
+
+  userContent.push({
+    type: 'text',
+    text: `Issue report:\n"${issue.description}"\n\nSeverity reported: ${issue.severity}${issue.photoUrl ? '\n[Photo attached]' : ''}${videoFrames.length > 0 ? `\n[Video attached — ${videoFrames.length} frames extracted at regular intervals]` : issue.videoUrl ? '\n[Video attached but frames could not be extracted]' : ''}\n\nAnalyze this issue report and provide your assessment.`,
+  });
+
+  // Include photo for vision analysis if available
+  if (issue.photoUrl) {
+    try {
+      const response = await fetch(issue.photoUrl);
+      const buffer = await response.arrayBuffer();
+      const base64 = Buffer.from(buffer).toString('base64');
+      const contentType = response.headers.get('content-type') || 'image/jpeg';
+      userContent.push({
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: contentType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
+          data: base64,
+        },
+      });
+    } catch {
+      // If image fetch fails, continue without it
+    }
+  }
+
+  // Include video frames for vision analysis
+  for (const frame of videoFrames) {
+    userContent.push({
+      type: 'image',
+      source: {
+        type: 'base64',
+        media_type: frame.mediaType,
+        data: frame.base64,
+      },
+    });
+  }
+
+  const hasVisualContent = issue.photoUrl || videoFrames.length > 0;
+  const model = hasVisualContent ? 'claude-sonnet-4-6' : 'claude-haiku-4-5-20251001';
+
+  const result = await client.messages.create({
+    model,
+    max_tokens: 1500,
+    system: systemPrompt,
+    messages: [{ role: 'user', content: userContent }],
+    tools: [
+      {
+        name: 'analyze_issue',
+        description: 'Analyze a reported issue and provide structured assessment',
+        input_schema: {
+          type: 'object' as const,
+          properties: {
+            category: {
+              type: 'string',
+              enum: [
+                'MAINTENANCE', 'CLEANING', 'SAFETY', 'APPLIANCE', 'PEST',
+                'SUPPLY_REQUEST', 'QUALITY_CONCERN', 'GENERAL',
+              ],
+            },
+            urgency: { type: 'string', enum: ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] },
+            sentiment: { type: 'string', enum: ['NEUTRAL', 'NEGATIVE', 'DISTRESSED'] },
+            summary: { type: 'string', description: 'One-line summary of the issue' },
+            suggestedAction: {
+              type: 'string',
+              enum: ['CREATE_JOB', 'DISPATCH_WORKER', 'NOTIFY_ONLY'],
+            },
+            suggestedReply: { type: 'string', description: 'Suggested next steps for the host' },
+            jobData: {
+              type: 'object',
+              properties: {
+                type: { type: 'string', enum: ['CLEANING', 'COOKING', 'DRIVING', 'MAINTENANCE'] },
+                notes: { type: 'string' },
+              },
+            },
+          },
+          required: ['category', 'urgency', 'sentiment', 'summary', 'suggestedAction'],
+        },
+      },
+    ],
+    tool_choice: { type: 'tool', name: 'analyze_issue' },
+  });
+
+  const toolUse = result.content.find((block) => block.type === 'tool_use');
+  if (!toolUse || toolUse.type !== 'tool_use') return;
+
+  const analysis = toolUse.input as AiAnalysis & { jobData?: any };
+
+  const actionPayload: any = {};
+  if (analysis.jobData) {
+    actionPayload.jobData = {
+      type: analysis.jobData.type || 'MAINTENANCE',
+      propertyId: issue.propertyId || analysis.jobData.propertyId,
+      notes: analysis.jobData.notes || analysis.summary,
+    };
+  }
+
+  const suggestion = await prisma.aiSuggestion.create({
+    data: {
+      issueId: issue.id,
+      category: analysis.category,
+      urgency: analysis.urgency,
+      sentiment: analysis.sentiment,
+      summary: analysis.summary,
+      suggestedAction: analysis.suggestedAction,
+      suggestedReply: analysis.suggestedReply,
+      actionPayload: Object.keys(actionPayload).length > 0 ? actionPayload : undefined,
+      status: 'PENDING',
+    },
+  });
+
+  // Emit via Socket.IO to host
+  try {
+    const { getIO } = require('./socket');
+    const io = getIO();
+    if (io) {
+      io.of('/host').emit('ai_issue_suggestion', suggestion);
+    }
+  } catch (err) {
+    console.error('Failed to emit AI issue suggestion via socket:', err);
+  }
+
+  // Push notification for HIGH/CRITICAL
+  if (['HIGH', 'CRITICAL'].includes(analysis.urgency)) {
+    try {
+      const host = await prisma.host.findUnique({
+        where: { id: hostId },
+        select: { pushToken: true },
+      });
+      if (host?.pushToken) {
+        const { sendPushNotification } = require('../../../../backend/src/lib/pushNotifications');
+        await sendPushNotification(host.pushToken, {
+          title: `Issue Alert: ${analysis.category}`,
+          body: analysis.summary,
+          data: { issueId: issue.id, suggestionId: suggestion.id, type: 'ai_issue_suggestion' },
+          sound: 'default',
+          priority: 'high',
+          channelId: 'issues',
+        });
+      }
+    } catch (err) {
+      console.error('Failed to send AI issue push notification:', err);
     }
   }
 }
