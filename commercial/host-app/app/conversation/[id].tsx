@@ -475,8 +475,8 @@ export default function ConversationScreen() {
           </View>
         )}
 
-        {/* Visibility toggle — only for GUEST_HOST conversations with a worker looped in */}
-        {conversation?.channelType === 'GUEST_HOST' && conversation?.workerId && (
+        {/* Visibility toggle — only for GUEST_HOST conversations */}
+        {!isInternal && (
           <TouchableOpacity
             style={[styles.visibilityToggle, visibility === 'TEAM_ONLY' && styles.visibilityToggleActive]}
             onPress={() => setVisibility((v) => v === 'ALL' ? 'TEAM_ONLY' : 'ALL')}

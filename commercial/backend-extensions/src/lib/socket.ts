@@ -93,8 +93,8 @@ export function setupSocketIO(server: http.Server, allowedOrigins: string[]): Se
           updateData.unreadByGuest = { increment: 1 };
         }
 
-        // If worker is looped into this GUEST_HOST conversation, notify them
-        if (conversation.channelType === 'GUEST_HOST' && conversation.workerId) {
+        // If GUEST_HOST conversation, also increment unreadByWorker (3-way messaging)
+        if (conversation.channelType === 'GUEST_HOST') {
           updateData.unreadByWorker = { increment: 1 };
         }
 
@@ -111,8 +111,8 @@ export function setupSocketIO(server: http.Server, allowedOrigins: string[]): Se
           guestNs.to(`conv:${data.conversationId}`).emit('new_message', message);
         }
 
-        // Only broadcast to workers if a worker is looped in
-        if (conversation.channelType === 'GUEST_HOST' && conversation.workerId) {
+        // If GUEST_HOST conversation, also broadcast to workers (3-way messaging)
+        if (conversation.channelType === 'GUEST_HOST') {
           workerNs.to(`conv:${data.conversationId}`).emit('new_message', message);
         }
 
@@ -224,8 +224,8 @@ export function setupSocketIO(server: http.Server, allowedOrigins: string[]): Se
           unreadByHost: { increment: 1 },
         };
 
-        // Only increment unreadByWorker if a worker is looped in
-        if (conversation.channelType === 'GUEST_HOST' && conversation.workerId) {
+        // If GUEST_HOST conversation, also increment unreadByWorker (3-way)
+        if (conversation.channelType === 'GUEST_HOST') {
           updateData.unreadByWorker = { increment: 1 };
         }
 
@@ -234,7 +234,7 @@ export function setupSocketIO(server: http.Server, allowedOrigins: string[]): Se
           data: updateData,
         });
 
-        // Emit to host and guest
+        // Emit to all namespaces (3-way)
         hostNs.to(`conv:${data.conversationId}`).emit('new_message', message);
         guestNs.to(`conv:${data.conversationId}`).emit('new_message', message);
 
@@ -336,12 +336,18 @@ export function setupSocketIO(server: http.Server, allowedOrigins: string[]): Se
         return;
       }
 
-      // Allow joining GUEST_HOST conversations only if this worker is looped in
+      // Allow joining GUEST_HOST conversations via property staff assignment (3-way messaging)
       const guestHostConv = await prisma.conversation.findFirst({
-        where: { id: conversationId, channelType: 'GUEST_HOST', workerId },
+        where: { id: conversationId, channelType: 'GUEST_HOST' },
+        include: { booking: { select: { propertyId: true } } },
       });
-      if (guestHostConv) {
-        socket.join(`conv:${conversationId}`);
+      if (guestHostConv?.booking?.propertyId) {
+        const assigned = await prisma.propertyStaff.findFirst({
+          where: { workerId, propertyId: guestHostConv.booking.propertyId },
+        });
+        if (assigned) {
+          socket.join(`conv:${conversationId}`);
+        }
       }
     });
 
@@ -351,11 +357,24 @@ export function setupSocketIO(server: http.Server, allowedOrigins: string[]): Se
 
     socket.on('send_message', async (data: { conversationId: string; content: string; imageUrl?: string; voiceUrl?: string; voiceDuration?: number; visibility?: string }) => {
       try {
-        // First try: worker is directly assigned to conversation (internal)
         // Worker can send in conversations where they are directly assigned (internal or looped-in GUEST_HOST)
-        const conversation = await prisma.conversation.findFirst({
+        let conversation = await prisma.conversation.findFirst({
           where: { id: data.conversationId, workerId },
         });
+
+        // Also allow sending in GUEST_HOST conversations via property staff assignment (3-way messaging)
+        if (!conversation) {
+          const guestHostConv = await prisma.conversation.findFirst({
+            where: { id: data.conversationId, channelType: 'GUEST_HOST' },
+            include: { booking: { select: { propertyId: true } } },
+          });
+          if (guestHostConv?.booking?.propertyId) {
+            const assigned = await prisma.propertyStaff.findFirst({
+              where: { workerId, propertyId: guestHostConv.booking.propertyId },
+            });
+            if (assigned) conversation = guestHostConv;
+          }
+        }
         if (!conversation) return;
 
         const isGuestHostConversation = conversation.channelType === 'GUEST_HOST';

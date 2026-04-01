@@ -201,7 +201,7 @@ router.post('/:code/issue', async (req: Request, res: Response) => {
       },
     });
 
-    // Trigger AI analysis for guest-reported issues
+    // Trigger AI analysis if commercial extension is available
     if (req.app.locals.analyzeIssue) {
       const property = await prisma.property.findUnique({
         where: { id: booking.propertyId },

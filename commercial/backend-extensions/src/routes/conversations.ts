@@ -279,10 +279,8 @@ router.post('/:id/messages', async (req: AuthRequest, res: Response) => {
       if (visibility === 'ALL') unreadUpdates.unreadByGuest = { increment: 1 };
     } else {
       if (visibility === 'ALL') unreadUpdates.unreadByGuest = { increment: 1 };
-      // Only notify worker if looped in
-      if (conversation.workerId) {
-        unreadUpdates.unreadByWorker = { increment: 1 };
-      }
+      // Host messages in GUEST_HOST also notify workers (3-way messaging)
+      unreadUpdates.unreadByWorker = { increment: 1 };
     }
 
     await prisma.conversation.update({
@@ -302,10 +300,8 @@ router.post('/:id/messages', async (req: AuthRequest, res: Response) => {
       if (visibility === 'ALL') {
         io.of('/guest').to(`conv:${conversation.id}`).emit('new_message', message);
       }
-      // Only broadcast to workers if looped in
-      if (conversation.workerId) {
-        io.of('/worker').to(`conv:${conversation.id}`).emit('new_message', message);
-      }
+      // Workers always see messages in GUEST_HOST conversations (3-way messaging)
+      io.of('/worker').to(`conv:${conversation.id}`).emit('new_message', message);
     }
 
     // Trigger voice translation if voice message (non-blocking)

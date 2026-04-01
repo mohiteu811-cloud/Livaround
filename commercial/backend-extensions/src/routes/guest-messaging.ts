@@ -174,11 +174,8 @@ router.post('/:code/messages', async (req: Request, res: Response) => {
       lastMessageAt: message.createdAt,
       lastMessagePreview: (sanitizedContent || (voiceUrl ? 'Voice message' : 'Image')).slice(0, 100),
       unreadByHost: { increment: 1 },
+      unreadByWorker: { increment: 1 }, // 3-way: notify assigned workers
     };
-    // Only notify worker if looped in
-    if (conversation.workerId) {
-      updateData.unreadByWorker = { increment: 1 };
-    }
 
     await prisma.conversation.update({
       where: { id: conversation.id },
@@ -190,10 +187,7 @@ router.post('/:code/messages', async (req: Request, res: Response) => {
     if (io) {
       io.of('/host').to(`conv:${conversation.id}`).emit('new_message', message);
       io.of('/guest').to(`conv:${conversation.id}`).emit('new_message', message);
-      // Only broadcast to workers if looped in
-      if (conversation.workerId) {
-        io.of('/worker').to(`conv:${conversation.id}`).emit('new_message', message);
-      }
+      io.of('/worker').to(`conv:${conversation.id}`).emit('new_message', message); // 3-way: workers see guest messages
     }
 
     // Send push notification to host

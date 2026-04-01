@@ -313,9 +313,9 @@ ${bookingContext ? `\n${bookingContext}` : ''}`;
   }
 }
 
-// ── Issue Analysis ───────────────────────────────────────────────────────────
+// ── Issue Analysis (worker/guest reported issues) ──────────────────────────
 
-export async function analyzeIssueAsync(
+export async function analyzeIssue(
   issue: { id: string; description: string; photoUrl?: string | null; videoUrl?: string | null; severity: string; propertyId?: string | null },
   hostId: string
 ) {
@@ -587,7 +587,7 @@ ${propertyContext ? `\n${propertyContext}` : ''}`;
           data: { issueId: issue.id, suggestionId: suggestion.id, type: 'ai_issue_suggestion' },
           sound: 'default',
           priority: 'high',
-          channelId: 'messages',
+          channelId: 'issues',
         });
       }
     } catch (err) {
