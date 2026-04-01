@@ -1,6 +1,9 @@
 import { prisma } from '../../../../backend/src/lib/prisma';
 import { Server } from 'socket.io';
 import { analyzeMessageAsync } from './ai-analyzer';
+import { execSync } from 'child_process';
+import { writeFileSync, readFileSync, unlinkSync } from 'fs';
+import { randomUUID } from 'crypto';
 
 // Google Cloud clients - lazy initialized
 let speechClient: any = null;
@@ -85,6 +88,10 @@ async function processTranslation(
   }
 
   try {
+    // 1. Download audio file
+    const response = await fetch(message.voiceUrl);
+    const audioBuffer = Buffer.from(await response.arrayBuffer());
+
     // 2. Speech-to-Text with auto language detection
     const recognizeConfig: any = {
       languageCode: 'en-US',
@@ -93,39 +100,41 @@ async function processTranslation(
       model: 'latest_long',
     };
 
-    // Determine audio source: convert Firebase HTTPS URL to gs:// URI if possible,
-    // otherwise download and send as content
-    let audio: any;
-    const gcsMatch = message.voiceUrl.match(/^https:\/\/storage\.googleapis\.com\/([^/]+)\/(.+)$/);
-    const firebaseMatch = message.voiceUrl.match(/^https:\/\/([^.]+\.firebasestorage\.app)\/(.+?)(\?.*)?$/);
+    let audioContent: string;
+    const urlLower = message.voiceUrl.toLowerCase();
+    const isM4a = urlLower.includes('.m4a') || urlLower.includes('.mp4') || urlLower.includes('.aac');
 
-    if (gcsMatch) {
-      // Standard GCS URL → gs:// URI (Speech API auto-detects encoding)
-      const gcsUri = `gs://${gcsMatch[1]}/${gcsMatch[2]}`;
-      console.log('Voice translation: using GCS URI', gcsUri);
-      audio = { uri: gcsUri };
-    } else if (firebaseMatch) {
-      // Firebase Storage URL → gs:// URI
-      const gcsUri = `gs://${firebaseMatch[1]}/${decodeURIComponent(firebaseMatch[2])}`;
-      console.log('Voice translation: using Firebase GCS URI', gcsUri);
-      audio = { uri: gcsUri };
-    } else {
-      // Non-GCS URL: download and send as content with explicit encoding
-      const response = await fetch(message.voiceUrl);
-      const audioBuffer = Buffer.from(await response.arrayBuffer());
-      audio = { content: audioBuffer.toString('base64') };
-
-      const urlLower = message.voiceUrl.toLowerCase();
-      if (urlLower.includes('.webm')) {
-        recognizeConfig.encoding = 'WEBM_OPUS';
-      } else if (urlLower.includes('.ogg')) {
-        recognizeConfig.encoding = 'OGG_OPUS';
+    if (isM4a) {
+      // M4A/AAC not supported by Speech API — convert to WAV (LINEAR16) with ffmpeg
+      const tmpId = randomUUID();
+      const inputPath = `/tmp/voice-${tmpId}.m4a`;
+      const outputPath = `/tmp/voice-${tmpId}.wav`;
+      writeFileSync(inputPath, audioBuffer);
+      try {
+        execSync(`ffmpeg -i ${inputPath} -ar 16000 -ac 1 -f wav ${outputPath} -y`, { timeout: 30000, stdio: 'pipe' });
+        const wavBuffer = readFileSync(outputPath);
+        audioContent = wavBuffer.toString('base64');
+        recognizeConfig.encoding = 'LINEAR16';
+        recognizeConfig.sampleRateHertz = 16000;
+        console.log('Voice translation: converted M4A to WAV');
+      } finally {
+        try { unlinkSync(inputPath); } catch {}
+        try { unlinkSync(outputPath); } catch {}
       }
+    } else if (urlLower.includes('.webm')) {
+      audioContent = audioBuffer.toString('base64');
+      recognizeConfig.encoding = 'WEBM_OPUS';
+    } else if (urlLower.includes('.ogg')) {
+      audioContent = audioBuffer.toString('base64');
+      recognizeConfig.encoding = 'OGG_OPUS';
+    } else {
+      // Unknown format — try sending as-is
+      audioContent = audioBuffer.toString('base64');
     }
 
     let sttResponse: any;
     [sttResponse] = await speech.recognize({
-      audio,
+      audio: { content: audioContent },
       config: recognizeConfig,
     });
 
