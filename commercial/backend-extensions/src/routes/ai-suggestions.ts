@@ -9,7 +9,7 @@ router.use(authenticate);
 router.use(requirePlan('pro', prisma));
 
 // ── GET /api/ai-suggestions ──────────────────────────────────────────────────
-// List all suggestions (optionally filtered by status)
+// List all suggestions (conversation-based + issue-based), optionally filtered by status
 
 router.get('/', async (req: AuthRequest, res: Response) => {
   try {
@@ -20,7 +20,10 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 
     const suggestions = await prisma.aiSuggestion.findMany({
       where: {
-        conversation: { hostId: host.id },
+        OR: [
+          { conversation: { hostId: host.id } },
+          { issue: { property: { hostId: host.id } } },
+        ],
         ...(status ? { status } : {}),
       },
       orderBy: { createdAt: 'desc' },
@@ -37,6 +40,9 @@ router.get('/', async (req: AuthRequest, res: Response) => {
         },
         message: {
           select: { id: true, content: true, imageUrl: true, senderType: true, senderName: true, createdAt: true },
+        },
+        issue: {
+          select: { id: true, description: true, severity: true, status: true, property: { select: { id: true, name: true } } },
         },
       },
     });
@@ -79,6 +85,21 @@ router.get('/conversation/:conversationId', async (req: AuthRequest, res: Respon
   }
 });
 
+// Helper: verify host owns the suggestion (via conversation or issue property)
+async function verifySuggestionOwnership(suggestionId: string, hostId: string) {
+  const suggestion = await prisma.aiSuggestion.findUnique({
+    where: { id: suggestionId },
+    include: {
+      conversation: { select: { hostId: true } },
+      issue: { select: { property: { select: { hostId: true } } } },
+    },
+  });
+  if (!suggestion) return null;
+  const ownerHostId = suggestion.conversation?.hostId || suggestion.issue?.property?.hostId;
+  if (ownerHostId !== hostId) return null;
+  return suggestion;
+}
+
 // ── POST /api/ai-suggestions/:id/approve ─────────────────────────────────────
 
 router.post('/:id/approve', async (req: AuthRequest, res: Response) => {
@@ -86,14 +107,8 @@ router.post('/:id/approve', async (req: AuthRequest, res: Response) => {
     const host = await prisma.host.findUnique({ where: { userId: req.user!.id } });
     if (!host) return res.status(403).json({ error: 'Host not found' });
 
-    // Verify host owns the conversation
-    const suggestion = await prisma.aiSuggestion.findUnique({
-      where: { id: req.params.id },
-      include: { conversation: { select: { hostId: true } } },
-    });
-    if (!suggestion || suggestion.conversation.hostId !== host.id) {
-      return res.status(404).json({ error: 'Suggestion not found' });
-    }
+    const suggestion = await verifySuggestionOwnership(req.params.id, host.id);
+    if (!suggestion) return res.status(404).json({ error: 'Suggestion not found' });
 
     const result = await executeAction(req.params.id, req.body);
     return res.json({ ok: true, ...result });
@@ -110,13 +125,8 @@ router.post('/:id/dismiss', async (req: AuthRequest, res: Response) => {
     const host = await prisma.host.findUnique({ where: { userId: req.user!.id } });
     if (!host) return res.status(403).json({ error: 'Host not found' });
 
-    const suggestion = await prisma.aiSuggestion.findUnique({
-      where: { id: req.params.id },
-      include: { conversation: { select: { hostId: true } } },
-    });
-    if (!suggestion || suggestion.conversation.hostId !== host.id) {
-      return res.status(404).json({ error: 'Suggestion not found' });
-    }
+    const suggestion = await verifySuggestionOwnership(req.params.id, host.id);
+    if (!suggestion) return res.status(404).json({ error: 'Suggestion not found' });
 
     await dismissSuggestion(req.params.id);
     return res.json({ ok: true });

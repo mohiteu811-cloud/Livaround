@@ -11,6 +11,14 @@ interface ActionPayload {
     propertyId: string;
     notes: string;
   };
+  dispatchData?: {
+    suggestedRole: string;
+    reason: string;
+  };
+  tradesmanData?: {
+    suggestedTrade: string;
+    reason: string;
+  };
 }
 
 export async function executeAction(
@@ -26,6 +34,7 @@ export async function executeAction(
         },
       },
       message: true,
+      issue: { select: { id: true, propertyId: true, description: true, photoUrl: true } },
     },
   });
 
@@ -38,29 +47,33 @@ export async function executeAction(
   let createdIssueId: string | undefined;
   let createdJobId: string | undefined;
 
-  if (action === 'CREATE_ISSUE' || action === 'CREATE_JOB' || action === 'DISPATCH_WORKER') {
-    // Create issue if issueData is provided
+  // Derive propertyId from conversation or issue
+  const propertyId = payload.jobData?.propertyId
+    || suggestion.conversation?.propertyId
+    || suggestion.issue?.propertyId
+    || undefined;
+
+  if (action === 'CREATE_ISSUE' || action === 'CREATE_JOB' || action === 'DISPATCH_WORKER' || action === 'CALL_TRADESMAN') {
+    // Create issue if issueData is provided (only for conversation-based suggestions)
     if (payload.issueData) {
-      const propertyId = payload.jobData?.propertyId || suggestion.conversation.propertyId;
       const issue = await prisma.issue.create({
         data: {
           propertyId: propertyId || undefined,
-          jobId: undefined,
           description: payload.issueData.description || suggestion.summary,
           severity: payload.issueData.severity || 'MEDIUM',
-          photoUrl: payload.issueData.photoUrl || suggestion.message.imageUrl || undefined,
+          photoUrl: payload.issueData.photoUrl || suggestion.message?.imageUrl || undefined,
           status: 'OPEN',
         },
       });
       createdIssueId = issue.id;
     }
 
-    // Create job if jobData is provided
-    if (payload.jobData && payload.jobData.propertyId) {
+    // Create job if jobData is provided or if dispatching
+    if (payload.jobData && propertyId) {
       const job = await prisma.job.create({
         data: {
-          propertyId: payload.jobData.propertyId,
-          bookingId: suggestion.conversation.booking?.id || undefined,
+          propertyId,
+          bookingId: suggestion.conversation?.booking?.id || undefined,
           type: payload.jobData.type || 'MAINTENANCE',
           status: 'PENDING',
           scheduledAt: new Date(),
@@ -69,10 +82,25 @@ export async function executeAction(
       });
       createdJobId = job.id;
 
-      // Auto-dispatch if DISPATCH_WORKER
-      if (action === 'DISPATCH_WORKER') {
+      // Check host's auto-dispatch preference
+      const hostId = suggestion.conversation?.hostId
+        || (suggestion.issue?.propertyId
+          ? (await prisma.property.findUnique({ where: { id: suggestion.issue.propertyId }, select: { hostId: true } }))?.hostId
+          : undefined);
+
+      const host = hostId
+        ? await prisma.host.findUnique({ where: { id: hostId }, select: { autoDispatch: true } })
+        : null;
+      const shouldAutoDispatch = host?.autoDispatch !== false; // default true
+
+      // Auto-dispatch if DISPATCH_WORKER and autoDispatch is enabled
+      if ((action === 'DISPATCH_WORKER' || action === 'CALL_TRADESMAN') && shouldAutoDispatch) {
+        const roleFilter = payload.dispatchData?.suggestedRole;
         const availableWorker = await prisma.propertyStaff.findFirst({
-          where: { propertyId: payload.jobData.propertyId },
+          where: {
+            propertyId,
+            ...(roleFilter ? { role: roleFilter } : {}),
+          },
           include: { worker: { select: { id: true, isAvailable: true, pushToken: true } } },
         });
 
@@ -98,12 +126,20 @@ export async function executeAction(
           }
         }
       }
+
+      // Link job back to the issue if this was an issue-based suggestion
+      if (suggestion.issueId) {
+        await prisma.issue.update({
+          where: { id: suggestion.issueId },
+          data: { jobId: job.id, status: 'IN_REVIEW' },
+        });
+      }
     }
   }
 
-  // Send suggested reply if action is AUTO_REPLY or if reply was provided
+  // Send suggested reply if action is AUTO_REPLY (only for conversation-based suggestions)
   const replyText = overrides?.suggestedReply || suggestion.suggestedReply;
-  if (action === 'AUTO_REPLY' && replyText) {
+  if (action === 'AUTO_REPLY' && replyText && suggestion.conversationId) {
     await prisma.message.create({
       data: {
         conversationId: suggestion.conversationId,

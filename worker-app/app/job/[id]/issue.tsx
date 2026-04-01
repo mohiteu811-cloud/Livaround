@@ -57,6 +57,19 @@ export default function ReportIssueScreen() {
     }
   }
 
+  async function pickPhotoFromLibrary() {
+    if (!(await requestPermission())) return;
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.8,
+      allowsEditing: false,
+    });
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      setPhoto({ uri: asset.uri, type: asset.mimeType ?? 'image/jpeg' });
+    }
+  }
+
   async function recordVideo() {
     const camPerm = await ImagePicker.requestCameraPermissionsAsync();
     if (camPerm.status !== 'granted') {
@@ -195,9 +208,14 @@ export default function ReportIssueScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          <TouchableOpacity style={styles.mediaButton} onPress={pickPhoto}>
-            <Text style={styles.mediaButtonText}>{tr.takePhoto}</Text>
-          </TouchableOpacity>
+          <View style={styles.videoButtons}>
+            <TouchableOpacity style={[styles.mediaButton, { flex: 1 }]} onPress={pickPhoto}>
+              <Text style={styles.mediaButtonText}>{tr.takePhoto}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.mediaButton, { flex: 1 }]} onPress={pickPhotoFromLibrary}>
+              <Text style={styles.mediaButtonText}>{tr.library}</Text>
+            </TouchableOpacity>
+          </View>
         )}
 
         {/* Video */}
