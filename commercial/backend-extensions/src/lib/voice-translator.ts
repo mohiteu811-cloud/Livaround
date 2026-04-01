@@ -85,17 +85,7 @@ async function processTranslation(
   }
 
   try {
-    // 1. Download audio
-    const response = await fetch(message.voiceUrl);
-    const audioBuffer = Buffer.from(await response.arrayBuffer());
-    const audioContent = audioBuffer.toString('base64');
-
     // 2. Speech-to-Text with auto language detection
-    // Determine encoding from the file URL extension
-    const urlLower = message.voiceUrl.toLowerCase();
-    const isWebm = urlLower.includes('.webm');
-    const isOgg = urlLower.includes('.ogg');
-
     const recognizeConfig: any = {
       languageCode: 'en-US',
       alternativeLanguageCodes: ['hi-IN', 'mr-IN', 'kn-IN', 'ta-IN', 'te-IN', 'bn-IN', 'gu-IN', 'pa-IN', 'ml-IN', 'ur-IN'],
@@ -103,19 +93,39 @@ async function processTranslation(
       model: 'latest_long',
     };
 
-    // Only set encoding for formats we know; for M4A/AAC, omit encoding
-    // so Google auto-detects from the audio content
-    if (isWebm) {
-      recognizeConfig.encoding = 'WEBM_OPUS';
-    } else if (isOgg) {
-      recognizeConfig.encoding = 'OGG_OPUS';
-    }
-    // For .m4a / AAC: no encoding set — Google auto-detects
+    // Determine audio source: convert Firebase HTTPS URL to gs:// URI if possible,
+    // otherwise download and send as content
+    let audio: any;
+    const gcsMatch = message.voiceUrl.match(/^https:\/\/storage\.googleapis\.com\/([^/]+)\/(.+)$/);
+    const firebaseMatch = message.voiceUrl.match(/^https:\/\/([^.]+\.firebasestorage\.app)\/(.+?)(\?.*)?$/);
 
-    // Always use content-based recognition (Firebase URLs aren't valid GCS URIs)
+    if (gcsMatch) {
+      // Standard GCS URL → gs:// URI (Speech API auto-detects encoding)
+      const gcsUri = `gs://${gcsMatch[1]}/${gcsMatch[2]}`;
+      console.log('Voice translation: using GCS URI', gcsUri);
+      audio = { uri: gcsUri };
+    } else if (firebaseMatch) {
+      // Firebase Storage URL → gs:// URI
+      const gcsUri = `gs://${firebaseMatch[1]}/${decodeURIComponent(firebaseMatch[2])}`;
+      console.log('Voice translation: using Firebase GCS URI', gcsUri);
+      audio = { uri: gcsUri };
+    } else {
+      // Non-GCS URL: download and send as content with explicit encoding
+      const response = await fetch(message.voiceUrl);
+      const audioBuffer = Buffer.from(await response.arrayBuffer());
+      audio = { content: audioBuffer.toString('base64') };
+
+      const urlLower = message.voiceUrl.toLowerCase();
+      if (urlLower.includes('.webm')) {
+        recognizeConfig.encoding = 'WEBM_OPUS';
+      } else if (urlLower.includes('.ogg')) {
+        recognizeConfig.encoding = 'OGG_OPUS';
+      }
+    }
+
     let sttResponse: any;
     [sttResponse] = await speech.recognize({
-      audio: { content: audioContent },
+      audio,
       config: recognizeConfig,
     });
 
@@ -131,8 +141,8 @@ async function processTranslation(
     if (!transcript) return;
 
     // 3. Determine target language
-    // Workers \u2192 translate to English for host/guest
-    // Host/Guest \u2192 translate to Hindi (most common worker language) as default
+    // Workers → translate to English for host/guest
+    // Host/Guest → translate to Hindi (most common worker language) as default
     const isWorkerSender = message.senderType === 'WORKER' || message.senderType === 'SUPERVISOR';
     const sourceLang = detectedLanguage.split('-')[0]; // e.g., 'hi' from 'hi-IN'
     const targetLang = isWorkerSender ? 'en' : 'hi';
