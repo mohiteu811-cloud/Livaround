@@ -95,11 +95,6 @@ async function processTranslation(
     const urlLower = message.voiceUrl.toLowerCase();
     const isWebm = urlLower.includes('.webm');
     const isOgg = urlLower.includes('.ogg');
-    // expo-av on mobile records AAC/M4A; web MediaRecorder uses WEBM_OPUS
-    const encoding = isWebm ? 'WEBM_OPUS' : isOgg ? 'OGG_OPUS' : 'AMR_WB';
-
-    // For AAC/M4A files, use longRunningRecognize with auto-detect encoding
-    const useAutoDetect = !isWebm && !isOgg;
 
     const recognizeConfig: any = {
       languageCode: 'en-US',
@@ -108,25 +103,21 @@ async function processTranslation(
       model: 'latest_long',
     };
 
-    if (!useAutoDetect) {
-      recognizeConfig.encoding = encoding;
+    // Only set encoding for formats we know; for M4A/AAC, omit encoding
+    // so Google auto-detects from the audio content
+    if (isWebm) {
+      recognizeConfig.encoding = 'WEBM_OPUS';
+    } else if (isOgg) {
+      recognizeConfig.encoding = 'OGG_OPUS';
     }
+    // For .m4a / AAC: no encoding set — Google auto-detects
 
-    // Try direct recognition first; if it fails (wrong encoding), retry with URI-based recognition
+    // Always use content-based recognition (Firebase URLs aren't valid GCS URIs)
     let sttResponse: any;
-    try {
-      [sttResponse] = await speech.recognize({
-        audio: { content: audioContent },
-        config: recognizeConfig,
-      });
-    } catch (recognizeError: any) {
-      // Fallback: use the audio URI directly (Google can auto-detect format from URL)
-      console.warn('Direct recognition failed, trying URI-based:', recognizeError.message);
-      [sttResponse] = await speech.recognize({
-        audio: { uri: message.voiceUrl },
-        config: recognizeConfig,
-      });
-    }
+    [sttResponse] = await speech.recognize({
+      audio: { content: audioContent },
+      config: recognizeConfig,
+    });
 
     if (!sttResponse.results?.length) {
       console.warn('No transcription results for message', message.id);
