@@ -138,6 +138,8 @@ async function processTranslation(
       config: recognizeConfig,
     });
 
+    console.log('Voice STT response:', JSON.stringify(sttResponse.results?.length || 0), 'results');
+
     if (!sttResponse.results?.length) {
       console.warn('No transcription results for message', message.id);
       return;
@@ -146,6 +148,8 @@ async function processTranslation(
     const result = sttResponse.results[0];
     const transcript = result.alternatives?.[0]?.transcript;
     const detectedLanguage = result.languageCode || 'en-us';
+
+    console.log('Voice transcript:', transcript, '| language:', detectedLanguage);
 
     if (!transcript) return;
 
@@ -170,6 +174,8 @@ async function processTranslation(
 
       translation = translateResponse.translations?.[0]?.translatedText || null;
     }
+
+    console.log('Voice translation result:', { transcript, translation, sourceLang, targetLang });
 
     // 4. Update message record
     await prisma.message.update({
