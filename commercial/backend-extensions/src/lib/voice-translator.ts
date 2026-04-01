@@ -6,13 +6,25 @@ import { analyzeMessageAsync } from './ai-analyzer';
 let speechClient: any = null;
 let translateClient: any = null;
 
+function getGoogleCredentials(): any {
+  if (process.env.GOOGLE_CLOUD_CREDENTIALS) {
+    try {
+      const creds = JSON.parse(process.env.GOOGLE_CLOUD_CREDENTIALS);
+      return { credentials: creds, projectId: creds.project_id };
+    } catch (err) {
+      console.error('Failed to parse GOOGLE_CLOUD_CREDENTIALS:', err);
+    }
+  }
+  return {};
+}
+
 function getSpeechClient() {
   if (!speechClient) {
     try {
       const { SpeechClient } = require('@google-cloud/speech');
-      speechClient = new SpeechClient();
-    } catch {
-      console.warn('Google Cloud Speech not available');
+      speechClient = new SpeechClient(getGoogleCredentials());
+    } catch (err) {
+      console.warn('Google Cloud Speech not available:', err);
     }
   }
   return speechClient;
@@ -22,9 +34,9 @@ function getTranslateClient() {
   if (!translateClient) {
     try {
       const { TranslationServiceClient } = require('@google-cloud/translate').v3;
-      translateClient = new TranslationServiceClient();
-    } catch {
-      console.warn('Google Cloud Translate not available');
+      translateClient = new TranslationServiceClient(getGoogleCredentials());
+    } catch (err) {
+      console.warn('Google Cloud Translate not available:', err);
     }
   }
   return translateClient;
