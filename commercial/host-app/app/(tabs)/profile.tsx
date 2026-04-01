@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, Platform, Linking } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, Platform, Linking, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { api, User, clearToken } from '../../src/lib/api';
@@ -7,9 +7,11 @@ import { disconnectSocket } from '../../src/lib/socket';
 
 export default function ProfileScreen() {
   const [user, setUser] = useState<User | null>(null);
+  const [autoDispatch, setAutoDispatch] = useState(false);
 
   useEffect(() => {
     api.auth.me().then(setUser).catch(() => {});
+    api.hostApp.getSettings().then(s => setAutoDispatch(s.autoDispatch)).catch(() => {});
   }, []);
 
   async function handleLogout() {
@@ -25,6 +27,16 @@ export default function ProfileScreen() {
         },
       },
     ]);
+  }
+
+  async function toggleAutoDispatch(val: boolean) {
+    setAutoDispatch(val);
+    try {
+      await api.hostApp.updateSettings({ autoDispatch: val });
+    } catch {
+      setAutoDispatch(!val);
+      Alert.alert('Error', 'Failed to update setting');
+    }
   }
 
   function openBilling() {
@@ -66,6 +78,17 @@ export default function ProfileScreen() {
           <Text style={styles.menuText}>Issues & Maintenance</Text>
           <Text style={styles.menuArrow}>›</Text>
         </TouchableOpacity>
+
+        <View style={styles.menuItem}>
+          <Text style={styles.menuEmoji}>⚡</Text>
+          <Text style={styles.menuText}>Auto-Dispatch Jobs</Text>
+          <Switch
+            value={autoDispatch}
+            onValueChange={toggleAutoDispatch}
+            trackColor={{ false: '#334155', true: '#1d4ed8' }}
+            thumbColor={autoDispatch ? '#3b82f6' : '#94a3b8'}
+          />
+        </View>
       </View>
 
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
