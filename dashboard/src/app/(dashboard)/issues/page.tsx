@@ -331,13 +331,16 @@ export default function IssuesPage() {
     try {
       const data = await api.jobs.listIssues();
       setIssues(data);
+    } catch {
+      // API may fail if not authenticated or endpoint unavailable
+      setIssues([]);
     } finally {
       setLoading(false);
     }
   }
 
   async function handleStatusChange(id: string, status: 'OPEN' | 'IN_REVIEW' | 'RESOLVED') {
-    await api.jobs.resolveIssue(id, status);
+    try { await api.jobs.resolveIssue(id, status); } catch { return; }
     await load();
   }
 
