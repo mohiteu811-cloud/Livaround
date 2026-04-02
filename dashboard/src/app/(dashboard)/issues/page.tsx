@@ -8,6 +8,17 @@ import { Select } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 
+function safeFormat(dateStr: string | undefined | null, fmt: string): string {
+  try {
+    if (!dateStr) return '—';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '—';
+    return format(d, fmt);
+  } catch {
+    return '—';
+  }
+}
+
 const JOB_TYPE_ICONS: Record<string, string> = {
   CLEANING: '🧹',
   COOKING: '🍳',
@@ -222,7 +233,7 @@ function IssueDetailModal({ issue, onClose, onStatusChange }: {
           {STATUS_ICONS[issue.status]} {issue.status.replace('_', ' ')}
         </span>
         <span className="px-2 py-1 rounded-full bg-slate-800 text-slate-400">
-          {format(new Date(issue.createdAt), 'dd MMM yyyy, HH:mm')}
+          {safeFormat(issue.createdAt, 'dd MMM yyyy, HH:mm')}
         </span>
       </div>
 
@@ -231,16 +242,16 @@ function IssueDetailModal({ issue, onClose, onStatusChange }: {
         <div className="bg-slate-800/60 rounded-lg p-4 text-sm space-y-1.5">
           <div className="flex items-center gap-2 text-slate-200 font-medium">
             <span>{JOB_TYPE_ICONS[issue.job.type] ?? '📋'}</span>
-            <span>{issue.job.type.charAt(0) + issue.job.type.slice(1).toLowerCase()} job</span>
+            <span>{(issue.job.type || 'Unknown').charAt(0) + (issue.job.type || 'Unknown').slice(1).toLowerCase()} job</span>
           </div>
           {issue.job.property && (
             <p className="text-slate-400">📍 {issue.job.property.name}</p>
           )}
           {issue.job.worker && (
-            <p className="text-slate-400">👷 {issue.job.worker.user.name}</p>
+            <p className="text-slate-400">👷 {issue.job.worker?.user?.name || 'Unknown'}</p>
           )}
           <p className="text-slate-500 text-xs">
-            Scheduled {format(new Date(issue.job.scheduledAt), 'dd MMM yyyy, HH:mm')}
+            Scheduled {safeFormat(issue.job.scheduledAt, 'dd MMM yyyy, HH:mm')}
           </p>
         </div>
       )}
@@ -412,8 +423,8 @@ export default function IssuesPage() {
                 </div>
                 {issue.job && (
                   <p className="text-slate-500 text-xs">
-                    {JOB_TYPE_ICONS[issue.job.type] ?? '📋'} {issue.job.type.charAt(0) + issue.job.type.slice(1).toLowerCase()} · {issue.job.property?.name}
-                    {issue.job.worker && ` · ${issue.job.worker.user.name}`}
+                    {JOB_TYPE_ICONS[issue.job.type] ?? '📋'} {(issue.job.type || 'Unknown').charAt(0) + (issue.job.type || 'Unknown').slice(1).toLowerCase()} · {issue.job.property?.name}
+                    {issue.job.worker?.user?.name ? ` · ${issue.job.worker.user.name}` : ''}
                   </p>
                 )}
                 <div className="flex gap-2">
@@ -460,14 +471,14 @@ export default function IssuesPage() {
                       {issue.job ? (
                         <div>
                           <p className="text-slate-300 text-xs">
-                            {JOB_TYPE_ICONS[issue.job.type] ?? '📋'} {issue.job.type.charAt(0) + issue.job.type.slice(1).toLowerCase()}
+                            {JOB_TYPE_ICONS[issue.job.type] ?? '📋'} {(issue.job.type || 'Unknown').charAt(0) + (issue.job.type || 'Unknown').slice(1).toLowerCase()}
                           </p>
                           <p className="text-slate-500 text-xs">{issue.job.property?.name}</p>
                         </div>
                       ) : '—'}
                     </td>
                     <td className="px-6 py-4 text-slate-400 text-xs">
-                      {issue.job?.worker?.user.name ?? <span className="text-slate-600 italic">Unknown</span>}
+                      {issue.job?.worker?.user?.name ?? <span className="text-slate-600 italic">Unknown</span>}
                     </td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${SEVERITY_STYLES[issue.severity]}`}>
@@ -480,7 +491,7 @@ export default function IssuesPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-slate-500 text-xs">
-                      {format(new Date(issue.createdAt), 'dd MMM, HH:mm')}
+                      {safeFormat(issue.createdAt, 'dd MMM, HH:mm')}
                     </td>
                     <td className="px-6 py-4">
                       <button
