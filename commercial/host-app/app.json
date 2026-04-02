@@ -52,7 +52,7 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "REPLACE_WITH_HOST_APP_PROJECT_ID"
+        "projectId": "e8dd8d7e-1a0b-4b7c-adb6-cbb1fc509d82"
       }
     },
     "experiments": {
