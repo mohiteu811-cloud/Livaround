@@ -25,11 +25,13 @@ export default function LoginScreen() {
     }
     await setToken(token);
 
-    // Register push notifications
-    const pushToken = await registerForPushNotifications();
-    if (pushToken) {
-      await api.hostApp.registerPushToken(pushToken).catch(() => {});
-    }
+    // Register push notifications (non-blocking — don't fail login if unavailable)
+    try {
+      const pushToken = await registerForPushNotifications();
+      if (pushToken) {
+        await api.hostApp.registerPushToken(pushToken).catch(() => {});
+      }
+    } catch {}
 
     // Connect Socket.IO
     connectSocket().catch(() => {});

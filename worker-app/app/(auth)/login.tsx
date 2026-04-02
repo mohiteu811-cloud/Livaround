@@ -30,11 +30,13 @@ export default function LoginScreen() {
       }
       await setToken(token);
 
-      // Register push notifications
-      const pushToken = await registerForPushNotifications();
-      if (pushToken && user.worker?.id) {
-        await api.workers.registerPushToken(user.worker.id, pushToken).catch(() => {});
-      }
+      // Register push notifications (non-blocking — don't fail login if unavailable)
+      try {
+        const pushToken = await registerForPushNotifications();
+        if (pushToken && user.worker?.id) {
+          await api.workers.registerPushToken(user.worker.id, pushToken).catch(() => {});
+        }
+      } catch {}
 
       // Request location permission and start tracking (must await before navigating)
       await startLocationTracking().catch(() => {});
