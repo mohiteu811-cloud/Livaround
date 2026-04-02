@@ -331,14 +331,18 @@ export default function IssuesPage() {
     try {
       const data = await api.jobs.listIssues();
       setIssues(data);
+    } catch {
+      setIssues([]);
     } finally {
       setLoading(false);
     }
   }
 
   async function handleStatusChange(id: string, status: 'OPEN' | 'IN_REVIEW' | 'RESOLVED') {
-    await api.jobs.resolveIssue(id, status);
-    await load();
+    try {
+      await api.jobs.resolveIssue(id, status);
+      await load();
+    } catch {}
   }
 
   const filtered = issues.filter((i) =>
