@@ -95,12 +95,14 @@ export default function ReportIssueScreen() {
     });
     if (!result.canceled && result.assets[0]) {
       const asset = result.assets[0];
-      setVideo({ uri: asset.uri, type: asset.mimeType ?? 'video/mp4', duration: asset.duration ?? undefined });
+      const durationMs = asset.duration ?? undefined;
+      const durationSec = durationMs != null ? durationMs / 1000 : undefined;
+      setVideo({ uri: asset.uri, type: asset.mimeType ?? 'video/mp4', duration: durationSec });
     }
   }
 
   async function handleSubmit() {
-    if (!description.trim()) {
+    if (!description.trim() || description.trim().length < 5) {
       Alert.alert(tr.required, tr.describeIssue);
       return;
     }

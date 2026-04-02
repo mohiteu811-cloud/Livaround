@@ -8,7 +8,7 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 200 * 1024 * 1024 }, // 200 MB
   fileFilter: (_req, file, cb) => {
-    const allowed = /image\/(jpeg|jpg|png|webp|gif)|video\/(mp4|quicktime|webm|3gpp)|audio\/(aac|mp4|m4a|mpeg|ogg|webm|wav|x-m4a)|application\/(pdf)|text\/(csv|plain)/;
+    const allowed = /image\/(jpeg|jpg|png|webp|gif|heic|heif)|video\/(mp4|quicktime|webm|3gpp|3gpp2|x-matroska|mpeg|avi)|audio\/(aac|mp4|m4a|mpeg|ogg|webm|wav|x-m4a)|application\/(pdf|octet-stream)|text\/(csv|plain)/;
     cb(null, allowed.test(file.mimetype));
   },
 });
