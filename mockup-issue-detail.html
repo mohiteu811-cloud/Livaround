@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Issue Detail - Mockup</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #020617; display: flex; justify-content: center; padding: 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+  .phone { width: 390px; height: 844px; background: #0f172a; border-radius: 40px; overflow: hidden; border: 3px solid #1e293b; display: flex; flex-direction: column; }
+  .status-bar { height: 50px; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; color: #f8fafc; font-size: 14px; font-weight: 600; }
+  .header-bar { display: flex; align-items: center; padding: 12px 16px; gap: 12px; }
+  .back-text { color: #3b82f6; font-size: 16px; font-weight: 600; cursor: pointer; }
+  .header-title { font-size: 18px; font-weight: 700; color: #f8fafc; }
+  .scroll { flex: 1; overflow-y: auto; padding: 0 16px 24px; }
+  .scroll::-webkit-scrollbar { width: 0; }
+  .card { background: #1e293b; border-radius: 12px; padding: 16px; border: 1px solid #334155; margin-bottom: 12px; }
+  .description { font-size: 16px; font-weight: 600; color: #f8fafc; margin-bottom: 8px; line-height: 1.4; }
+  .badge-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+  .badge { border-radius: 6px; padding: 3px 10px; display: inline-block; }
+  .badge-text { color: #fff; font-size: 11px; font-weight: 600; }
+  .small-badge { border-radius: 4px; padding: 2px 6px; display: inline-block; }
+  .small-badge-text { color: #fff; font-size: 10px; font-weight: 600; }
+  .label { font-size: 12px; color: #64748b; text-transform: uppercase; margin-top: 12px; margin-bottom: 2px; font-weight: 600; }
+  .label:first-child { margin-top: 0; }
+  .value { font-size: 15px; color: #e2e8f0; }
+  .photo { width: 100%; height: 180px; border-radius: 8px; margin-top: 8px; object-fit: cover; background: #334155; display: flex; align-items: center; justify-content: center; color: #64748b; font-size: 13px; }
+  .link-text { color: #3b82f6; font-size: 14px; font-weight: 600; margin-top: 8px; cursor: pointer; }
+  .section-title { font-size: 14px; font-weight: 700; color: #f8fafc; margin-bottom: 8px; }
+  .suggestion-item { border-top: 1px solid #334155; padding-top: 10px; margin-top: 6px; }
+  .suggestion-header { display: flex; align-items: flex-start; cursor: pointer; }
+  .suggestion-summary { font-size: 14px; font-weight: 600; color: #f8fafc; margin-bottom: 6px; flex: 1; }
+  .expand-icon { color: #64748b; font-size: 16px; margin-left: 8px; margin-top: 2px; }
+  .suggestion-details { margin-top: 10px; padding-left: 4px; }
+  .detail-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .detail-label { font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px; }
+  .detail-value { font-size: 13px; color: #e2e8f0; }
+  .detail-block { margin-bottom: 12px; }
+  .detail-text { font-size: 13px; color: #cbd5e1; line-height: 20px; }
+  .action-section { margin-top: 8px; padding-top: 10px; border-top: 1px solid #334155; }
+  .suggestion-btns { display: flex; gap: 10px; }
+  .approve-btn { background: #166534; border-radius: 8px; padding: 8px 14px; border: none; cursor: pointer; }
+  .approve-btn-text { color: #fff; font-size: 13px; font-weight: 600; }
+  .dismiss-btn { border-radius: 8px; padding: 8px 14px; border: 1px solid #475569; background: transparent; cursor: pointer; }
+  .dismiss-btn-text { color: #94a3b8; font-size: 13px; font-weight: 600; }
+  .trade-btn { background: #1e3a5f; border-radius: 8px; padding: 8px 14px; margin-top: 8px; border: none; cursor: pointer; }
+  .trade-btn-text { color: #3b82f6; font-size: 13px; font-weight: 600; }
+  .primary-btn { background: #3b82f6; border-radius: 10px; padding: 14px; text-align: center; border: none; width: 100%; cursor: pointer; margin-top: 4px; }
+  .btn-text { color: #fff; font-size: 16px; font-weight: 700; }
+  .collapsed .suggestion-details { display: none; }
+
+  /* Second phone for collapsed state */
+  .phones { display: flex; gap: 30px; flex-wrap: wrap; justify-content: center; }
+  .phone-label { color: #94a3b8; font-size: 13px; text-align: center; margin-bottom: 8px; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="phones">
+
+<!-- Phone 1: Expanded AI Analysis -->
+<div>
+  <div class="phone-label">Issue Detail - AI Analysis Expanded</div>
+  <div class="phone">
+    <div class="status-bar">
+      <span>9:41</span>
+      <span>5G</span>
+    </div>
+    <div class="header-bar">
+      <span class="back-text">&#8249; Back</span>
+      <span class="header-title">Issue Detail</span>
+    </div>
+    <div class="scroll">
+      <!-- Description & Status -->
+      <div class="card">
+        <div class="description">Water leaking from bathroom ceiling, tiles appear damaged and there is visible mold forming around the edges</div>
+        <div class="badge-row">
+          <span class="badge" style="background:#ef4444"><span class="badge-text">HIGH</span></span>
+          <span class="badge" style="background:#ef4444"><span class="badge-text">OPEN</span></span>
+        </div>
+      </div>
+
+      <!-- Details -->
+      <div class="card">
+        <div class="label" style="margin-top:0">Property</div>
+        <div class="value">Villa Serena - Candolim</div>
+        <div class="label">Reported By</div>
+        <div class="value">Ravi Kumar</div>
+        <div class="label">Created</div>
+        <div class="value">Apr 2, 2026, 3:15 PM</div>
+      </div>
+
+      <!-- Media -->
+      <div class="card">
+        <div class="label" style="margin-top:0">Media</div>
+        <div class="photo">[ Photo: Bathroom ceiling leak ]</div>
+        <div class="link-text">View Video</div>
+      </div>
+
+      <!-- AI Analysis -->
+      <div class="card">
+        <div class="section-title">AI Analysis</div>
+
+        <!-- Suggestion 1 - Expanded (PENDING) -->
+        <div class="suggestion-item">
+          <div class="suggestion-header" onclick="this.parentElement.classList.toggle('collapsed')">
+            <div style="flex:1">
+              <div class="suggestion-summary">Bathroom ceiling leak with mold — requires professional plumbing inspection</div>
+              <div class="badge-row">
+                <span class="small-badge" style="background:#334155"><span class="small-badge-text">MAINTENANCE</span></span>
+                <span class="small-badge" style="background:#ef4444"><span class="small-badge-text">HIGH</span></span>
+                <span class="small-badge" style="background:#f59e0b"><span class="small-badge-text">PENDING</span></span>
+              </div>
+            </div>
+            <span class="expand-icon">&#9662;</span>
+          </div>
+          <div class="suggestion-details">
+            <div class="detail-row">
+              <span class="detail-label">Sentiment</span>
+              <span class="detail-value">NEGATIVE</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Recommended Action</span>
+              <span class="detail-value">CALL TRADESMAN</span>
+            </div>
+            <div class="detail-block">
+              <div class="detail-label">Next Steps</div>
+              <div class="detail-text">The ceiling leak suggests a plumbing issue in the floor above or a roof drainage problem. The mold indicates this has been ongoing. Recommended steps: 1) Immediately place a bucket to catch water and protect flooring. 2) Call a plumber to inspect the source of the leak. 3) Once fixed, engage a cleaning crew to treat the mold. 4) Notify current guests if the unit is occupied and offer room change if available.</div>
+            </div>
+            <div class="detail-block">
+              <div class="detail-label">Tradesman Details</div>
+              <div class="detail-text">Trade needed: Plumber<br>Water leak from ceiling with visible mold — needs pipe inspection and repair before mold remediation</div>
+            </div>
+            <div class="action-section">
+              <div class="suggestion-btns">
+                <button class="approve-btn"><span class="approve-btn-text">Approve</span></button>
+                <button class="dismiss-btn"><span class="dismiss-btn-text">Dismiss</span></button>
+              </div>
+              <button class="trade-btn"><span class="trade-btn-text">Find Plumber</span></button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Suggestion 2 - Collapsed (APPROVED) -->
+        <div class="suggestion-item collapsed">
+          <div class="suggestion-header" onclick="this.parentElement.classList.toggle('collapsed')">
+            <div style="flex:1">
+              <div class="suggestion-summary">Initial assessment — water damage detected in bathroom area</div>
+              <div class="badge-row">
+                <span class="small-badge" style="background:#334155"><span class="small-badge-text">MAINTENANCE</span></span>
+                <span class="small-badge" style="background:#f59e0b"><span class="small-badge-text">MEDIUM</span></span>
+                <span class="small-badge" style="background:#10b981"><span class="small-badge-text">APPROVED</span></span>
+              </div>
+            </div>
+            <span class="expand-icon">&#9656;</span>
+          </div>
+          <div class="suggestion-details">
+            <div class="detail-row">
+              <span class="detail-label">Sentiment</span>
+              <span class="detail-value">NEUTRAL</span>
+            </div>
+            <div class="detail-block">
+              <div class="detail-label">Next Steps</div>
+              <div class="detail-text">Send a caretaker to assess the extent of the damage and document it with photos.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Status Action -->
+      <button class="primary-btn"><span class="btn-text">Mark In Review</span></button>
+    </div>
+  </div>
+</div>
+
+<!-- Phone 2: Scrolled down / different issue -->
+<div>
+  <div class="phone-label">Issue Detail - With Linked Job</div>
+  <div class="phone">
+    <div class="status-bar">
+      <span>9:41</span>
+      <span>5G</span>
+    </div>
+    <div class="header-bar">
+      <span class="back-text">&#8249; Back</span>
+      <span class="header-title">Issue Detail</span>
+    </div>
+    <div class="scroll">
+      <!-- Description & Status -->
+      <div class="card">
+        <div class="description">AC unit not cooling properly in master bedroom, making buzzing noise</div>
+        <div class="badge-row">
+          <span class="badge" style="background:#f59e0b"><span class="badge-text">MEDIUM</span></span>
+          <span class="badge" style="background:#f59e0b"><span class="badge-text">IN REVIEW</span></span>
+        </div>
+      </div>
+
+      <!-- Details -->
+      <div class="card">
+        <div class="label" style="margin-top:0">Property</div>
+        <div class="value">Ocean View Apartment - Baga</div>
+        <div class="label">Reported By</div>
+        <div class="value">Suresh Patel</div>
+        <div class="label">Created</div>
+        <div class="value">Apr 1, 2026, 11:20 AM</div>
+      </div>
+
+      <!-- AI Analysis - single suggestion expanded -->
+      <div class="card">
+        <div class="section-title">AI Analysis</div>
+        <div class="suggestion-item">
+          <div class="suggestion-header" onclick="this.parentElement.classList.toggle('collapsed')">
+            <div style="flex:1">
+              <div class="suggestion-summary">AC malfunction with unusual noise — likely compressor or fan motor issue</div>
+              <div class="badge-row">
+                <span class="small-badge" style="background:#334155"><span class="small-badge-text">APPLIANCE</span></span>
+                <span class="small-badge" style="background:#f59e0b"><span class="small-badge-text">MEDIUM</span></span>
+                <span class="small-badge" style="background:#10b981"><span class="small-badge-text">APPROVED</span></span>
+              </div>
+            </div>
+            <span class="expand-icon">&#9662;</span>
+          </div>
+          <div class="suggestion-details">
+            <div class="detail-row">
+              <span class="detail-label">Sentiment</span>
+              <span class="detail-value">NEGATIVE</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Recommended Action</span>
+              <span class="detail-value">CALL TRADESMAN</span>
+            </div>
+            <div class="detail-block">
+              <div class="detail-label">Next Steps</div>
+              <div class="detail-text">The buzzing noise combined with poor cooling suggests either a failing compressor, clogged filter, or worn fan motor bearing. Steps: 1) Check and clean the AC filter as an immediate fix. 2) If noise persists, call an AC technician for inspection. 3) Provide a portable fan to guests in the meantime. 4) Schedule regular AC maintenance to prevent recurrence.</div>
+            </div>
+            <div class="detail-block">
+              <div class="detail-label">Tradesman Details</div>
+              <div class="detail-text">Trade needed: AC Technician<br>AC not cooling with buzzing noise in master bedroom — needs compressor/motor inspection</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Linked Job -->
+      <div class="card" style="cursor:pointer">
+        <div class="label" style="margin-top:0">Linked Job</div>
+        <div class="value">MAINTENANCE — IN_PROGRESS</div>
+        <div class="value" style="margin-top:4px">Worker: Amit Singh</div>
+        <div class="link-text">View Job &#8250;</div>
+      </div>
+
+      <!-- Status Action -->
+      <button class="primary-btn" style="background:#166534"><span class="btn-text">Resolve</span></button>
+    </div>
+  </div>
+</div>
+
+</div>
+</body>
+</html>
