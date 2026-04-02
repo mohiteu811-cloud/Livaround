@@ -8,6 +8,12 @@ import { Select } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 
+function parseMediaUrls(raw: any): { url: string; type: string }[] {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  try { const parsed = JSON.parse(raw); return Array.isArray(parsed) ? parsed : []; } catch { return []; }
+}
+
 function safeFormat(dateStr: string | undefined | null, fmt: string): string {
   try {
     if (!dateStr) return '—';
@@ -264,9 +270,10 @@ function IssueDetailModal({ issue, onClose, onStatusChange }: {
 
       {/* Media */}
       {(() => {
+        const parsed = parseMediaUrls(issue.mediaUrls);
         const mediaList: { url: string; type: string }[] =
-          issue.mediaUrls && issue.mediaUrls.length > 0
-            ? issue.mediaUrls
+          parsed.length > 0
+            ? parsed
             : [
                 ...(issue.photoUrl ? [{ url: issue.photoUrl, type: 'image' }] : []),
                 ...(issue.videoUrl ? [{ url: issue.videoUrl, type: 'video' }] : []),
@@ -429,9 +436,10 @@ export default function IssuesPage() {
                 )}
                 <div className="flex gap-2">
                   {(() => {
-                    const mediaCount = issue.mediaUrls?.length || ((issue.photoUrl ? 1 : 0) + (issue.videoUrl ? 1 : 0));
-                    const imageCount = issue.mediaUrls?.filter((m: any) => m.type === 'image').length || (issue.photoUrl ? 1 : 0);
-                    const videoCount = issue.mediaUrls?.filter((m: any) => m.type === 'video').length || (issue.videoUrl ? 1 : 0);
+                    const media = parseMediaUrls(issue.mediaUrls);
+                    const mediaCount = media.length || ((issue.photoUrl ? 1 : 0) + (issue.videoUrl ? 1 : 0));
+                    const imageCount = media.filter((m) => m.type === 'image').length || (issue.photoUrl ? 1 : 0);
+                    const videoCount = media.filter((m) => m.type === 'video').length || (issue.videoUrl ? 1 : 0);
                     return (
                       <>
                         {imageCount > 0 && <span className="text-xs text-slate-500">📷 {imageCount > 1 ? `${imageCount} Photos` : 'Photo'}</span>}
