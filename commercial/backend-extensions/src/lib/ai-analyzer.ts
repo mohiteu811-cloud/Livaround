@@ -291,14 +291,15 @@ ${bookingContext ? `\n${bookingContext}` : ''}`;
     console.error('Failed to emit AI suggestion via socket:', err);
   }
 
-  // Send push notification for HIGH/CRITICAL urgency
+  // Send push notification for AI conversation alerts (respects host prefs)
   if (['HIGH', 'CRITICAL'].includes(analysis.urgency)) {
     try {
       const host = await prisma.host.findUnique({
         where: { id: conversation.hostId },
-        select: { pushToken: true },
+        select: { pushToken: true, notificationPrefs: true },
       });
-      if (host?.pushToken) {
+      const prefs = (() => { try { return JSON.parse(host?.notificationPrefs || '{}'); } catch { return {}; } })();
+      if (host?.pushToken && prefs.aiConversationAlerts !== false) {
         const { sendPushNotification } = require('../../../../backend/src/lib/pushNotifications');
         await sendPushNotification(host.pushToken, {
           title: `AI Alert: ${analysis.category}`,
@@ -620,26 +621,29 @@ ${propertyContext ? `\n${propertyContext}` : ''}`;
     console.error('Failed to emit AI issue suggestion via socket:', err);
   }
 
-  // Push notification for HIGH/CRITICAL
-  if (['HIGH', 'CRITICAL'].includes(analysis.urgency)) {
-    try {
-      const host = await prisma.host.findUnique({
-        where: { id: hostId },
-        select: { pushToken: true },
+  // Push notification for issues (respects host prefs)
+  try {
+    const host = await prisma.host.findUnique({
+      where: { id: hostId },
+      select: { pushToken: true, notificationPrefs: true },
+    });
+    const prefs = (() => { try { return JSON.parse(host?.notificationPrefs || '{}'); } catch { return {}; } })();
+    const aiIssueAlerts = prefs.aiIssueAlerts ?? 'all';
+    const shouldNotify =
+      aiIssueAlerts === 'all' ||
+      (aiIssueAlerts === 'high_critical' && ['HIGH', 'CRITICAL'].includes(analysis.urgency));
+    if (host?.pushToken && shouldNotify) {
+      const { sendPushNotification } = require('../../../../backend/src/lib/pushNotifications');
+      await sendPushNotification(host.pushToken, {
+        title: `Issue Alert: ${analysis.category}`,
+        body: analysis.summary,
+        data: { issueId: issue.id, suggestionId: suggestion.id, type: 'ai_issue_suggestion' },
+        sound: 'default',
+        priority: 'high',
+        channelId: 'issues',
       });
-      if (host?.pushToken) {
-        const { sendPushNotification } = require('../../../../backend/src/lib/pushNotifications');
-        await sendPushNotification(host.pushToken, {
-          title: `Issue Alert: ${analysis.category}`,
-          body: analysis.summary,
-          data: { issueId: issue.id, suggestionId: suggestion.id, type: 'ai_issue_suggestion' },
-          sound: 'default',
-          priority: 'high',
-          channelId: 'issues',
-        });
-      }
-    } catch (err) {
-      console.error('Failed to send AI issue push notification:', err);
     }
+  } catch (err) {
+    console.error('Failed to send AI issue push notification:', err);
   }
 }

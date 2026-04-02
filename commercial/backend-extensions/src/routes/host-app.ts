@@ -165,7 +165,9 @@ router.get('/settings', async (req: AuthRequest, res: Response) => {
   try {
     const host = await prisma.host.findUnique({ where: { userId: req.user!.id } });
     if (!host) return res.status(403).json({ error: 'Host not found' });
-    return res.json({ autoDispatch: host.autoDispatch });
+    let notificationPrefs = { guestMessages: true, workerMessages: true, aiConversationAlerts: true, aiIssueAlerts: 'all' };
+    try { notificationPrefs = JSON.parse(host.notificationPrefs); } catch {}
+    return res.json({ autoDispatch: host.autoDispatch, notificationPrefs });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Internal server error' });
@@ -182,6 +184,11 @@ router.patch('/settings', async (req: AuthRequest, res: Response) => {
     const updateData: any = {};
     if (typeof req.body.autoDispatch === 'boolean') {
       updateData.autoDispatch = req.body.autoDispatch;
+    }
+    if (req.body.notificationPrefs && typeof req.body.notificationPrefs === 'object') {
+      const existing = (() => { try { return JSON.parse(host.notificationPrefs); } catch { return {}; } })();
+      const merged = { ...existing, ...req.body.notificationPrefs };
+      updateData.notificationPrefs = JSON.stringify(merged);
     }
 
     await prisma.host.update({ where: { id: host.id }, data: updateData });

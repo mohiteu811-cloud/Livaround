@@ -381,10 +381,10 @@ router.post('/:id/messages', async (req: AuthRequest, res: Response) => {
     } else if (!isHost) {
       const host = await prisma.host.findUnique({
         where: { id: conversation.hostId },
-        select: { pushToken: true },
+        select: { pushToken: true, notificationPrefs: true },
       });
-      console.log('Push to host:', { hostId: conversation.hostId, hasPushToken: !!host?.pushToken });
-      if (host?.pushToken) {
+      const prefs = (() => { try { return JSON.parse(host?.notificationPrefs || '{}'); } catch { return {}; } })();
+      if (host?.pushToken && prefs.workerMessages !== false) {
         const { sendPushNotification } = require('../../../../backend/src/lib/pushNotifications');
         await sendPushNotification(host.pushToken, {
           title: `Message from ${senderName}`,

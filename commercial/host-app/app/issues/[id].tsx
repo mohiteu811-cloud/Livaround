@@ -21,6 +21,7 @@ export default function IssueDetailScreen() {
   const [tradesmen, setTradesmen] = useState<any[]>([]);
   const [loadingTradesmen, setLoadingTradesmen] = useState(false);
   const [expandedSuggestions, setExpandedSuggestions] = useState<Record<string, boolean>>({});
+  const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
 
   const loadIssue = useCallback(async () => {
     try {
@@ -133,10 +134,13 @@ export default function IssueDetailScreen() {
           <View style={styles.card}>
             <Text style={styles.label}>Media</Text>
             {issue.photoUrl && (
-              <Image source={{ uri: issue.photoUrl }} style={styles.photo} resizeMode="cover" />
+              <TouchableOpacity onPress={() => setFullScreenImage(issue.photoUrl)}>
+                <Image source={{ uri: issue.photoUrl }} style={styles.photo} resizeMode="cover" />
+                <Text style={styles.tapHint}>Tap to view full screen</Text>
+              </TouchableOpacity>
             )}
             {issue.videoUrl && (
-              <TouchableOpacity onPress={() => Linking.openURL(issue.videoUrl)}>
+              <TouchableOpacity onPress={() => Linking.openURL(issue.videoUrl)} style={{ marginTop: issue.photoUrl ? 12 : 0 }}>
                 <Text style={styles.linkText}>View Video</Text>
               </TouchableOpacity>
             )}
@@ -323,6 +327,18 @@ export default function IssueDetailScreen() {
         </View>
       </ScrollView>
 
+      {/* Full-screen image viewer */}
+      <Modal visible={!!fullScreenImage} transparent animationType="fade">
+        <View style={styles.fullScreenOverlay}>
+          <TouchableOpacity style={styles.fullScreenClose} onPress={() => setFullScreenImage(null)}>
+            <Text style={styles.fullScreenCloseText}>✕</Text>
+          </TouchableOpacity>
+          {fullScreenImage && (
+            <Image source={{ uri: fullScreenImage }} style={styles.fullScreenImage} resizeMode="contain" />
+          )}
+        </View>
+      </Modal>
+
       {/* Tradesman picker modal */}
       <Modal visible={tradesmenModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
@@ -341,11 +357,16 @@ export default function IssueDetailScreen() {
                     <View style={{ flex: 1 }}>
                       <Text style={styles.tradesmanName}>{item.name || 'Unknown'}</Text>
                       {item.trade && <Text style={styles.tradesmanTrade}>{item.trade}</Text>}
+                      {item.company && <Text style={styles.tradesmanCompany}>{item.company}</Text>}
                     </View>
-                    {item.phone && (
-                      <TouchableOpacity onPress={() => Linking.openURL(`tel:${item.phone}`)}>
-                        <Text style={styles.callBtn}>Call</Text>
-                      </TouchableOpacity>
+                    {item.phones && item.phones.length > 0 && (
+                      <View style={{ gap: 6 }}>
+                        {item.phones.map((phone: string, idx: number) => (
+                          <TouchableOpacity key={idx} style={styles.phoneBtn} onPress={() => Linking.openURL(`tel:${phone}`)}>
+                            <Text style={styles.phoneBtnText}>{phone}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
                     )}
                   </View>
                 )}
@@ -379,6 +400,7 @@ const styles = StyleSheet.create({
   value: { fontSize: 15, color: '#e2e8f0' },
   errorText: { color: '#fca5a5', textAlign: 'center', marginTop: 40, fontSize: 16 },
   photo: { width: '100%', height: 200, borderRadius: 8, marginTop: 8 },
+  tapHint: { color: '#64748b', fontSize: 11, marginTop: 4, textAlign: 'center' },
   linkText: { color: '#3b82f6', fontSize: 14, fontWeight: '600', marginTop: 8 },
 
   sectionTitle: { fontSize: 14, fontWeight: '700', color: '#f8fafc', marginBottom: 8 },
@@ -415,7 +437,13 @@ const styles = StyleSheet.create({
   tradesmanRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#334155' },
   tradesmanName: { fontSize: 15, color: '#e2e8f0', fontWeight: '600' },
   tradesmanTrade: { fontSize: 12, color: '#94a3b8', marginTop: 2 },
-  callBtn: { color: '#3b82f6', fontSize: 14, fontWeight: '600', paddingHorizontal: 12 },
+  tradesmanCompany: { fontSize: 12, color: '#64748b', marginTop: 1 },
+  phoneBtn: { backgroundColor: '#1e3a5f', borderRadius: 6, paddingHorizontal: 10, paddingVertical: 6 },
+  phoneBtnText: { color: '#3b82f6', fontSize: 13, fontWeight: '600' },
+  fullScreenOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' },
+  fullScreenClose: { position: 'absolute' as const, top: 50, right: 20, zIndex: 10, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 20, width: 40, height: 40, alignItems: 'center' as const, justifyContent: 'center' as const },
+  fullScreenCloseText: { color: '#fff', fontSize: 20, fontWeight: '600' as const },
+  fullScreenImage: { width: '100%' as any, height: '80%' as any },
   emptyList: { color: '#64748b', textAlign: 'center', marginVertical: 24, fontSize: 14 },
   modalCloseBtn: { marginTop: 16, paddingVertical: 12, alignItems: 'center', borderRadius: 10, borderWidth: 1, borderColor: '#334155' },
   modalCloseBtnText: { color: '#94a3b8', fontSize: 15, fontWeight: '600' },

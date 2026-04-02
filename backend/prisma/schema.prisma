@@ -31,8 +31,9 @@ model Host {
   name           String
   organizationId String?       @unique
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
-  pushToken      String?
-  autoDispatch   Boolean       @default(true)
+  pushToken         String?
+  autoDispatch      Boolean       @default(true)
+  notificationPrefs String        @default("{\"guestMessages\":true,\"workerMessages\":true,\"aiConversationAlerts\":true,\"aiIssueAlerts\":\"all\"}")
   properties     Property[]
   tradeRoles     TradeRole[]
   ownersCreated  Owner[]

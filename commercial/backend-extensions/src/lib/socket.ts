@@ -243,12 +243,13 @@ export function setupSocketIO(server: http.Server, allowedOrigins: string[]): Se
           workerNs.to(`conv:${data.conversationId}`).emit('new_message', message);
         }
 
-        // Send push notification to host
+        // Send push notification to host (respects notification prefs)
         const host = await prisma.host.findUnique({
           where: { id: hostId },
-          select: { pushToken: true },
+          select: { pushToken: true, notificationPrefs: true },
         });
-        if (host?.pushToken) {
+        const hostPrefs = (() => { try { return JSON.parse(host?.notificationPrefs || '{}'); } catch { return {}; } })();
+        if (host?.pushToken && hostPrefs.guestMessages !== false) {
           await sendPushNotification(host.pushToken, {
             title: `Message from ${guestName}`,
             body: (data.content || (data.voiceUrl ? 'Voice message' : 'Sent an image')).slice(0, 100),
@@ -432,13 +433,14 @@ export function setupSocketIO(server: http.Server, allowedOrigins: string[]): Se
           guestNs.to(`conv:${data.conversationId}`).emit('new_message', message);
         }
 
-        // Push notification to host
-        const host = await prisma.host.findUnique({
+        // Push notification to host (respects notification prefs)
+        const hostForPush = await prisma.host.findUnique({
           where: { id: conversation.hostId },
-          select: { pushToken: true },
+          select: { pushToken: true, notificationPrefs: true },
         });
-        if (host?.pushToken) {
-          await sendPushNotification(host.pushToken, {
+        const workerMsgPrefs = (() => { try { return JSON.parse(hostForPush?.notificationPrefs || '{}'); } catch { return {}; } })();
+        if (hostForPush?.pushToken && workerMsgPrefs.workerMessages !== false) {
+          await sendPushNotification(hostForPush.pushToken, {
             title: `Message from ${worker?.user?.name || 'Worker'}`,
             body: (data.content || (data.voiceUrl ? 'Voice message' : 'Sent an image')).slice(0, 100),
             data: { conversationId: data.conversationId, type: 'internal_message' },
