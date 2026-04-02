@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
-import { AlertTriangle, CheckCircle, Clock, Eye, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Clock, Eye, X, Sparkles, ChevronDown, ChevronRight, ThumbsUp, XCircle } from 'lucide-react';
 import { api, JobIssue } from '@/lib/api';
 import { Select } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
@@ -32,6 +32,172 @@ const STATUS_ICONS: Record<string, React.ReactNode> = {
   IN_REVIEW: <Clock size={12} />,
   RESOLVED: <CheckCircle size={12} />,
 };
+
+const URGENCY_STYLES: Record<string, string> = {
+  CRITICAL: 'text-red-400 bg-red-500/15',
+  HIGH: 'text-orange-400 bg-orange-500/15',
+  MEDIUM: 'text-yellow-400 bg-yellow-500/15',
+  LOW: 'text-slate-400 bg-slate-500/15',
+};
+
+const SUGGESTION_STATUS_STYLES: Record<string, string> = {
+  PENDING: 'text-amber-400 bg-amber-500/15',
+  APPROVED: 'text-emerald-400 bg-emerald-500/15',
+  DISMISSED: 'text-slate-400 bg-slate-600/15',
+};
+
+interface AiSuggestion {
+  id: string;
+  category: string;
+  urgency: string;
+  sentiment: string;
+  summary: string;
+  suggestedAction: string;
+  suggestedReply?: string;
+  status: string;
+  actionPayload?: {
+    dispatchData?: { suggestedRole: string; reason?: string };
+    tradesmanData?: { suggestedTrade: string; reason?: string };
+    jobData?: { type: string; notes?: string };
+  };
+}
+
+function AiSuggestionsSection({ issueId }: { issueId: string }) {
+  const [suggestions, setSuggestions] = useState<AiSuggestion[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [acting, setActing] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        // The issue GET endpoint returns aiSuggestions; fall back to listing all
+        const data = await api.aiSuggestions.list();
+        // Filter to suggestions that may relate to this issue
+        setSuggestions(data.filter((s: any) => s.issueId === issueId || s.createdIssueId === issueId));
+        // Auto-expand pending
+        const exp: Record<string, boolean> = {};
+        data.forEach((s: any) => {
+          if (s.status === 'PENDING' && (s.issueId === issueId || s.createdIssueId === issueId)) exp[s.id] = true;
+        });
+        setExpanded(exp);
+      } catch {
+        setSuggestions([]);
+      }
+      setLoading(false);
+    })();
+  }, [issueId]);
+
+  async function handleApprove(id: string) {
+    setActing(true);
+    try {
+      await api.aiSuggestions.approve(id);
+      setSuggestions(prev => prev.map(s => s.id === id ? { ...s, status: 'APPROVED' } : s));
+    } catch {}
+    setActing(false);
+  }
+
+  async function handleDismiss(id: string) {
+    setActing(true);
+    try {
+      await api.aiSuggestions.dismiss(id);
+      setSuggestions(prev => prev.map(s => s.id === id ? { ...s, status: 'DISMISSED' } : s));
+    } catch {}
+    setActing(false);
+  }
+
+  if (loading) return <div className="flex justify-center py-4"><div className="w-5 h-5 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" /></div>;
+  if (suggestions.length === 0) return null;
+
+  return (
+    <div>
+      <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+        <Sparkles size={12} className="text-amber-400" /> AI Analysis ({suggestions.length})
+      </p>
+      <div className="space-y-2">
+        {suggestions.map(s => {
+          const isExpanded = expanded[s.id];
+          const isPending = s.status === 'PENDING';
+          const payload = s.actionPayload || {};
+          return (
+            <div key={s.id} className="bg-slate-800/60 rounded-lg border border-slate-700/50 overflow-hidden">
+              <button
+                onClick={() => setExpanded(prev => ({ ...prev, [s.id]: !prev[s.id] }))}
+                className="w-full text-left px-4 py-3 flex items-start gap-2 hover:bg-slate-800 transition-colors"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-slate-200 font-medium">{s.summary}</p>
+                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-700 text-slate-300">{s.category}</span>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${URGENCY_STYLES[s.urgency] || 'bg-slate-700 text-slate-300'}`}>{s.urgency}</span>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${SUGGESTION_STATUS_STYLES[s.status] || 'bg-slate-700 text-slate-300'}`}>{s.status}</span>
+                  </div>
+                </div>
+                {isExpanded ? <ChevronDown size={16} className="text-slate-400 mt-1 shrink-0" /> : <ChevronRight size={16} className="text-slate-400 mt-1 shrink-0" />}
+              </button>
+              {isExpanded && (
+                <div className="px-4 pb-4 space-y-3 border-t border-slate-700/50 pt-3">
+                  {s.sentiment && (
+                    <div>
+                      <p className="text-xs text-slate-500">Sentiment</p>
+                      <p className="text-sm text-slate-300">{s.sentiment}</p>
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-xs text-slate-500">Recommended Action</p>
+                    <p className="text-sm text-slate-300">{s.suggestedAction.replace(/_/g, ' ')}</p>
+                  </div>
+                  {s.suggestedReply && (
+                    <div>
+                      <p className="text-xs text-slate-500">Next Steps</p>
+                      <p className="text-sm text-slate-300">{s.suggestedReply}</p>
+                    </div>
+                  )}
+                  {payload.dispatchData && (
+                    <div>
+                      <p className="text-xs text-slate-500">Dispatch Details</p>
+                      <p className="text-sm text-slate-300">Role needed: {payload.dispatchData.suggestedRole}{payload.dispatchData.reason ? ` — ${payload.dispatchData.reason}` : ''}</p>
+                    </div>
+                  )}
+                  {payload.tradesmanData && (
+                    <div>
+                      <p className="text-xs text-slate-500">Tradesman Details</p>
+                      <p className="text-sm text-slate-300">Trade needed: {payload.tradesmanData.suggestedTrade}{payload.tradesmanData.reason ? ` — ${payload.tradesmanData.reason}` : ''}</p>
+                    </div>
+                  )}
+                  {payload.jobData && (
+                    <div>
+                      <p className="text-xs text-slate-500">Job Details</p>
+                      <p className="text-sm text-slate-300">Type: {payload.jobData.type}{payload.jobData.notes ? ` — ${payload.jobData.notes}` : ''}</p>
+                    </div>
+                  )}
+                  {isPending && (
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        onClick={() => handleApprove(s.id)}
+                        disabled={acting}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium transition-colors disabled:opacity-50"
+                      >
+                        <ThumbsUp size={12} /> Approve
+                      </button>
+                      <button
+                        onClick={() => handleDismiss(s.id)}
+                        disabled={acting}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-medium transition-colors disabled:opacity-50"
+                      >
+                        <XCircle size={12} /> Dismiss
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function IssueDetailModal({ issue, onClose, onStatusChange }: {
   issue: JobIssue;
@@ -125,6 +291,9 @@ function IssueDetailModal({ issue, onClose, onStatusChange }: {
           </div>
         );
       })()}
+
+      {/* AI Analysis */}
+      <AiSuggestionsSection issueId={issue.id} />
 
       {/* Actions */}
       {issue.status !== 'RESOLVED' && (

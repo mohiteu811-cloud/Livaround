@@ -27,6 +27,7 @@ import {
   Handshake,
   Banknote,
   MessageSquare,
+  Bell,
 } from 'lucide-react';
 import { clearToken } from '@/lib/auth';
 import { getCurrentUser } from '@/lib/auth';
@@ -54,6 +55,7 @@ const nav = [
   { href: '/revenue', icon: BarChart3, label: 'Revenue' },
   { href: '/partner', icon: Handshake, label: 'Partner' },
   { href: '/settings/billing', icon: CreditCard, label: 'Billing' },
+  { href: '/settings/notifications', icon: Bell, label: 'Notifications' },
 ];
 
 function NavLinks({ onNavigate, isAdmin }: { onNavigate?: () => void; isAdmin?: boolean }) {

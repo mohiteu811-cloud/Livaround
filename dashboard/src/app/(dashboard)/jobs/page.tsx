@@ -378,6 +378,12 @@ export default function JobsPage() {
   const [typeFilter, setTypeFilter] = useState('');
   const [view, setView] = useState<'active' | 'weekly' | 'archived'>('active');
   const [weekStart, setWeekStart] = useState(() => getMonday(new Date()));
+  const [autoDispatch, setAutoDispatch] = useState(false);
+  const [autoDispatchLoading, setAutoDispatchLoading] = useState(false);
+
+  useEffect(() => {
+    api.hostApp.getSettings().then(s => setAutoDispatch(s.autoDispatch)).catch(() => {});
+  }, []);
 
   useEffect(() => { load(); }, [view, weekStart]);
 
@@ -397,7 +403,8 @@ export default function JobsPage() {
     } finally { setLoading(false); }
   }
 
-  async function handleComplete(id: string) { await api.jobs.complete(id); load(); }
+  const [completeWithMediaModal, setCompleteWithMediaModal] = useState<string | null>(null);
+  async function handleComplete(id: string) { setCompleteWithMediaModal(id); }
   async function handleCancel(id: string) { if (!confirm('Cancel this job?')) return; await api.jobs.cancel(id); load(); }
   async function handleArchive(id: string) { await api.jobs.archive(id); load(); }
   async function handleUnarchive(id: string) { await api.jobs.unarchive(id); load(); }
@@ -437,7 +444,27 @@ export default function JobsPage() {
               : `${jobs.filter((j) => j.status === 'PENDING').length} pending dispatch`}
           </p>
         </div>
-        <Button onClick={() => setCreateModal(true)}><Plus size={16} /> Create job</Button>
+        <div className="flex items-center gap-4">
+          <label className="flex items-center gap-2 cursor-pointer" title="Automatically assign jobs to available workers">
+            <span className="text-xs text-slate-400">Auto-dispatch</span>
+            <button
+              onClick={async () => {
+                const next = !autoDispatch;
+                setAutoDispatchLoading(true);
+                try {
+                  await api.hostApp.updateSettings({ autoDispatch: next });
+                  setAutoDispatch(next);
+                } catch {}
+                setAutoDispatchLoading(false);
+              }}
+              disabled={autoDispatchLoading}
+              className={`relative w-10 h-5 rounded-full transition-colors ${autoDispatch ? 'bg-brand-600' : 'bg-slate-700'} ${autoDispatchLoading ? 'opacity-50' : ''}`}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${autoDispatch ? 'translate-x-5' : 'translate-x-0'}`} />
+            </button>
+          </label>
+          <Button onClick={() => setCreateModal(true)}><Plus size={16} /> Create job</Button>
+        </div>
       </div>
 
       {/* View tabs */}
@@ -582,6 +609,76 @@ export default function JobsPage() {
           <CompletionMediaModal job={completionModal} onClose={() => setCompletionModal(null)} />
         </Modal>
       )}
+
+      {completeWithMediaModal && (
+        <Modal open={!!completeWithMediaModal} onClose={() => setCompleteWithMediaModal(null)} title="Complete job">
+          <CompleteJobWithMediaForm
+            onComplete={async (data) => {
+              await api.jobs.complete(completeWithMediaModal, data);
+              setCompleteWithMediaModal(null);
+              load();
+            }}
+            onClose={() => setCompleteWithMediaModal(null)}
+          />
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+function CompleteJobWithMediaForm({ onComplete, onClose }: {
+  onComplete: (data?: { completionPhotoUrl?: string; completionVideoUrl?: string }) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setFile(f);
+    setPreview(URL.createObjectURL(f));
+  }
+
+  async function handleSubmit() {
+    setLoading(true);
+    try {
+      let data: { completionPhotoUrl?: string; completionVideoUrl?: string } | undefined;
+      if (file) {
+        const { url, type } = await api.upload.file(file);
+        data = type === 'video' ? { completionVideoUrl: url } : { completionPhotoUrl: url };
+      }
+      await onComplete(data);
+    } catch {}
+    setLoading(false);
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-slate-300">Optionally attach a completion photo or video before marking this job as complete.</p>
+      <div>
+        <input type="file" accept="image/*,video/*" onChange={handleFile} className="text-sm text-slate-400 file:mr-3 file:px-4 file:py-2 file:rounded-lg file:border-0 file:bg-slate-800 file:text-slate-300 file:font-medium file:cursor-pointer hover:file:bg-slate-700" />
+      </div>
+      {preview && (
+        <div className="relative">
+          {file?.type.startsWith('video') ? (
+            <video src={preview} controls playsInline className="w-full rounded-lg border border-slate-700 max-h-48 bg-black" />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={preview} alt="Preview" className="w-full rounded-lg border border-slate-700 object-cover max-h-48" />
+          )}
+          <button onClick={() => { setFile(null); setPreview(null); }} className="absolute top-2 right-2 p-1 bg-slate-900/80 rounded-full text-slate-400 hover:text-white">
+            <XCircle size={16} />
+          </button>
+        </div>
+      )}
+      <div className="flex gap-3 pt-1">
+        <Button variant="secondary" onClick={onClose} className="flex-1 justify-center">Cancel</Button>
+        <Button loading={loading} onClick={handleSubmit} className="flex-1 justify-center bg-emerald-600 hover:bg-emerald-500 text-white">
+          <CheckCircle size={14} /> Complete
+        </Button>
+      </div>
     </div>
   );
 }
