@@ -9,6 +9,8 @@ import { api } from '../../src/lib/api';
 
 const SEVERITY_COLORS: Record<string, string> = { HIGH: '#ef4444', MEDIUM: '#f59e0b', LOW: '#3b82f6' };
 const STATUS_COLORS: Record<string, string> = { OPEN: '#ef4444', IN_REVIEW: '#f59e0b', RESOLVED: '#10b981' };
+const URGENCY_COLORS: Record<string, string> = { CRITICAL: '#dc2626', HIGH: '#ef4444', MEDIUM: '#f59e0b', LOW: '#3b82f6' };
+const SUGGESTION_STATUS_COLORS: Record<string, string> = { PENDING: '#f59e0b', APPROVED: '#10b981', DISMISSED: '#64748b' };
 
 export default function IssueDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -18,11 +20,18 @@ export default function IssueDetailScreen() {
   const [tradesmenModal, setTradesmenModal] = useState(false);
   const [tradesmen, setTradesmen] = useState<any[]>([]);
   const [loadingTradesmen, setLoadingTradesmen] = useState(false);
+  const [expandedSuggestions, setExpandedSuggestions] = useState<Record<string, boolean>>({});
 
   const loadIssue = useCallback(async () => {
     try {
       const data = await api.issues.get(id);
       setIssue(data);
+      // Auto-expand pending suggestions
+      const expanded: Record<string, boolean> = {};
+      (data.aiSuggestions || []).forEach((s: any) => {
+        if (s.status === 'PENDING') expanded[s.id] = true;
+      });
+      setExpandedSuggestions(expanded);
     } catch {}
     setLoading(false);
   }, [id]);
@@ -38,6 +47,10 @@ export default function IssueDetailScreen() {
       Alert.alert('Error', e?.message || 'Action failed');
     }
     setActing(false);
+  };
+
+  const toggleSuggestion = (suggestionId: string) => {
+    setExpandedSuggestions(prev => ({ ...prev, [suggestionId]: !prev[suggestionId] }));
   };
 
   const openTradesmen = async (trade?: string) => {
@@ -72,7 +85,7 @@ export default function IssueDetailScreen() {
     );
   }
 
-  const pendingSuggestions = (issue.aiSuggestions || []).filter((s: any) => s.status === 'PENDING');
+  const allSuggestions = issue.aiSuggestions || [];
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -130,41 +143,138 @@ export default function IssueDetailScreen() {
           </View>
         )}
 
-        {/* AI Suggestions */}
-        {pendingSuggestions.length > 0 && (
+        {/* AI Analysis */}
+        {allSuggestions.length > 0 && (
           <View style={styles.card}>
-            <Text style={styles.sectionTitle}>AI Suggestions</Text>
-            {pendingSuggestions.map((s: any) => (
-              <View key={s.id} style={styles.suggestionItem}>
-                <Text style={styles.suggestionText}>{s.summary || s.actionType}</Text>
-                {s.actionLabel && <Text style={styles.suggestionAction}>{s.actionLabel}</Text>}
-                <View style={styles.suggestionBtns}>
-                  <TouchableOpacity
-                    style={styles.approveBtn}
-                    onPress={() => runAction(() => api.aiSuggestions.approve(s.id))}
-                    disabled={acting}
-                  >
-                    <Text style={styles.approveBtnText}>Approve</Text>
+            <Text style={styles.sectionTitle}>AI Analysis</Text>
+            {allSuggestions.map((s: any) => {
+              const isExpanded = expandedSuggestions[s.id];
+              const isPending = s.status === 'PENDING';
+              const payload = s.actionPayload || {};
+
+              return (
+                <View key={s.id} style={styles.suggestionItem}>
+                  {/* Header row — tap to expand/collapse */}
+                  <TouchableOpacity onPress={() => toggleSuggestion(s.id)} style={styles.suggestionHeader}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.suggestionSummary}>{s.summary}</Text>
+                      <View style={styles.badgeRow}>
+                        <View style={[styles.smallBadge, { backgroundColor: '#334155' }]}>
+                          <Text style={styles.smallBadgeText}>{s.category}</Text>
+                        </View>
+                        <View style={[styles.smallBadge, { backgroundColor: URGENCY_COLORS[s.urgency] || '#64748b' }]}>
+                          <Text style={styles.smallBadgeText}>{s.urgency}</Text>
+                        </View>
+                        <View style={[styles.smallBadge, { backgroundColor: SUGGESTION_STATUS_COLORS[s.status] || '#64748b' }]}>
+                          <Text style={styles.smallBadgeText}>{s.status}</Text>
+                        </View>
+                      </View>
+                    </View>
+                    <Text style={styles.expandIcon}>{isExpanded ? '▾' : '▸'}</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.dismissBtn}
-                    onPress={() => runAction(() => api.aiSuggestions.dismiss(s.id))}
-                    disabled={acting}
-                  >
-                    <Text style={styles.dismissBtnText}>Dismiss</Text>
-                  </TouchableOpacity>
+
+                  {/* Expanded details */}
+                  {isExpanded && (
+                    <View style={styles.suggestionDetails}>
+                      {/* Sentiment */}
+                      {s.sentiment && (
+                        <View style={styles.detailRow}>
+                          <Text style={styles.detailLabel}>Sentiment</Text>
+                          <Text style={styles.detailValue}>{s.sentiment}</Text>
+                        </View>
+                      )}
+
+                      {/* Suggested Action */}
+                      <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>Recommended Action</Text>
+                        <Text style={styles.detailValue}>{s.suggestedAction.replace(/_/g, ' ')}</Text>
+                      </View>
+
+                      {/* Next Steps / Suggested Reply */}
+                      {s.suggestedReply && (
+                        <View style={styles.detailBlock}>
+                          <Text style={styles.detailLabel}>Next Steps</Text>
+                          <Text style={styles.detailText}>{s.suggestedReply}</Text>
+                        </View>
+                      )}
+
+                      {/* Dispatch details */}
+                      {payload.dispatchData && (
+                        <View style={styles.detailBlock}>
+                          <Text style={styles.detailLabel}>Dispatch Details</Text>
+                          <Text style={styles.detailText}>
+                            Role needed: {payload.dispatchData.suggestedRole}
+                            {payload.dispatchData.reason ? `\n${payload.dispatchData.reason}` : ''}
+                          </Text>
+                        </View>
+                      )}
+
+                      {/* Tradesman details */}
+                      {payload.tradesmanData && (
+                        <View style={styles.detailBlock}>
+                          <Text style={styles.detailLabel}>Tradesman Details</Text>
+                          <Text style={styles.detailText}>
+                            Trade needed: {payload.tradesmanData.suggestedTrade}
+                            {payload.tradesmanData.reason ? `\n${payload.tradesmanData.reason}` : ''}
+                          </Text>
+                        </View>
+                      )}
+
+                      {/* Job details */}
+                      {payload.jobData && (
+                        <View style={styles.detailBlock}>
+                          <Text style={styles.detailLabel}>Job Details</Text>
+                          <Text style={styles.detailText}>
+                            Type: {payload.jobData.type}
+                            {payload.jobData.notes ? `\nNotes: ${payload.jobData.notes}` : ''}
+                          </Text>
+                        </View>
+                      )}
+
+                      {/* Action buttons for pending suggestions */}
+                      {isPending && (
+                        <View style={styles.actionSection}>
+                          <View style={styles.suggestionBtns}>
+                            <TouchableOpacity
+                              style={styles.approveBtn}
+                              onPress={() => runAction(() => api.aiSuggestions.approve(s.id))}
+                              disabled={acting}
+                            >
+                              <Text style={styles.approveBtnText}>Approve</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={styles.dismissBtn}
+                              onPress={() => runAction(() => api.aiSuggestions.dismiss(s.id))}
+                              disabled={acting}
+                            >
+                              <Text style={styles.dismissBtnText}>Dismiss</Text>
+                            </TouchableOpacity>
+                          </View>
+                          {payload.tradesmanData?.suggestedTrade && (
+                            <TouchableOpacity
+                              style={styles.tradeBtn}
+                              onPress={() => openTradesmen(payload.tradesmanData.suggestedTrade)}
+                              disabled={acting}
+                            >
+                              <Text style={styles.tradeBtnText}>Find {payload.tradesmanData.suggestedTrade}</Text>
+                            </TouchableOpacity>
+                          )}
+                          {payload.dispatchData?.suggestedRole && (
+                            <TouchableOpacity
+                              style={styles.tradeBtn}
+                              onPress={() => openTradesmen()}
+                              disabled={acting}
+                            >
+                              <Text style={styles.tradeBtnText}>Dispatch {payload.dispatchData.suggestedRole}</Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      )}
+                    </View>
+                  )}
                 </View>
-                {s.suggestedTrade && (
-                  <TouchableOpacity
-                    style={styles.tradeBtn}
-                    onPress={() => openTradesmen(s.suggestedTrade)}
-                    disabled={acting}
-                  >
-                    <Text style={styles.tradeBtnText}>Find {s.suggestedTrade}</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            ))}
+              );
+            })}
           </View>
         )}
 
@@ -260,19 +370,31 @@ const styles = StyleSheet.create({
   content: { padding: 16, gap: 12, paddingBottom: 24 },
   card: { backgroundColor: '#1e293b', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#334155' },
   description: { fontSize: 16, fontWeight: '600', color: '#f8fafc', marginBottom: 8 },
-  badgeRow: { flexDirection: 'row', gap: 8 },
+  badgeRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginTop: 4 },
   badge: { borderRadius: 6, paddingHorizontal: 10, paddingVertical: 3 },
   badgeText: { color: '#fff', fontSize: 11, fontWeight: '600' },
+  smallBadge: { borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
+  smallBadgeText: { color: '#fff', fontSize: 10, fontWeight: '600' },
   label: { fontSize: 12, color: '#64748b', textTransform: 'uppercase', marginTop: 12, marginBottom: 2 },
   value: { fontSize: 15, color: '#e2e8f0' },
   errorText: { color: '#fca5a5', textAlign: 'center', marginTop: 40, fontSize: 16 },
   photo: { width: '100%', height: 200, borderRadius: 8, marginTop: 8 },
   linkText: { color: '#3b82f6', fontSize: 14, fontWeight: '600', marginTop: 8 },
 
-  sectionTitle: { fontSize: 14, fontWeight: '700', color: '#f8fafc', marginBottom: 12 },
-  suggestionItem: { borderTopWidth: 1, borderTopColor: '#334155', paddingTop: 12, marginTop: 8 },
-  suggestionText: { fontSize: 14, color: '#e2e8f0', marginBottom: 4 },
-  suggestionAction: { fontSize: 12, color: '#94a3b8', marginBottom: 8 },
+  sectionTitle: { fontSize: 14, fontWeight: '700', color: '#f8fafc', marginBottom: 8 },
+  suggestionItem: { borderTopWidth: 1, borderTopColor: '#334155', paddingTop: 10, marginTop: 6 },
+  suggestionHeader: { flexDirection: 'row', alignItems: 'flex-start' },
+  suggestionSummary: { fontSize: 14, fontWeight: '600', color: '#f8fafc', marginBottom: 6 },
+  expandIcon: { color: '#64748b', fontSize: 16, marginLeft: 8, marginTop: 2 },
+
+  suggestionDetails: { marginTop: 10, paddingLeft: 4 },
+  detailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  detailLabel: { fontSize: 11, color: '#64748b', textTransform: 'uppercase', fontWeight: '600', marginBottom: 4 },
+  detailValue: { fontSize: 13, color: '#e2e8f0' },
+  detailBlock: { marginBottom: 12 },
+  detailText: { fontSize: 13, color: '#cbd5e1', lineHeight: 20 },
+
+  actionSection: { marginTop: 8, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#334155' },
   suggestionBtns: { flexDirection: 'row', gap: 10 },
   approveBtn: { backgroundColor: '#166534', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
   approveBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
