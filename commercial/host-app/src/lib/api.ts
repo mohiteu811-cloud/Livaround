@@ -52,12 +52,20 @@ export interface Property {
   address: string;
   city: string;
   country: string;
+  description?: string;
   type: string;
   bedrooms: number;
   bathrooms: number;
   maxGuests: number;
+  amenities?: string[];
   isActive: boolean;
   images?: string[];
+  wifiName?: string;
+  wifiPassword?: string;
+  mapUrl?: string;
+  checkInInstructions?: string;
+  houseRules?: string[];
+  _count?: { bookings: number; jobs: number };
 }
 
 export interface Booking {
@@ -77,6 +85,19 @@ export interface Booking {
   guestCode?: string;
   lockCode?: string;
   notes?: string;
+  createdAt?: string;
+}
+
+export interface GuestServiceRequest {
+  id: string;
+  bookingId: string;
+  propertyId: string;
+  type: 'HOUSEKEEPING' | 'COOK' | 'DRIVER' | 'CAR_RENTAL' | 'ARRIVAL_TIME' | 'EARLY_CHECK_IN' | 'DEPARTURE_TIME' | 'OTHER';
+  requestedDate?: string;
+  requestedTime?: string;
+  notes?: string;
+  status: 'PENDING' | 'CONFIRMED' | 'DECLINED';
+  createdAt: string;
 }
 
 export interface Job {
@@ -90,6 +111,7 @@ export interface Job {
   status: string;
   scheduledAt: string;
   completedAt?: string;
+  archivedAt?: string;
   notes?: string;
   checklist?: { item: string; done: boolean }[];
 }
@@ -104,6 +126,13 @@ export interface Worker {
   name?: string;
   email?: string;
   phone?: string;
+}
+
+export interface WorkerLocation {
+  latitude: number | null;
+  longitude: number | null;
+  updatedAt: string;
+  user: { name: string };
 }
 
 export interface Conversation {
@@ -168,6 +197,174 @@ export interface Issue {
   createdAt: string;
 }
 
+export interface TradeRole {
+  id: string;
+  hostId: string;
+  name: string;
+  description?: string;
+  color: string;
+  createdAt: string;
+  _count?: { workers: number; maintenanceRequests: number };
+}
+
+export interface PropertyStaffAssignment {
+  id: string;
+  propertyId: string;
+  workerId: string;
+  role: 'CARETAKER' | 'CLEANER' | 'SUPERVISOR';
+  createdAt: string;
+  worker: Worker;
+}
+
+export interface MaintenanceSettings {
+  propertyId: string;
+  requireApproval: boolean;
+  autoAssignTradeRoles: string[];
+  allowCaretakerAssign: boolean;
+}
+
+export interface MaintenanceRequest {
+  id: string;
+  propertyId: string;
+  property?: { id: string; name: string; city: string };
+  reportedById: string;
+  reportedBy?: { id: string; user: { id: string; name: string } };
+  tradeRoleId?: string;
+  tradeRole?: TradeRole;
+  title: string;
+  description: string;
+  photoUrl?: string;
+  videoUrl?: string;
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'AUTO_ASSIGNED' | 'ASSIGNED' | 'IN_PROGRESS' | 'COMPLETED';
+  assignedWorkerId?: string;
+  assignedWorker?: { id: string; user: { id: string; name: string } };
+  jobId?: string;
+  job?: { id: string; status: string };
+  hostNotes?: string;
+  scheduledAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InventoryItem {
+  id: string;
+  propertyId: string;
+  property?: { id: string; name: string };
+  name: string;
+  category: string;
+  currentStock: number;
+  minStock: number;
+  unit: string;
+  location?: string;
+  photos: string[];
+  lastRestocked?: string;
+}
+
+export interface SupplyCabinet {
+  id: string;
+  propertyId: string;
+  property?: { id: string; name: string };
+  name: string;
+  location: string;
+  photoUrl?: string;
+  qrCode: string;
+  description?: string;
+}
+
+export interface PropertyOwnership {
+  id: string;
+  ownerId: string;
+  propertyId: string;
+  property?: { id: string; name: string; city: string };
+  involvementLevel: 'NONE' | 'REPORTS_ONLY' | 'FINANCIAL' | 'FULL';
+  ownershipPercent?: number;
+  commissionPct?: number;
+  createdAt: string;
+}
+
+export interface OwnerEntry {
+  id: string;
+  user: { id: string; name: string; email: string; phone?: string };
+  properties: PropertyOwnership[];
+}
+
+export interface Tradesman {
+  id: string;
+  hostId: string;
+  name: string;
+  trade: string;
+  phones: string[];
+  company?: string;
+  notes?: string;
+  area?: string;
+  email?: string;
+  createdAt: string;
+  updatedAt: string;
+  properties: {
+    id: string;
+    tradesmanId: string;
+    propertyId: string;
+    property: { id: string; name: string; city: string };
+  }[];
+}
+
+export interface PropertyArea {
+  id: string;
+  propertyId: string;
+  name: string;
+  floor?: string;
+  description?: string;
+  order: number;
+  docs: PropertyDoc[];
+  createdAt: string;
+}
+
+export interface PropertyDoc {
+  id: string;
+  propertyId: string;
+  areaId?: string;
+  title: string;
+  description: string;
+  category: string;
+  photos: string[];
+  tags: string[];
+  order: number;
+  createdAt: string;
+}
+
+export interface PropertyContact {
+  id: string;
+  propertyId: string;
+  agency: string;
+  name?: string;
+  phones: string[];
+  company?: string;
+  notes?: string;
+  order: number;
+  createdAt: string;
+}
+
+export interface PropertyGuide {
+  areas: PropertyArea[];
+  ungroupedDocs: PropertyDoc[];
+  contacts: PropertyContact[];
+}
+
+export interface RevenueReport {
+  id: string;
+  propertyId: string;
+  property?: { id: string; name: string; city: string };
+  month: number;
+  year: number;
+  grossRevenue: number;
+  netRevenue: number;
+  commissionPct: number;
+  commissionAmount: number;
+  status: string;
+  createdAt: string;
+}
+
 // ── API Client ───────────────────────────────────────────────────────────────
 
 export const api = {
@@ -205,8 +402,45 @@ export const api = {
   properties: {
     list: () => request<Property[]>('/api/properties'),
     get: (id: string) => request<Property>(`/api/properties/${id}`),
-    getStaff: (propertyId: string) =>
-      request<any[]>(`/api/properties/${propertyId}/staff`),
+    create: (data: Partial<Property>) =>
+      request<Property>('/api/properties', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: Partial<Property>) =>
+      request<Property>(`/api/properties/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: string) => request<void>(`/api/properties/${id}`, { method: 'DELETE' }),
+    getStaff: (propertyId: string) => request<PropertyStaffAssignment[]>(`/api/properties/${propertyId}/staff`),
+  },
+
+  propertyStaff: {
+    list: (propertyId: string) => request<PropertyStaffAssignment[]>(`/api/properties/${propertyId}/staff`),
+    assign: (propertyId: string, data: { workerId: string; role: string }) =>
+      request<PropertyStaffAssignment>(`/api/properties/${propertyId}/staff`, { method: 'POST', body: JSON.stringify(data) }),
+    remove: (propertyId: string, workerId: string) =>
+      request<void>(`/api/properties/${propertyId}/staff/${workerId}`, { method: 'DELETE' }),
+    getSettings: (propertyId: string) => request<MaintenanceSettings>(`/api/properties/${propertyId}/maintenance-settings`),
+    updateSettings: (propertyId: string, data: Partial<MaintenanceSettings>) =>
+      request<MaintenanceSettings>(`/api/properties/${propertyId}/maintenance-settings`, { method: 'PUT', body: JSON.stringify(data) }),
+  },
+
+  guide: {
+    get: (propertyId: string) => request<PropertyGuide>(`/api/properties/${propertyId}/guide`),
+    createArea: (propertyId: string, data: { name: string; floor?: string; description?: string; order?: number }) =>
+      request<PropertyArea>(`/api/properties/${propertyId}/guide/areas`, { method: 'POST', body: JSON.stringify(data) }),
+    updateArea: (propertyId: string, areaId: string, data: Partial<{ name: string; floor: string; description: string; order: number }>) =>
+      request<PropertyArea>(`/api/properties/${propertyId}/guide/areas/${areaId}`, { method: 'PUT', body: JSON.stringify(data) }),
+    deleteArea: (propertyId: string, areaId: string) =>
+      request<void>(`/api/properties/${propertyId}/guide/areas/${areaId}`, { method: 'DELETE' }),
+    createDoc: (propertyId: string, data: { areaId?: string; title: string; description: string; category?: string; photos?: string[]; tags?: string[]; order?: number }) =>
+      request<PropertyDoc>(`/api/properties/${propertyId}/guide/docs`, { method: 'POST', body: JSON.stringify(data) }),
+    updateDoc: (propertyId: string, docId: string, data: Partial<PropertyDoc>) =>
+      request<PropertyDoc>(`/api/properties/${propertyId}/guide/docs/${docId}`, { method: 'PUT', body: JSON.stringify(data) }),
+    deleteDoc: (propertyId: string, docId: string) =>
+      request<void>(`/api/properties/${propertyId}/guide/docs/${docId}`, { method: 'DELETE' }),
+    createContact: (propertyId: string, data: { agency: string; name?: string; phones?: string[]; company?: string; notes?: string; order?: number }) =>
+      request<PropertyContact>(`/api/properties/${propertyId}/guide/contacts`, { method: 'POST', body: JSON.stringify(data) }),
+    updateContact: (propertyId: string, contactId: string, data: Partial<PropertyContact>) =>
+      request<PropertyContact>(`/api/properties/${propertyId}/guide/contacts/${contactId}`, { method: 'PUT', body: JSON.stringify(data) }),
+    deleteContact: (propertyId: string, contactId: string) =>
+      request<void>(`/api/properties/${propertyId}/guide/contacts/${contactId}`, { method: 'DELETE' }),
   },
 
   bookings: {
@@ -244,11 +478,20 @@ export const api = {
       request<Booking>(`/api/bookings/${id}/checkin`, { method: 'POST' }),
     checkout: (id: string) =>
       request<Booking>(`/api/bookings/${id}/checkout`, { method: 'POST' }),
+    guestRequests: (id: string) =>
+      request<GuestServiceRequest[]>(`/api/bookings/${id}/guest-requests`),
+    respondToGuestRequest: (bookingId: string, reqId: string, status: 'CONFIRMED' | 'DECLINED') =>
+      request<{ id: string; status: string }>(`/api/bookings/${bookingId}/guest-requests/${reqId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status }),
+      }),
   },
 
   jobs: {
-    list: (params?: { status?: string; propertyId?: string }) => {
-      const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
+    list: (params?: { status?: string; propertyId?: string; archived?: string; weekStart?: string }) => {
+      const qs = params ? '?' + new URLSearchParams(
+        Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined)) as Record<string, string>
+      ).toString() : '';
       return request<Job[]>(`/api/jobs${qs}`);
     },
     get: (id: string) => request<Job>(`/api/jobs/${id}`),
@@ -283,6 +526,8 @@ export const api = {
       request<Job>(`/api/jobs/${id}/cancel`, { method: 'POST' }),
     archive: (id: string) =>
       request<Job>(`/api/jobs/${id}/archive`, { method: 'POST' }),
+    unarchive: (id: string) =>
+      request<Job>(`/api/jobs/${id}/unarchive`, { method: 'POST' }),
     dispatchWorkers: (propertyId: string) =>
       request<Worker[]>(`/api/jobs/dispatch-workers?propertyId=${propertyId}`),
     issues: (id: string) =>
@@ -311,6 +556,8 @@ export const api = {
       request<void>(`/api/workers/${id}`, { method: 'DELETE' }),
     resetPassword: (id: string) =>
       request<{ tempPassword: string }>(`/api/workers/${id}/reset-password`, { method: 'POST' }),
+    getLocation: (id: string) =>
+      request<WorkerLocation>(`/api/workers/${id}/location`),
   },
 
   issues: {
@@ -326,10 +573,77 @@ export const api = {
       }),
   },
 
+  maintenance: {
+    list: (params?: { status?: string; propertyId?: string; priority?: string }) => {
+      const qs = params ? '?' + new URLSearchParams(
+        Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined)) as Record<string, string>
+      ).toString() : '';
+      return request<MaintenanceRequest[]>(`/api/maintenance${qs}`);
+    },
+    get: (id: string) => request<MaintenanceRequest>(`/api/maintenance/${id}`),
+    create: (data: {
+      propertyId: string; title: string; description: string;
+      priority?: string; tradeRoleId?: string; photoUrl?: string; videoUrl?: string;
+    }) => request<MaintenanceRequest>('/api/maintenance', { method: 'POST', body: JSON.stringify(data) }),
+    review: (id: string, data: { action: 'APPROVE' | 'REJECT'; assignedWorkerId?: string; scheduledAt?: string; hostNotes?: string }) =>
+      request<MaintenanceRequest>(`/api/maintenance/${id}/review`, { method: 'POST', body: JSON.stringify(data) }),
+    assign: (id: string, data: { assignedWorkerId: string; scheduledAt?: string }) =>
+      request<MaintenanceRequest>(`/api/maintenance/${id}/assign`, { method: 'POST', body: JSON.stringify(data) }),
+  },
+
+  inventory: {
+    list: (params?: { propertyId?: string; lowStock?: string }) => {
+      const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
+      return request<InventoryItem[]>(`/api/inventory${qs}`);
+    },
+    lowStock: () => request<InventoryItem[]>('/api/inventory/low-stock'),
+    create: (data: Partial<InventoryItem>) =>
+      request<InventoryItem>('/api/inventory', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: Partial<InventoryItem>) =>
+      request<InventoryItem>(`/api/inventory/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: string) => request<void>(`/api/inventory/${id}`, { method: 'DELETE' }),
+  },
+
+  owners: {
+    list: () => request<OwnerEntry[]>('/api/owners'),
+    create: (data: { name: string; email: string; phone?: string }) =>
+      request<OwnerEntry & { tempPassword: string }>('/api/owners', { method: 'POST', body: JSON.stringify(data) }),
+    linkProperty: (ownerId: string, data: { propertyId: string; involvementLevel: string; ownershipPercent?: number; commissionPct?: number }) =>
+      request<PropertyOwnership>(`/api/owners/${ownerId}/properties`, { method: 'POST', body: JSON.stringify(data) }),
+    updateLink: (ownerId: string, propertyId: string, data: { involvementLevel?: string; ownershipPercent?: number; commissionPct?: number }) =>
+      request<PropertyOwnership>(`/api/owners/${ownerId}/properties/${propertyId}`, { method: 'PUT', body: JSON.stringify(data) }),
+    unlinkProperty: (ownerId: string, propertyId: string) =>
+      request<void>(`/api/owners/${ownerId}/properties/${propertyId}`, { method: 'DELETE' }),
+    delete: (id: string) => request<void>(`/api/owners/${id}`, { method: 'DELETE' }),
+  },
+
+  tradeRoles: {
+    list: () => request<TradeRole[]>('/api/trade-roles'),
+    create: (data: { name: string; description?: string; color?: string }) =>
+      request<TradeRole>('/api/trade-roles', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: Partial<TradeRole>) =>
+      request<TradeRole>(`/api/trade-roles/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: string) => request<void>(`/api/trade-roles/${id}`, { method: 'DELETE' }),
+  },
+
   tradesmen: {
     list: (params?: { trade?: string; propertyId?: string }) => {
       const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
-      return request<any[]>(`/api/tradesmen${qs}`);
+      return request<Tradesman[]>(`/api/tradesmen${qs}`);
+    },
+    create: (data: { name: string; trade: string; phones?: string[]; company?: string; notes?: string; area?: string; email?: string; propertyIds?: string[] }) =>
+      request<Tradesman>('/api/tradesmen', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: Partial<{ name: string; trade: string; phones: string[]; company: string; notes: string; area: string; email: string; propertyIds: string[] }>) =>
+      request<Tradesman>(`/api/tradesmen/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: string) => request<void>(`/api/tradesmen/${id}`, { method: 'DELETE' }),
+  },
+
+  revenueReports: {
+    list: (params?: { propertyId?: string; month?: number; year?: number }) => {
+      const qs = params ? '?' + new URLSearchParams(
+        Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)]))
+      ).toString() : '';
+      return request<RevenueReport[]>(`/api/revenue-reports${qs}`);
     },
   },
 
