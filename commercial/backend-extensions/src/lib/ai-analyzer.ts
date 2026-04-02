@@ -319,7 +319,7 @@ ${bookingContext ? `\n${bookingContext}` : ''}`;
 // ── Issue Analysis (worker/guest reported issues) ──────────────────────────
 
 export async function analyzeIssue(
-  issue: { id: string; description: string; photoUrl?: string | null; videoUrl?: string | null; severity: string; propertyId?: string | null },
+  issue: { id: string; description: string; photoUrl?: string | null; videoUrl?: string | null; mediaUrls?: string | null; severity: string; propertyId?: string | null },
   hostId: string
 ) {
   if (process.env.AI_ANALYSIS_ENABLED?.toLowerCase() !== 'true') {
@@ -452,23 +452,39 @@ When recommending next steps, choose the right action:
 
 ${propertyContext ? `\n${propertyContext}` : ''}`;
 
-  // Extract frames from video if available
+  // Parse mediaUrls for multi-media support
+  const parsedMedia: { url: string; type: string }[] = (() => {
+    try { return issue.mediaUrls ? JSON.parse(issue.mediaUrls) : []; } catch { return []; }
+  })();
+  // Collect all photo URLs (from mediaUrls + legacy photoUrl)
+  const photoUrls: string[] = [
+    ...parsedMedia.filter(m => m.type === 'image').map(m => m.url),
+  ];
+  if (issue.photoUrl && !photoUrls.includes(issue.photoUrl)) photoUrls.push(issue.photoUrl);
+  // Collect all video URLs (from mediaUrls + legacy videoUrl)
+  const videoUrls: string[] = [
+    ...parsedMedia.filter(m => m.type === 'video').map(m => m.url),
+  ];
+  if (issue.videoUrl && !videoUrls.includes(issue.videoUrl)) videoUrls.push(issue.videoUrl);
+
+  // Extract frames from all videos
   let videoFrames: ExtractedFrame[] = [];
-  if (issue.videoUrl) {
-    videoFrames = await extractVideoFrames(issue.videoUrl);
+  for (const vUrl of videoUrls) {
+    const frames = await extractVideoFrames(vUrl);
+    videoFrames.push(...frames);
   }
 
   const userContent: Anthropic.MessageCreateParams['messages'][0]['content'] = [];
 
   userContent.push({
     type: 'text',
-    text: `Issue report:\n"${issue.description}"\n\nSeverity reported: ${issue.severity}${issue.photoUrl ? '\n[Photo attached]' : ''}${videoFrames.length > 0 ? `\n[Video attached — ${videoFrames.length} frames extracted at regular intervals]` : issue.videoUrl ? '\n[Video attached but frames could not be extracted]' : ''}\n\nAnalyze this issue report and provide your assessment.`,
+    text: `Issue report:\n"${issue.description}"\n\nSeverity reported: ${issue.severity}${photoUrls.length > 0 ? `\n[${photoUrls.length} photo(s) attached]` : ''}${videoFrames.length > 0 ? `\n[${videoUrls.length} video(s) attached — ${videoFrames.length} frames extracted at regular intervals]` : videoUrls.length > 0 ? `\n[${videoUrls.length} video(s) attached but frames could not be extracted]` : ''}\n\nAnalyze this issue report and provide your assessment.`,
   });
 
-  // Include photo for vision analysis if available
-  if (issue.photoUrl) {
+  // Include all photos for vision analysis
+  for (const photoUrl of photoUrls) {
     try {
-      const response = await fetch(issue.photoUrl);
+      const response = await fetch(photoUrl);
       const buffer = await response.arrayBuffer();
       const base64 = Buffer.from(buffer).toString('base64');
       const contentType = response.headers.get('content-type') || 'image/jpeg';
@@ -497,7 +513,7 @@ ${propertyContext ? `\n${propertyContext}` : ''}`;
     });
   }
 
-  const hasVisualContent = issue.photoUrl || videoFrames.length > 0;
+  const hasVisualContent = photoUrls.length > 0 || videoFrames.length > 0;
   const model = hasVisualContent ? 'claude-sonnet-4-6' : 'claude-haiku-4-5-20251001';
 
   const result = await client.messages.create({

@@ -22,6 +22,7 @@ export default function IssueDetailScreen() {
   const [loadingTradesmen, setLoadingTradesmen] = useState(false);
   const [expandedSuggestions, setExpandedSuggestions] = useState<Record<string, boolean>>({});
   const [fullScreenImage, setFullScreenImage] = useState<string | null>(null);
+  const [fullScreenIndex, setFullScreenIndex] = useState(0);
 
   const loadIssue = useCallback(async () => {
     try {
@@ -130,22 +131,60 @@ export default function IssueDetailScreen() {
         </View>
 
         {/* Media */}
-        {(issue.photoUrl || issue.videoUrl) && (
-          <View style={styles.card}>
-            <Text style={styles.label}>Media</Text>
-            {issue.photoUrl && (
-              <TouchableOpacity onPress={() => setFullScreenImage(issue.photoUrl)}>
-                <Image source={{ uri: issue.photoUrl }} style={styles.photo} resizeMode="cover" />
+        {(() => {
+          // Build unified media list from mediaUrls array (new) or legacy fields
+          const mediaList: { url: string; type: 'image' | 'video' }[] =
+            issue.mediaUrls && issue.mediaUrls.length > 0
+              ? issue.mediaUrls
+              : [
+                  ...(issue.photoUrl ? [{ url: issue.photoUrl, type: 'image' as const }] : []),
+                  ...(issue.videoUrl ? [{ url: issue.videoUrl, type: 'video' as const }] : []),
+                ];
+          if (mediaList.length === 0) return null;
+          const imageItems = mediaList.filter(m => m.type === 'image');
+          return (
+            <View style={styles.card}>
+              <Text style={styles.label}>Media ({mediaList.length})</Text>
+              <FlatList
+                data={mediaList}
+                horizontal
+                keyExtractor={(_, i) => i.toString()}
+                showsHorizontalScrollIndicator={false}
+                style={{ marginTop: 8 }}
+                renderItem={({ item, index }) => (
+                  item.type === 'image' ? (
+                    <TouchableOpacity
+                      onPress={() => {
+                        const imgIdx = imageItems.findIndex(img => img.url === item.url);
+                        setFullScreenIndex(imgIdx >= 0 ? imgIdx : 0);
+                        setFullScreenImage(item.url);
+                      }}
+                      style={styles.galleryThumb}
+                    >
+                      <Image source={{ uri: item.url }} style={styles.galleryImage} resizeMode="cover" />
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity
+                      onPress={() => Linking.openURL(item.url)}
+                      style={styles.galleryThumb}
+                    >
+                      <View style={styles.galleryVideoThumb}>
+                        <Text style={{ fontSize: 28 }}>🎥</Text>
+                        <Text style={styles.galleryVideoLabel}>Play Video</Text>
+                      </View>
+                    </TouchableOpacity>
+                  )
+                )}
+              />
+              {mediaList.length > 1 && (
+                <Text style={styles.tapHint}>Swipe for more · Tap to view</Text>
+              )}
+              {mediaList.length === 1 && imageItems.length > 0 && (
                 <Text style={styles.tapHint}>Tap to view full screen</Text>
-              </TouchableOpacity>
-            )}
-            {issue.videoUrl && (
-              <TouchableOpacity onPress={() => Linking.openURL(issue.videoUrl)} style={{ marginTop: issue.photoUrl ? 12 : 0 }}>
-                <Text style={styles.linkText}>View Video</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
+              )}
+            </View>
+          );
+        })()}
 
         {/* AI Analysis */}
         {allSuggestions.length > 0 && (
@@ -327,7 +366,7 @@ export default function IssueDetailScreen() {
         </View>
       </ScrollView>
 
-      {/* Full-screen image viewer */}
+      {/* Full-screen image viewer with navigation */}
       <Modal visible={!!fullScreenImage} transparent animationType="fade">
         <View style={styles.fullScreenOverlay}>
           <TouchableOpacity style={styles.fullScreenClose} onPress={() => setFullScreenImage(null)}>
@@ -336,6 +375,42 @@ export default function IssueDetailScreen() {
           {fullScreenImage && (
             <Image source={{ uri: fullScreenImage }} style={styles.fullScreenImage} resizeMode="contain" />
           )}
+          {/* Navigation arrows for multiple images */}
+          {(() => {
+            const allImages = (
+              issue?.mediaUrls && issue.mediaUrls.length > 0
+                ? issue.mediaUrls.filter((m: any) => m.type === 'image')
+                : issue?.photoUrl ? [{ url: issue.photoUrl }] : []
+            );
+            if (allImages.length <= 1) return null;
+            return (
+              <View style={styles.fullScreenNav}>
+                <TouchableOpacity
+                  style={[styles.navArrow, fullScreenIndex === 0 && styles.navArrowDisabled]}
+                  disabled={fullScreenIndex === 0}
+                  onPress={() => {
+                    const newIdx = fullScreenIndex - 1;
+                    setFullScreenIndex(newIdx);
+                    setFullScreenImage(allImages[newIdx].url);
+                  }}
+                >
+                  <Text style={styles.navArrowText}>‹</Text>
+                </TouchableOpacity>
+                <Text style={styles.navCounter}>{fullScreenIndex + 1} / {allImages.length}</Text>
+                <TouchableOpacity
+                  style={[styles.navArrow, fullScreenIndex === allImages.length - 1 && styles.navArrowDisabled]}
+                  disabled={fullScreenIndex === allImages.length - 1}
+                  onPress={() => {
+                    const newIdx = fullScreenIndex + 1;
+                    setFullScreenIndex(newIdx);
+                    setFullScreenImage(allImages[newIdx].url);
+                  }}
+                >
+                  <Text style={styles.navArrowText}>›</Text>
+                </TouchableOpacity>
+              </View>
+            );
+          })()}
         </View>
       </Modal>
 
@@ -440,10 +515,19 @@ const styles = StyleSheet.create({
   tradesmanCompany: { fontSize: 12, color: '#64748b', marginTop: 1 },
   phoneBtn: { backgroundColor: '#1e3a5f', borderRadius: 6, paddingHorizontal: 10, paddingVertical: 6 },
   phoneBtnText: { color: '#3b82f6', fontSize: 13, fontWeight: '600' },
+  galleryThumb: { width: 140, height: 120, borderRadius: 10, marginRight: 10 },
+  galleryImage: { width: 140, height: 120, borderRadius: 10, backgroundColor: '#1e293b' },
+  galleryVideoThumb: { width: 140, height: 120, borderRadius: 10, backgroundColor: '#1e293b', borderWidth: 1, borderColor: '#334155', alignItems: 'center' as const, justifyContent: 'center' as const },
+  galleryVideoLabel: { color: '#3b82f6', fontSize: 12, fontWeight: '600' as const, marginTop: 4 },
   fullScreenOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' },
   fullScreenClose: { position: 'absolute' as const, top: 50, right: 20, zIndex: 10, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 20, width: 40, height: 40, alignItems: 'center' as const, justifyContent: 'center' as const },
   fullScreenCloseText: { color: '#fff', fontSize: 20, fontWeight: '600' as const },
   fullScreenImage: { width: '100%' as any, height: '80%' as any },
+  fullScreenNav: { position: 'absolute' as const, bottom: 60, flexDirection: 'row' as const, alignItems: 'center' as const, gap: 20 },
+  navArrow: { backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20, width: 44, height: 44, alignItems: 'center' as const, justifyContent: 'center' as const },
+  navArrowDisabled: { opacity: 0.3 },
+  navArrowText: { color: '#fff', fontSize: 24, fontWeight: '700' as const },
+  navCounter: { color: '#fff', fontSize: 14, fontWeight: '600' as const },
   emptyList: { color: '#64748b', textAlign: 'center', marginVertical: 24, fontSize: 14 },
   modalCloseBtn: { marginTop: 16, paddingVertical: 12, alignItems: 'center', borderRadius: 10, borderWidth: 1, borderColor: '#334155' },
   modalCloseBtnText: { color: '#94a3b8', fontSize: 15, fontWeight: '600' },

@@ -694,6 +694,7 @@ export interface JobIssue {
   description: string;
   photoUrl?: string;
   videoUrl?: string;
+  mediaUrls?: { url: string; type: 'image' | 'video' }[];
   severity: 'LOW' | 'MEDIUM' | 'HIGH';
   status: 'OPEN' | 'IN_REVIEW' | 'RESOLVED';
   createdAt: string;

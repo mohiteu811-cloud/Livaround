@@ -165,6 +165,7 @@ export interface Issue {
   status: 'OPEN' | 'IN_REVIEW' | 'RESOLVED';
   photoUrl?: string;
   videoUrl?: string;
+  mediaUrls?: { url: string; type: 'image' | 'video' }[];
   createdAt: string;
 }
 

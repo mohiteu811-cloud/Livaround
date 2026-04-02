@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Alert, ScrollView, Image,
+  ActivityIndicator, Alert, ScrollView, Image, FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -11,6 +11,7 @@ import { useLang, t } from '../../../src/lib/i18n';
 import { useVoiceInput } from '../../../src/lib/useVoice';
 
 type Severity = 'LOW' | 'MEDIUM' | 'HIGH';
+type MediaItem = { uri: string; type: string; mediaType: 'image' | 'video'; duration?: number };
 
 export default function ReportIssueScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -30,8 +31,7 @@ export default function ReportIssueScreen() {
     useVoiceInput(lang, (transcript) => {
       setDescription(prev => prev ? `${prev} ${transcript}` : transcript);
     });
-  const [photo, setPhoto] = useState<{ uri: string; type: string } | null>(null);
-  const [video, setVideo] = useState<{ uri: string; type: string; duration?: number } | null>(null);
+  const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -53,7 +53,7 @@ export default function ReportIssueScreen() {
     });
     if (!result.canceled && result.assets[0]) {
       const asset = result.assets[0];
-      setPhoto({ uri: asset.uri, type: asset.mimeType ?? 'image/jpeg' });
+      setMediaItems(prev => [...prev, { uri: asset.uri, type: asset.mimeType ?? 'image/jpeg', mediaType: 'image' }]);
     }
   }
 
@@ -62,11 +62,16 @@ export default function ReportIssueScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       quality: 0.8,
-      allowsEditing: false,
+      allowsMultipleSelection: true,
+      selectionLimit: 10,
     });
-    if (!result.canceled && result.assets[0]) {
-      const asset = result.assets[0];
-      setPhoto({ uri: asset.uri, type: asset.mimeType ?? 'image/jpeg' });
+    if (!result.canceled) {
+      const newItems: MediaItem[] = result.assets.map(asset => ({
+        uri: asset.uri,
+        type: asset.mimeType ?? 'image/jpeg',
+        mediaType: 'image' as const,
+      }));
+      setMediaItems(prev => [...prev, ...newItems]);
     }
   }
 
@@ -83,7 +88,12 @@ export default function ReportIssueScreen() {
     });
     if (!result.canceled && result.assets[0]) {
       const asset = result.assets[0];
-      setVideo({ uri: asset.uri, type: asset.mimeType ?? 'video/mp4', duration: asset.duration ?? undefined });
+      setMediaItems(prev => [...prev, {
+        uri: asset.uri,
+        type: asset.mimeType ?? 'video/mp4',
+        mediaType: 'video',
+        duration: asset.duration ?? undefined,
+      }]);
     }
   }
 
@@ -95,8 +105,17 @@ export default function ReportIssueScreen() {
     });
     if (!result.canceled && result.assets[0]) {
       const asset = result.assets[0];
-      setVideo({ uri: asset.uri, type: asset.mimeType ?? 'video/mp4', duration: asset.duration ?? undefined });
+      setMediaItems(prev => [...prev, {
+        uri: asset.uri,
+        type: asset.mimeType ?? 'video/mp4',
+        mediaType: 'video',
+        duration: asset.duration ?? undefined,
+      }]);
     }
+  }
+
+  function removeMedia(index: number) {
+    setMediaItems(prev => prev.filter((_, i) => i !== index));
   }
 
   async function handleSubmit() {
@@ -106,25 +125,21 @@ export default function ReportIssueScreen() {
     }
     setLoading(true);
     try {
-      let photoUrl: string | undefined;
-      let videoUrl: string | undefined;
+      const uploadedMedia: { url: string; type: 'image' | 'video' }[] = [];
 
-      if (photo || video) setUploading(true);
-      if (photo) {
-        const result = await api.upload.file(photo.uri, photo.type);
-        photoUrl = result.url;
+      if (mediaItems.length > 0) {
+        setUploading(true);
+        for (const item of mediaItems) {
+          const result = await api.upload.file(item.uri, item.type);
+          uploadedMedia.push({ url: result.url, type: item.mediaType });
+        }
+        setUploading(false);
       }
-      if (video) {
-        const result = await api.upload.file(video.uri, video.type);
-        videoUrl = result.url;
-      }
-      setUploading(false);
 
       await api.jobs.reportIssue(id, {
         description: description.trim(),
         severity,
-        photoUrl,
-        videoUrl,
+        mediaUrls: uploadedMedia.length > 0 ? uploadedMedia : undefined,
       });
 
       Alert.alert(tr.issueReported, tr.hostNotified, [
@@ -138,9 +153,8 @@ export default function ReportIssueScreen() {
     }
   }
 
-  const durationLabel = video?.duration
-    ? `${Math.round(video.duration)}s`
-    : null;
+  const photoCount = mediaItems.filter(m => m.mediaType === 'image').length;
+  const videoCount = mediaItems.filter(m => m.mediaType === 'video').length;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -198,53 +212,61 @@ export default function ReportIssueScreen() {
           textAlignVertical="top"
         />
 
-        {/* Photo */}
-        <Text style={styles.label}>{tr.photo}</Text>
-        {photo ? (
-          <View style={styles.mediaPreview}>
-            <Image source={{ uri: photo.uri }} style={styles.imagePreview} resizeMode="cover" />
-            <TouchableOpacity style={styles.removeButton} onPress={() => setPhoto(null)}>
-              <Text style={styles.removeText}>✕</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <View style={styles.videoButtons}>
-            <TouchableOpacity style={[styles.mediaButton, { flex: 1 }]} onPress={pickPhoto}>
-              <Text style={styles.mediaButtonText}>{tr.takePhoto}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.mediaButton, { flex: 1 }]} onPress={pickPhotoFromLibrary}>
-              <Text style={styles.mediaButtonText}>{tr.library}</Text>
-            </TouchableOpacity>
-          </View>
+        {/* Media */}
+        <View style={styles.labelRow}>
+          <Text style={styles.label}>Photos & Videos</Text>
+          {mediaItems.length > 0 && (
+            <Text style={styles.mediaCount}>
+              {photoCount > 0 ? `${photoCount} photo${photoCount > 1 ? 's' : ''}` : ''}
+              {photoCount > 0 && videoCount > 0 ? ' · ' : ''}
+              {videoCount > 0 ? `${videoCount} video${videoCount > 1 ? 's' : ''}` : ''}
+            </Text>
+          )}
+        </View>
+
+        {/* Media previews */}
+        {mediaItems.length > 0 && (
+          <FlatList
+            data={mediaItems}
+            horizontal
+            keyExtractor={(_, i) => i.toString()}
+            showsHorizontalScrollIndicator={false}
+            style={styles.mediaList}
+            renderItem={({ item, index }) => (
+              <View style={styles.mediaThumbnail}>
+                {item.mediaType === 'image' ? (
+                  <Image source={{ uri: item.uri }} style={styles.thumbImage} resizeMode="cover" />
+                ) : (
+                  <View style={styles.videoThumbBox}>
+                    <Text style={styles.videoIcon}>🎥</Text>
+                    {item.duration && <Text style={styles.videoDuration}>{Math.round(item.duration)}s</Text>}
+                  </View>
+                )}
+                <TouchableOpacity style={styles.removeButton} onPress={() => removeMedia(index)}>
+                  <Text style={styles.removeText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          />
         )}
 
-        {/* Video */}
-        <Text style={styles.label}>{tr.video}</Text>
-        {video ? (
-          <View style={styles.videoPreview}>
-            <View style={styles.videoThumb}>
-              <Text style={styles.videoIcon}>🎥</Text>
-              <View>
-                <Text style={styles.videoLabel}>{tr.videoRecorded}</Text>
-                {durationLabel && (
-                  <Text style={styles.videoDuration}>{durationLabel}</Text>
-                )}
-              </View>
-            </View>
-            <TouchableOpacity style={styles.removeButton} onPress={() => setVideo(null)}>
-              <Text style={styles.removeText}>✕</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <View style={styles.videoButtons}>
-            <TouchableOpacity style={[styles.mediaButton, { flex: 1 }]} onPress={recordVideo}>
-              <Text style={styles.mediaButtonText}>{tr.record}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.mediaButton, { flex: 1 }]} onPress={pickVideoFromLibrary}>
-              <Text style={styles.mediaButtonText}>{tr.library}</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+        {/* Add media buttons */}
+        <View style={styles.addMediaRow}>
+          <TouchableOpacity style={[styles.mediaButton, { flex: 1 }]} onPress={pickPhoto}>
+            <Text style={styles.mediaButtonText}>{tr.takePhoto}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.mediaButton, { flex: 1 }]} onPress={pickPhotoFromLibrary}>
+            <Text style={styles.mediaButtonText}>{tr.library}</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.addMediaRow}>
+          <TouchableOpacity style={[styles.mediaButton, { flex: 1 }]} onPress={recordVideo}>
+            <Text style={styles.mediaButtonText}>{tr.record}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.mediaButton, { flex: 1 }]} onPress={pickVideoFromLibrary}>
+            <Text style={styles.mediaButtonText}>Video {tr.library}</Text>
+          </TouchableOpacity>
+        </View>
 
         {uploading && (
           <View style={styles.uploadingBanner}>
@@ -289,6 +311,7 @@ const styles = StyleSheet.create({
     fontSize: 13, color: '#94a3b8', fontWeight: '600',
     textTransform: 'uppercase', letterSpacing: 0.5,
   },
+  mediaCount: { fontSize: 12, color: '#64748b' },
   voiceButton: {
     backgroundColor: '#1e293b', borderWidth: 1.5, borderColor: '#334155',
     borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6,
@@ -308,29 +331,28 @@ const styles = StyleSheet.create({
     backgroundColor: '#1e293b', borderWidth: 1, borderColor: '#334155',
     borderRadius: 12, padding: 14, color: '#f8fafc', fontSize: 15, minHeight: 130,
   },
+  mediaList: { marginBottom: 4 },
+  mediaThumbnail: { width: 100, height: 100, borderRadius: 10, marginRight: 10, position: 'relative' },
+  thumbImage: { width: 100, height: 100, borderRadius: 10, backgroundColor: '#1e293b' },
+  videoThumbBox: {
+    width: 100, height: 100, borderRadius: 10, backgroundColor: '#1e293b',
+    borderWidth: 1, borderColor: '#334155', alignItems: 'center', justifyContent: 'center',
+  },
+  videoIcon: { fontSize: 32 },
+  videoDuration: { color: '#64748b', fontSize: 11, marginTop: 4 },
+  removeButton: {
+    position: 'absolute', top: -6, right: -6,
+    backgroundColor: '#ef4444', borderRadius: 12,
+    width: 24, height: 24, alignItems: 'center', justifyContent: 'center',
+  },
+  removeText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  addMediaRow: { flexDirection: 'row', gap: 10 },
   mediaButton: {
     backgroundColor: '#1e293b', borderWidth: 1.5, borderColor: '#334155',
-    borderStyle: 'dashed', borderRadius: 12, paddingVertical: 18,
+    borderStyle: 'dashed', borderRadius: 12, paddingVertical: 14,
     alignItems: 'center',
   },
-  mediaButtonText: { color: '#94a3b8', fontSize: 15, fontWeight: '600' },
-  mediaPreview: { position: 'relative' },
-  imagePreview: { width: '100%', height: 200, borderRadius: 12, backgroundColor: '#1e293b' },
-  videoButtons: { flexDirection: 'row', gap: 10 },
-  videoPreview: {
-    backgroundColor: '#1e293b', borderWidth: 1, borderColor: '#334155',
-    borderRadius: 12, padding: 14, flexDirection: 'row',
-    alignItems: 'center', justifyContent: 'space-between',
-  },
-  videoThumb: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  videoIcon: { fontSize: 32 },
-  videoLabel: { color: '#f8fafc', fontSize: 14, fontWeight: '600' },
-  videoDuration: { color: '#64748b', fontSize: 12, marginTop: 2 },
-  removeButton: {
-    backgroundColor: '#334155', borderRadius: 20,
-    width: 28, height: 28, alignItems: 'center', justifyContent: 'center',
-  },
-  removeText: { color: '#f8fafc', fontSize: 13, fontWeight: '700' },
+  mediaButtonText: { color: '#94a3b8', fontSize: 14, fontWeight: '600' },
   uploadingBanner: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     backgroundColor: '#1e3a5f', borderRadius: 12, padding: 14,

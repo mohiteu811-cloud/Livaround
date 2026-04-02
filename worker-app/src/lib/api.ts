@@ -117,7 +117,7 @@ export const api = {
     start: (id: string) => request<Job>(`/api/jobs/${id}/start`, { method: 'POST' }),
     complete: (id: string, data?: { completionPhotoUrl?: string; completionVideoUrl?: string }) =>
       request<Job>(`/api/jobs/${id}/complete`, { method: 'POST', ...(data ? { body: JSON.stringify(data) } : {}) }),
-    reportIssue: (id: string, data: { description: string; severity: 'LOW' | 'MEDIUM' | 'HIGH'; photoUrl?: string; videoUrl?: string }) =>
+    reportIssue: (id: string, data: { description: string; severity: 'LOW' | 'MEDIUM' | 'HIGH'; photoUrl?: string; videoUrl?: string; mediaUrls?: { url: string; type: 'image' | 'video' }[] }) =>
       request<Issue>(`/api/jobs/${id}/issues`, { method: 'POST', body: JSON.stringify(data) }),
   },
 

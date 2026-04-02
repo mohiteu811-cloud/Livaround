@@ -42,6 +42,7 @@ const issueSchema = z.object({
   description: z.string().min(5),
   photoUrl: z.string().optional(),
   videoUrl: z.string().optional(),
+  mediaUrls: z.array(z.object({ url: z.string(), type: z.enum(['image', 'video']) })).optional(),
   severity: z.enum(['LOW', 'MEDIUM', 'HIGH']).default('LOW'),
 });
 
@@ -526,6 +527,10 @@ router.post('/:id/issues', validate(issueSchema), async (req: AuthRequest, res: 
     }
     if (!job) return res.status(404).json({ error: 'Job not found' });
 
+    const mediaUrls: { url: string; type: string }[] = req.body.mediaUrls || [];
+    const photoUrl = req.body.photoUrl ?? mediaUrls.find((m: any) => m.type === 'image')?.url ?? null;
+    const videoUrl = req.body.videoUrl ?? mediaUrls.find((m: any) => m.type === 'video')?.url ?? null;
+
     const issue = await prisma.issue.create({
       data: {
         jobId: req.params.id,
@@ -533,8 +538,9 @@ router.post('/:id/issues', validate(issueSchema), async (req: AuthRequest, res: 
         reportedById: reportedById ?? undefined,
         description: req.body.description,
         severity: req.body.severity,
-        photoUrl: req.body.photoUrl ?? null,
-        videoUrl: req.body.videoUrl ?? null,
+        photoUrl,
+        videoUrl,
+        mediaUrls: mediaUrls.length > 0 ? JSON.stringify(mediaUrls) : null,
       },
     });
 

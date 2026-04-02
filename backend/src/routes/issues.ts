@@ -7,12 +7,18 @@ import { validate } from '../middleware/validate';
 const router = Router();
 router.use(authenticate);
 
+const mediaItemSchema = z.object({
+  url: z.string(),
+  type: z.enum(['image', 'video']),
+});
+
 const createIssueSchema = z.object({
   propertyId: z.string(),
   jobId: z.string().optional(),
   description: z.string().min(5),
   photoUrl: z.string().optional(),
   videoUrl: z.string().optional(),
+  mediaUrls: z.array(mediaItemSchema).optional(),
   severity: z.enum(['LOW', 'MEDIUM', 'HIGH']).default('MEDIUM'),
 });
 
@@ -40,14 +46,21 @@ router.post('/', validate(createIssueSchema), async (req: AuthRequest, res: Resp
       if (!job) return res.status(404).json({ error: 'Job not found for this property' });
     }
 
+    // Support both legacy single fields and new mediaUrls array
+    const mediaUrls: { url: string; type: string }[] = req.body.mediaUrls || [];
+    // Backfill legacy fields from mediaUrls for backward compatibility
+    const photoUrl = req.body.photoUrl ?? mediaUrls.find(m => m.type === 'image')?.url ?? null;
+    const videoUrl = req.body.videoUrl ?? mediaUrls.find(m => m.type === 'video')?.url ?? null;
+
     const issue = await prisma.issue.create({
       data: {
         propertyId: req.body.propertyId,
         jobId: req.body.jobId ?? null,
         reportedById: worker.id,
         description: req.body.description,
-        photoUrl: req.body.photoUrl ?? null,
-        videoUrl: req.body.videoUrl ?? null,
+        photoUrl,
+        videoUrl,
+        mediaUrls: mediaUrls.length > 0 ? JSON.stringify(mediaUrls) : null,
         severity: req.body.severity,
       },
       include: {
@@ -121,7 +134,11 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       },
       orderBy: { createdAt: 'desc' },
     });
-    return res.json(issues);
+    const parsed = issues.map(i => ({
+      ...i,
+      mediaUrls: (() => { try { return i.mediaUrls ? JSON.parse(i.mediaUrls) : []; } catch { return []; } })(),
+    }));
+    return res.json(parsed);
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Internal server error' });
@@ -183,7 +200,11 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
       }
     }
 
-    return res.json(issue);
+    const parsed = {
+      ...issue,
+      mediaUrls: (() => { try { return issue.mediaUrls ? JSON.parse(issue.mediaUrls) : []; } catch { return []; } })(),
+    };
+    return res.json(parsed);
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Internal server error' });
