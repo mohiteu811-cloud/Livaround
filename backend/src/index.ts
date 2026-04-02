@@ -33,6 +33,8 @@ import adminRoutes from './routes/admin';
 import adminPayoutsRoutes from './routes/admin-payouts';
 import adminPartnersRoutes from './routes/admin-partners';
 import partnerRoutes from './routes/partner';
+import whatsappRoutes from './routes/whatsapp';
+import { startWhatsAppReminderScheduler } from './jobs/whatsapp-reminders';
 
 const app = express();
 const server = http.createServer(app);
@@ -69,6 +71,7 @@ app.use('/api/admin/payouts', adminPayoutsRoutes);
 app.use('/api/admin/partners', adminPartnersRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/partner', partnerRoutes);
+app.use('/api/whatsapp', whatsappRoutes);
 
 // Load commercial extensions (messaging, host-app endpoints) when available
 if (IS_COMMERCIAL) {
@@ -91,6 +94,11 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
   console.log(`LivAround API running on http://localhost:${PORT}`);
+
+  // Start WhatsApp reminder scheduler (commercial feature)
+  if (IS_COMMERCIAL) {
+    startWhatsAppReminderScheduler();
+  }
 });
 
 export default app;

@@ -33,6 +33,7 @@ model Host {
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   pushToken         String?
   autoDispatch      Boolean       @default(true)
+  whatsappEnabled   Boolean       @default(false)
   notificationPrefs String        @default("{\"guestMessages\":true,\"workerMessages\":true,\"aiConversationAlerts\":true,\"aiIssueAlerts\":\"all\"}")
   properties     Property[]
   tradeRoles     TradeRole[]
@@ -40,6 +41,7 @@ model Host {
   tradesmen      Tradesman[]
   workers        Worker[]
   conversations  Conversation[]
+  whatsappLogs   WhatsAppLog[]
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 }
@@ -104,8 +106,10 @@ model Booking {
   source      String   @default("DIRECT")
   externalId  String?
   notes       String?
-  guestCode   String?  @unique  // short URL token for guest app
-  lockCode    String?           // door lock code
+  guestCode         String?    @unique  // short URL token for guest app
+  lockCode          String?              // door lock code
+  whatsappSentAt    DateTime?            // when guest link was sent via WhatsApp
+  whatsappMessageId String?              // Meta message ID for delivery tracking
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -114,6 +118,7 @@ model Booking {
   guestIds        GuestID[]
   visitors        GuestVisitor[]
   conversation    Conversation?
+  whatsappLogs    WhatsAppLog[]
 }
 
 model GuestID {
@@ -862,4 +867,21 @@ model AiSuggestion {
 
   @@index([conversationId, status])
   @@index([issueId])
+}
+
+model WhatsAppLog {
+  id           String   @id @default(cuid())
+  bookingId    String?
+  booking      Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  hostId       String
+  host         Host     @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  phone        String   // E.164 formatted phone
+  template     String   // Template name used
+  messageId    String?  // Meta's message ID
+  status       String   @default("SENT") // SENT | DELIVERED | READ | FAILED
+  errorMessage String?
+  createdAt    DateTime @default(now())
+
+  @@index([bookingId])
+  @@index([hostId])
 }
