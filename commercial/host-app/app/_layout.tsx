@@ -30,16 +30,19 @@ export default function RootLayout() {
       const data = notification.request.content.data;
       const conversationId = data?.conversationId as string | undefined;
       const jobId = data?.jobId as string | undefined;
+      const issueId = data?.issueId as string | undefined;
 
       showBanner({
-        id: conversationId || jobId || 'unknown',
+        id: conversationId || jobId || issueId || 'unknown',
         title: notification.request.content.title ?? 'Notification',
         body: notification.request.content.body ?? '',
         route: conversationId
           ? `/conversation/${conversationId}`
           : jobId
             ? `/job/${jobId}`
-            : undefined,
+            : issueId
+              ? `/issues/${issueId}`
+              : undefined,
       });
     });
 
@@ -47,9 +50,11 @@ export default function RootLayout() {
       const data = response.notification.request.content.data;
       const conversationId = data?.conversationId as string | undefined;
       const jobId = data?.jobId as string | undefined;
+      const issueId = data?.issueId as string | undefined;
 
       if (conversationId) router.push(`/conversation/${conversationId}`);
       else if (jobId) router.push(`/job/${jobId}`);
+      else if (issueId) router.push(`/issues/${issueId}`);
     });
 
     return () => {

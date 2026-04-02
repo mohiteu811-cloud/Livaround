@@ -31,8 +31,9 @@ model Host {
   name           String
   organizationId String?       @unique
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
-  pushToken      String?
-  autoDispatch   Boolean       @default(true)
+  pushToken         String?
+  autoDispatch      Boolean       @default(true)
+  notificationPrefs String        @default("{\"guestMessages\":true,\"workerMessages\":true,\"aiConversationAlerts\":true,\"aiIssueAlerts\":\"all\"}")
   properties     Property[]
   tradeRoles     TradeRole[]
   ownersCreated  Owner[]
@@ -221,6 +222,7 @@ model Issue {
   description  String
   photoUrl     String?
   videoUrl     String?
+  mediaUrls    String?   // JSON array of {url, type} objects for multiple media files
   severity     String    @default("LOW")
   status       String    @default("OPEN")
   resolvedAt   DateTime?

@@ -67,6 +67,12 @@ export default function ProfileScreen() {
           <Text style={styles.menuArrow}>›</Text>
         </TouchableOpacity>
 
+        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/notifications-settings')}>
+          <Text style={styles.menuEmoji}>🔔</Text>
+          <Text style={styles.menuText}>Notifications</Text>
+          <Text style={styles.menuArrow}>›</Text>
+        </TouchableOpacity>
+
         <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/workers')}>
           <Text style={styles.menuEmoji}>👷</Text>
           <Text style={styles.menuText}>Workers</Text>

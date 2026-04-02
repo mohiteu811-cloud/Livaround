@@ -120,7 +120,7 @@ router.post('/:code/messages', async (req: Request, res: Response) => {
           select: {
             hostId: true,
             name: true,
-            host: { select: { id: true, name: true, pushToken: true, organizationId: true } },
+            host: { select: { id: true, name: true, pushToken: true, organizationId: true, notificationPrefs: true } },
           },
         },
       },
@@ -190,8 +190,9 @@ router.post('/:code/messages', async (req: Request, res: Response) => {
       io.of('/worker').to(`conv:${conversation.id}`).emit('new_message', message); // 3-way: workers see guest messages
     }
 
-    // Send push notification to host
-    if (booking.property.host.pushToken) {
+    // Send push notification to host (respects notification prefs)
+    const hostPrefs = (() => { try { return JSON.parse(booking.property.host.notificationPrefs || '{}'); } catch { return {}; } })();
+    if (booking.property.host.pushToken && hostPrefs.guestMessages !== false) {
       await sendPushNotification(booking.property.host.pushToken, {
         title: `Message from ${booking.guestName}`,
         body: (sanitizedContent || (voiceUrl ? 'Voice message' : 'Sent an image')).slice(0, 100),

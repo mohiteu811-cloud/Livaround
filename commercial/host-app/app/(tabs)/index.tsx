@@ -71,13 +71,13 @@ export default function DashboardScreen() {
               <StatCard emoji="⏳" label="Pending Jobs" value={summary.pendingJobs} onPress={() => router.push('/(tabs)/jobs')} />
               <StatCard emoji="📅" label="Active Bookings" value={summary.activeBookings} onPress={() => router.push('/(tabs)/bookings')} />
               <StatCard emoji="💬" label="Unread Messages" value={summary.unreadMessages} onPress={() => router.push('/(tabs)/messages')} />
-              <StatCard emoji="⚠️" label="Open Issues" value={summary.openIssues} />
+              <StatCard emoji="⚠️" label="Open Issues" value={summary.openIssues} onPress={() => router.push('/(tabs)/issues')} />
             </View>
 
-            <View style={styles.propertySummary}>
+            <TouchableOpacity style={styles.propertySummary} onPress={() => router.push('/(tabs)/properties')}>
               <Text style={styles.propertyCount}>{summary.propertyCount}</Text>
               <Text style={styles.propertyLabel}>Properties Managed</Text>
-            </View>
+            </TouchableOpacity>
           </>
         )}
       </ScrollView>

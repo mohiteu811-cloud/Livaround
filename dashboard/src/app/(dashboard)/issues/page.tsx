@@ -85,31 +85,46 @@ function IssueDetailModal({ issue, onClose, onStatusChange }: {
         <p className="text-slate-300 text-sm leading-relaxed">{issue.description}</p>
       </div>
 
-      {/* Photo */}
-      {issue.photoUrl && (
-        <div>
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Photo</p>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={issue.photoUrl}
-            alt="Issue photo"
-            className="w-full rounded-lg border border-slate-700 object-cover max-h-72"
-          />
-        </div>
-      )}
-
-      {/* Video */}
-      {issue.videoUrl && (
-        <div>
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Video</p>
-          <video
-            src={issue.videoUrl}
-            controls
-            playsInline
-            className="w-full rounded-lg border border-slate-700 max-h-72 bg-black"
-          />
-        </div>
-      )}
+      {/* Media */}
+      {(() => {
+        const mediaList: { url: string; type: string }[] =
+          issue.mediaUrls && issue.mediaUrls.length > 0
+            ? issue.mediaUrls
+            : [
+                ...(issue.photoUrl ? [{ url: issue.photoUrl, type: 'image' }] : []),
+                ...(issue.videoUrl ? [{ url: issue.videoUrl, type: 'video' }] : []),
+              ];
+        if (mediaList.length === 0) return null;
+        return (
+          <div>
+            <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">
+              Media ({mediaList.length})
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {mediaList.map((m, i) =>
+                m.type === 'image' ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    key={i}
+                    src={m.url}
+                    alt={`Issue media ${i + 1}`}
+                    className="w-full rounded-lg border border-slate-700 object-cover max-h-72 cursor-pointer hover:opacity-80 transition-opacity"
+                    onClick={() => window.open(m.url, '_blank')}
+                  />
+                ) : (
+                  <video
+                    key={i}
+                    src={m.url}
+                    controls
+                    playsInline
+                    className="w-full rounded-lg border border-slate-700 max-h-72 bg-black"
+                  />
+                )
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Actions */}
       {issue.status !== 'RESOLVED' && (
@@ -229,8 +244,17 @@ export default function IssuesPage() {
                   </p>
                 )}
                 <div className="flex gap-2">
-                  {issue.photoUrl && <span className="text-xs text-slate-500">📷 Photo</span>}
-                  {issue.videoUrl && <span className="text-xs text-slate-500">🎥 Video</span>}
+                  {(() => {
+                    const mediaCount = issue.mediaUrls?.length || ((issue.photoUrl ? 1 : 0) + (issue.videoUrl ? 1 : 0));
+                    const imageCount = issue.mediaUrls?.filter((m: any) => m.type === 'image').length || (issue.photoUrl ? 1 : 0);
+                    const videoCount = issue.mediaUrls?.filter((m: any) => m.type === 'video').length || (issue.videoUrl ? 1 : 0);
+                    return (
+                      <>
+                        {imageCount > 0 && <span className="text-xs text-slate-500">📷 {imageCount > 1 ? `${imageCount} Photos` : 'Photo'}</span>}
+                        {videoCount > 0 && <span className="text-xs text-slate-500">🎥 {videoCount > 1 ? `${videoCount} Videos` : 'Video'}</span>}
+                      </>
+                    );
+                  })()}
                 </div>
               </button>
             ))}

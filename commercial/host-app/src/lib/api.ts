@@ -165,7 +165,15 @@ export interface Issue {
   status: 'OPEN' | 'IN_REVIEW' | 'RESOLVED';
   photoUrl?: string;
   videoUrl?: string;
+  mediaUrls?: { url: string; type: 'image' | 'video' }[];
   createdAt: string;
+}
+
+export interface NotificationPrefs {
+  guestMessages: boolean;
+  workerMessages: boolean;
+  aiConversationAlerts: boolean;
+  aiIssueAlerts: 'all' | 'high_critical' | 'none';
 }
 
 // ── API Client ───────────────────────────────────────────────────────────────
@@ -194,12 +202,12 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ pushToken }),
       }),
-    updateSettings: (data: { autoDispatch?: boolean }) =>
+    updateSettings: (data: { autoDispatch?: boolean; notificationPrefs?: NotificationPrefs }) =>
       request<{ ok: boolean }>('/api/host-app/settings', {
         method: 'PATCH',
         body: JSON.stringify(data),
       }),
-    getSettings: () => request<{ autoDispatch: boolean }>('/api/host-app/settings'),
+    getSettings: () => request<{ autoDispatch: boolean; notificationPrefs: NotificationPrefs }>('/api/host-app/settings'),
   },
 
   properties: {
@@ -207,6 +215,21 @@ export const api = {
     get: (id: string) => request<Property>(`/api/properties/${id}`),
     getStaff: (propertyId: string) =>
       request<any[]>(`/api/properties/${propertyId}/staff`),
+    create: (data: {
+      name: string;
+      address: string;
+      city: string;
+      country: string;
+      type?: string;
+      bedrooms?: number;
+      bathrooms?: number;
+      maxGuests?: number;
+      description?: string;
+    }) =>
+      request<Property>('/api/properties', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
   },
 
   bookings: {
