@@ -3,8 +3,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { api, ConversationDetail, MessageItem } from '@/lib/api';
+import { connectSocket, joinConversation, leaveConversation, disconnectSocket } from '@/lib/socket';
 import { FeatureGate } from '@/components/FeatureGate';
-import { ArrowLeft, Send, Sparkles, Check, X, Mic, Paperclip } from 'lucide-react';
+import { ArrowLeft, Send, Sparkles, Check, X, Mic, Paperclip, Eye, EyeOff, UserPlus } from 'lucide-react';
 
 interface AiSuggestion {
   id: string;
@@ -44,6 +45,10 @@ export default function ConversationPage() {
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [mediaPreview, setMediaPreview] = useState<{ file: File; url: string; type: string } | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [visibility, setVisibility] = useState<'ALL' | 'TEAM_ONLY'>('ALL');
+  const [showWorkerPicker, setShowWorkerPicker] = useState(false);
+  const [workers, setWorkers] = useState<{ id: string; user: { name: string } }[]>([]);
+  const [loopingIn, setLoopingIn] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -54,12 +59,32 @@ export default function ConversationPage() {
     loadConversation();
     api.conversations.markRead(id).catch(() => {});
 
-    pollRef.current = setInterval(() => {
-      loadConversation(true);
-    }, 5000);
+    // Try Socket.IO for real-time updates, fall back to polling
+    const sock = connectSocket();
+    if (sock) {
+      joinConversation(id);
+      sock.on('new_message', (msg: MessageItem) => {
+        if (msg.conversationId === id) {
+          setMessages(prev => {
+            if (prev.some(m => m.id === msg.id)) return prev;
+            return [...prev, msg];
+          });
+          api.conversations.markRead(id).catch(() => {});
+        }
+      });
+    } else {
+      // Fallback to polling if socket unavailable
+      pollRef.current = setInterval(() => {
+        loadConversation(true);
+      }, 5000);
+    }
 
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
+      if (sock) {
+        leaveConversation(id);
+        sock.off('new_message');
+      }
     };
   }, [id]);
 
@@ -166,6 +191,7 @@ export default function ConversationPage() {
       const msg = await api.conversations.sendMessage(id, {
         content: text || '',
         imageUrl,
+        ...(visibility === 'TEAM_ONLY' ? { visibility: 'TEAM_ONLY' } : {}),
       });
       setMessages((prev) => [...prev, msg]);
     } catch {
@@ -275,8 +301,21 @@ export default function ConversationPage() {
               <p className="text-xs text-brand-400">{conversation.booking.property.name}</p>
             )}
           </div>
+          <button
+            onClick={async () => {
+              setShowWorkerPicker(true);
+              try {
+                const w = await api.workers.list();
+                setWorkers(w);
+              } catch {}
+            }}
+            className="ml-auto p-2 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
+            title="Loop in a worker"
+          >
+            <UserPlus size={18} />
+          </button>
           {conversation?.booking && (
-            <div className="ml-auto text-right">
+            <div className="text-right">
               <p className="text-xs text-slate-500">
                 {new Date(conversation.booking.checkIn).toLocaleDateString()} - {new Date(conversation.booking.checkOut).toLocaleDateString()}
               </p>
@@ -326,6 +365,11 @@ export default function ConversationPage() {
                         )}
                         {isHost && (
                           <span className="text-[9px] font-bold px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded-full border border-blue-500/30">Host</span>
+                        )}
+                        {(msg as any).visibility === 'TEAM_ONLY' && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 bg-purple-500/20 text-purple-400 rounded-full border border-purple-500/30 flex items-center gap-0.5">
+                            <EyeOff size={8} /> Team only
+                          </span>
                         )}
                       </div>
                       {msg.content && <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>}
@@ -432,6 +476,17 @@ export default function ConversationPage() {
             <Mic size={18} />
           </button>
           <button
+            onClick={() => setVisibility(v => v === 'ALL' ? 'TEAM_ONLY' : 'ALL')}
+            className={`p-2.5 rounded-xl transition-colors ${
+              visibility === 'TEAM_ONLY'
+                ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+                : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'
+            }`}
+            title={visibility === 'TEAM_ONLY' ? 'Sending as Team Only — click to switch to All' : 'Sending to All — click to switch to Team Only'}
+          >
+            {visibility === 'TEAM_ONLY' ? <EyeOff size={18} /> : <Eye size={18} />}
+          </button>
+          <button
             onClick={handleSend}
             disabled={(!input.trim() && !mediaPreview) || sending}
             className="p-2.5 bg-brand-600 hover:bg-brand-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-colors"
@@ -439,6 +494,43 @@ export default function ConversationPage() {
             <Send size={18} />
           </button>
         </div>
+
+        {/* Worker picker modal for loop-in */}
+        {showWorkerPicker && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowWorkerPicker(false)}>
+            <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-sm mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800">
+                <h3 className="text-sm font-semibold text-slate-100">Loop in a Worker</h3>
+                <button onClick={() => setShowWorkerPicker(false)} className="text-slate-400 hover:text-slate-200"><X size={18} /></button>
+              </div>
+              <div className="max-h-64 overflow-y-auto">
+                {workers.length === 0 ? (
+                  <p className="text-center py-8 text-slate-500 text-sm">No workers available</p>
+                ) : (
+                  workers.map(w => (
+                    <button
+                      key={w.id}
+                      disabled={loopingIn}
+                      onClick={async () => {
+                        setLoopingIn(true);
+                        try {
+                          await api.conversations.loopInWorker(id, w.id);
+                          setShowWorkerPicker(false);
+                          loadConversation();
+                        } catch {}
+                        setLoopingIn(false);
+                      }}
+                      className="w-full text-left px-5 py-3 flex items-center gap-3 hover:bg-slate-800 transition-colors border-b border-slate-800/50 disabled:opacity-50"
+                    >
+                      <div className="w-8 h-8 bg-slate-700 rounded-full flex items-center justify-center text-sm">👷</div>
+                      <span className="text-sm text-slate-200">{w.user.name}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </FeatureGate>
   );

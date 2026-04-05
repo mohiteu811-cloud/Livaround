@@ -417,6 +417,19 @@ export const api = {
       request<{ success: boolean; completed: number; failed: number }>('/api/admin/payouts/check-status', { method: 'POST' }),
   },
 
+  hostApp: {
+    dashboard: () => request<DashboardSummary>('/api/host-app/dashboard'),
+    bookingsCalendar: (month: string) =>
+      request<Booking[]>(`/api/host-app/bookings-calendar?month=${month}`),
+    getSettings: () =>
+      request<{ autoDispatch: boolean; notificationPrefs: NotificationPrefs }>('/api/host-app/settings'),
+    updateSettings: (data: { autoDispatch?: boolean; notificationPrefs?: NotificationPrefs }) =>
+      request<{ ok: boolean }>('/api/host-app/settings', {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+  },
+
   conversations: {
     list: () =>
       request<ConversationListItem[]>('/api/conversations'),
@@ -426,10 +439,15 @@ export const api = {
         `/api/conversations/${id}${qs}`
       );
     },
-    sendMessage: (id: string, data: { content: string; imageUrl?: string; voiceUrl?: string; voiceDuration?: number }) =>
+    sendMessage: (id: string, data: { content: string; imageUrl?: string; voiceUrl?: string; voiceDuration?: number; visibility?: 'ALL' | 'TEAM_ONLY' }) =>
       request<MessageItem>(`/api/conversations/${id}/messages`, { method: 'POST', body: JSON.stringify(data) }),
     markRead: (id: string) =>
       request<{ ok: boolean }>(`/api/conversations/${id}/read`, { method: 'PATCH' }),
+    loopInWorker: (id: string, workerId: string) =>
+      request<{ ok: boolean }>(`/api/conversations/${id}/loop-in-worker`, {
+        method: 'PATCH',
+        body: JSON.stringify({ workerId }),
+      }),
   },
 
   guestConversations: {
@@ -1247,7 +1265,26 @@ export interface MessageItem {
   voiceTranslation?: string | null;
   voiceLanguage?: string | null;
   isSystemMessage: boolean;
+  visibility?: 'ALL' | 'TEAM_ONLY';
   readByHost: boolean;
   readByGuest: boolean;
   createdAt: string;
+}
+
+export interface DashboardSummary {
+  todayCheckIns: number;
+  todayCheckOuts: number;
+  pendingJobs: number;
+  activeBookings: number;
+  unreadMessages: number;
+  openIssues: number;
+  propertyCount: number;
+  subscription: { plan: string; status: string; features: Record<string, boolean> };
+}
+
+export interface NotificationPrefs {
+  guestMessages: boolean;
+  workerMessages: boolean;
+  conversationAlerts: boolean;
+  issueAlerts: 'all' | 'high_critical' | 'none';
 }

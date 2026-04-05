@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
-import { Plus, Search, LogIn, LogOut, X, Link2, Check, Trash2, Bell, Clock, AlertTriangle, Send, Phone } from 'lucide-react';
+import { Plus, Search, LogIn, LogOut, X, Link2, Check, Trash2, Bell, Clock, AlertTriangle, Send, Phone, Calendar, List, ChevronLeft, ChevronRight } from 'lucide-react';
 import { api, Booking, GuestServiceRequest, Property } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Input, Select, Textarea, FormField } from '@/components/ui/Input';
@@ -323,6 +323,94 @@ function WhatsAppSendButton({ booking, whatsappAvailable }: { booking: Booking; 
   );
 }
 
+const STATUS_COLORS_CAL: Record<string, string> = {
+  CONFIRMED: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+  CHECKED_IN: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+  CHECKED_OUT: 'bg-slate-500/20 text-slate-400 border-slate-500/30',
+  CANCELLED: 'bg-red-500/20 text-red-400 border-red-500/30',
+};
+
+function BookingCalendar({ bookings }: { bookings: Booking[] }) {
+  const [calMonth, setCalMonth] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  });
+
+  const year = parseInt(calMonth.split('-')[0]);
+  const month = parseInt(calMonth.split('-')[1]) - 1;
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const startOffset = firstDay.getDay(); // 0=Sun
+  const daysInMonth = lastDay.getDate();
+
+  function prevMonth() {
+    const d = new Date(year, month - 1, 1);
+    setCalMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
+  function nextMonth() {
+    const d = new Date(year, month + 1, 1);
+    setCalMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
+
+  // Find bookings that overlap each day
+  function getBookingsForDay(day: number): Booking[] {
+    const date = new Date(year, month, day);
+    const dateStr = date.toISOString().split('T')[0];
+    return bookings.filter(b => {
+      const ci = b.checkIn.split('T')[0];
+      const co = b.checkOut.split('T')[0];
+      return ci <= dateStr && co >= dateStr;
+    });
+  }
+
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  return (
+    <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800">
+        <button onClick={prevMonth} className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-slate-200">
+          <ChevronLeft size={18} />
+        </button>
+        <h3 className="text-sm font-semibold text-slate-200">
+          {new Date(year, month).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+        </h3>
+        <button onClick={nextMonth} className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-slate-200">
+          <ChevronRight size={18} />
+        </button>
+      </div>
+      <div className="grid grid-cols-7">
+        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
+          <div key={d} className="px-2 py-2 text-center text-xs font-medium text-slate-500 border-b border-slate-800">{d}</div>
+        ))}
+        {Array.from({ length: startOffset }).map((_, i) => (
+          <div key={`empty-${i}`} className="min-h-[80px] border-b border-r border-slate-800/50" />
+        ))}
+        {Array.from({ length: daysInMonth }).map((_, i) => {
+          const day = i + 1;
+          const dateStr = new Date(year, month, day).toISOString().split('T')[0];
+          const isToday = dateStr === todayStr;
+          const dayBookings = getBookingsForDay(day);
+          return (
+            <div key={day} className={`min-h-[80px] border-b border-r border-slate-800/50 p-1 ${isToday ? 'bg-brand-600/5' : ''}`}>
+              <p className={`text-xs font-medium mb-1 px-1 ${isToday ? 'text-brand-400' : 'text-slate-400'}`}>{day}</p>
+              <div className="space-y-0.5">
+                {dayBookings.slice(0, 3).map(b => (
+                  <div key={b.id} className={`text-[10px] px-1.5 py-0.5 rounded truncate border ${STATUS_COLORS_CAL[b.status] || 'bg-slate-800 text-slate-300 border-slate-700'}`} title={`${b.guestName} · ${b.property?.name || ''}`}>
+                    {b.guestName.split(' ')[0]}
+                  </div>
+                ))}
+                {dayBookings.length > 3 && (
+                  <p className="text-[10px] text-slate-500 px-1">+{dayBookings.length - 3} more</p>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function BookingsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
@@ -332,6 +420,7 @@ export default function BookingsPage() {
   const [modal, setModal] = useState<{ open: boolean; booking?: Booking }>({ open: false });
   const [requestsModal, setRequestsModal] = useState<Booking | null>(null);
   const [whatsappAvailable, setWhatsappAvailable] = useState(false);
+  const [viewMode, setViewMode] = useState<'table' | 'calendar'>('table');
 
   useEffect(() => {
     api.whatsapp.status().then((s) => setWhatsappAvailable(s.available)).catch(() => {});
@@ -376,9 +465,27 @@ export default function BookingsPage() {
           <h1 className="text-2xl font-bold text-slate-100">Bookings</h1>
           <p className="text-slate-400 text-sm mt-1">{bookings.length} total bookings</p>
         </div>
-        <Button onClick={() => setModal({ open: true })}>
-          <Plus size={16} /> Add booking
-        </Button>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center bg-slate-900 border border-slate-800 rounded-lg p-0.5">
+            <button
+              onClick={() => setViewMode('table')}
+              className={`p-2 rounded-md transition-colors ${viewMode === 'table' ? 'bg-brand-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+              title="Table view"
+            >
+              <List size={16} />
+            </button>
+            <button
+              onClick={() => setViewMode('calendar')}
+              className={`p-2 rounded-md transition-colors ${viewMode === 'calendar' ? 'bg-brand-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+              title="Calendar view"
+            >
+              <Calendar size={16} />
+            </button>
+          </div>
+          <Button onClick={() => setModal({ open: true })}>
+            <Plus size={16} /> Add booking
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -400,6 +507,8 @@ export default function BookingsPage() {
         <div className="flex items-center justify-center h-64">
           <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
         </div>
+      ) : viewMode === 'calendar' ? (
+        <BookingCalendar bookings={filtered} />
       ) : (
         <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
           <table className="w-full text-sm">
