@@ -2,7 +2,7 @@
 
 ## Overview
 
-The LivAround Worker App is a React Native (Expo) mobile application for service workers who manage jobs at hospitality properties. Workers can receive and claim jobs, communicate with hosts and guests, track their work with checklists and media, and manage their availability — all with real-time updates and multi-language support.
+The LivAround Worker App is a React Native (Expo) mobile application for service workers who manage jobs at hospitality properties. Workers can receive and claim jobs, communicate with hosts and guests, track their work with checklists and media, and manage their availability — all with real-time updates, AI-powered message analysis, multilingual voice transcription and translation, and multi-language support.
 
 **Tech stack:** Expo (React Native), Expo Router, Socket.IO, TypeScript
 
@@ -174,7 +174,7 @@ Full-featured chat screen supporting multiple message types:
 - **Images/Photos** — inline media display
 - **Videos** — inline video player with controls
 - **Voice messages** — press-and-hold to record, waveform visualization, play/pause, duration display
-- **AI suggestions** — read-only cards with category, urgency level, and summary
+- **AI suggestions** — read-only cards with category, urgency level, and summary (see [Section 13: AI-Powered Features](#13-ai-powered-features))
 - **System messages** — automated notifications
 
 ### Voice Features
@@ -295,6 +295,78 @@ Centralized REST API client with Bearer token authentication.
 | Worker | `PUT /api/workers/{id}` (availability, push token), `POST /api/workers/me/location`, `GET /api/workers/me/properties` |
 
 **File:** `src/lib/api.ts`
+
+---
+
+## 13. AI-Powered Features
+
+The worker app surfaces several AI capabilities powered by the backend and commercial extensions. Workers see AI outputs as read-only information; hosts approve all AI-suggested actions.
+
+### AI Message Analysis & Suggestions
+
+When guests or workers send messages in a conversation, the backend analyzes them using Claude AI:
+
+- **Claude Haiku** for text-only messages; **Claude Sonnet** for messages with images
+- Detects **category** (MAINTENANCE, CLEANING, SAFETY, APPLIANCE, PEST, NOISE, AMENITY_REQUEST, CHECKIN_ISSUE, CHECKOUT, COMPLIMENT, GENERAL, JOB_UPDATE, SUPPLY_REQUEST, SCHEDULE_CONFLICT, QUALITY_CONCERN)
+- Assesses **urgency** (LOW, MEDIUM, HIGH, CRITICAL) and **sentiment** (POSITIVE, NEUTRAL, NEGATIVE, DISTRESSED)
+- Generates a summary, suggested reply, and recommended action (CREATE_ISSUE, CREATE_JOB, DISPATCH_WORKER, AUTO_REPLY, NOTIFY_ONLY)
+- 10-second debounce to batch rapid messages; rate-limited to 20 analyses per conversation per day
+- Skips trivial messages (yes/no/ok/thanks/hi) unless they contain images
+
+**Worker app display:** Read-only suggestion cards attached to messages showing category, color-coded urgency badge, and summary text with a "Host will review this suggestion" note.
+
+**Backend:** `commercial/backend-extensions/src/lib/ai-analyzer.ts`
+**Worker UI:** `app/conversation/[id].tsx`
+
+### AI Issue Analysis (Vision)
+
+When workers report issues with photos or videos, Claude Sonnet performs vision analysis:
+
+- Analyzes all attached photos and extracted video frames (1 frame per 10 seconds, max 10 frames via ffmpeg)
+- Recommends actions: CREATE_JOB, DISPATCH_WORKER, CALL_TRADESMAN, NOTIFY_ONLY
+- Suggests specific worker roles (CLEANER, COOK, CARETAKER, SUPERVISOR) or trades (Plumber, Electrician, Pest Control, Carpenter, Locksmith, AC Technician, Painter, Mason)
+- Evaluates impact on the current guest's stay
+- Results delivered in real-time via Socket.IO `ai_issue_suggestion` event
+
+**Backend:** `commercial/backend-extensions/src/lib/ai-analyzer.ts`
+
+### Voice Transcription & Translation
+
+Voice messages are automatically transcribed and translated by the backend:
+
+- **Google Cloud Speech-to-Text** transcribes audio with auto-language detection
+- Supports 10+ Indian languages: Hindi, Marathi, Kannada, Tamil, Telugu, Bengali, Gujarati, Punjabi, Malayalam, Urdu, plus English
+- **Smart directional translation:**
+  - Worker voice messages → translated to English (for host/guest)
+  - Host/guest voice messages → translated to Hindi (for worker)
+- Audio format conversion (M4A/AAC → WAV) via ffmpeg for Speech API compatibility
+- Rate-limited to 50 translations per conversation per day
+- Translated text triggers AI message analysis (creating linked suggestions)
+- Results delivered in real-time via Socket.IO `voice_translated` event
+
+**Worker app display:** Voice messages show the transcript and translation inline beneath the audio waveform player.
+
+**Backend:** `commercial/backend-extensions/src/lib/voice-translator.ts`
+
+### Real-Time AI Events (Socket.IO)
+
+| Event | Description |
+|-------|-------------|
+| `ai_suggestion` | New AI suggestion generated for a conversation message |
+| `ai_issue_suggestion` | New AI suggestion generated for a reported issue |
+| `voice_translated` | Voice transcription and translation completed |
+
+### AI Suggestion Actions (Host-Side)
+
+While workers see suggestions as read-only, hosts can approve or dismiss them. Approved actions include:
+
+- **CREATE_ISSUE** — automatically creates an issue from the suggestion
+- **CREATE_JOB** — creates and optionally auto-dispatches a job to available workers
+- **DISPATCH_WORKER** — assigns the best available worker based on suggested role
+- **CALL_TRADESMAN** — flags the need for an external tradesperson with the suggested trade
+- **AUTO_REPLY** — sends the AI-suggested reply to the conversation
+
+**API:** `GET /api/ai-suggestions`, `POST /api/ai-suggestions/{id}/approve`, `POST /api/ai-suggestions/{id}/dismiss`
 
 ---
 
