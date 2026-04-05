@@ -536,6 +536,15 @@ export const api = {
         body: JSON.stringify({ subscriptionId }),
       }),
   },
+
+  whatsapp: {
+    status: () =>
+      request<{ available: boolean; systemEnabled?: boolean; hostEnabled?: boolean; reason?: string }>('/api/whatsapp/status'),
+    toggle: () =>
+      request<{ whatsappEnabled: boolean }>('/api/whatsapp/toggle', { method: 'POST' }),
+    sendGuestLink: (bookingId: string) =>
+      request<{ success: boolean; messageId?: string }>(`/api/whatsapp/send-guest-link/${bookingId}`, { method: 'POST' }),
+  },
 };
 
 // --- Types ---
@@ -614,6 +623,8 @@ export interface Booking {
   notes?: string;
   guestCode?: string;
   lockCode?: string;
+  whatsappSentAt?: string;
+  whatsappMessageId?: string;
   createdAt: string;
   guestIds?: GuestID[];
   visitors?: GuestVisitor[];

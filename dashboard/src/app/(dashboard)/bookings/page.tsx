@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { format } from 'date-fns';
-import { Plus, Search, LogIn, LogOut, X, Link2, Check, Trash2, Bell, Clock, AlertTriangle, Calendar, List, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Search, LogIn, LogOut, X, Link2, Check, Trash2, Bell, Clock, AlertTriangle, Send, Phone, Calendar, List, ChevronLeft, ChevronRight } from 'lucide-react';
 import { api, Booking, GuestServiceRequest, Property } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Input, Select, Textarea, FormField } from '@/components/ui/Input';
@@ -209,6 +209,9 @@ function BookingForm({
           <Input type="email" placeholder="guest@example.com" value={form.guestEmail} onChange={(e) => set('guestEmail', e.target.value)} />
         </FormField>
       </div>
+      <FormField label="Guest phone (with country code)">
+        <Input type="tel" placeholder="+44 7700 900000" value={form.guestPhone || ''} onChange={(e) => set('guestPhone', e.target.value)} />
+      </FormField>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <FormField label="Check-in · 3:00 pm">
           <Input type="date" value={form.checkIn as string} onChange={(e) => set('checkIn', e.target.value)} required />
@@ -261,6 +264,61 @@ function GuestLinkButton({ guestCode }: { guestCode?: string }) {
     >
       {copied ? <Check size={12} className="text-emerald-400" /> : <Link2 size={12} />}
       {copied ? 'Copied!' : 'Guest link'}
+    </button>
+  );
+}
+
+function WhatsAppSendButton({ booking, whatsappAvailable }: { booking: Booking; whatsappAvailable: boolean }) {
+  const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  const [errorMsg, setErrorMsg] = useState('');
+
+  if (!whatsappAvailable || !booking.guestPhone || !booking.guestCode) return null;
+
+  // If already sent previously
+  const alreadySent = !!booking.whatsappSentAt;
+
+  async function send() {
+    setStatus('sending');
+    setErrorMsg('');
+    try {
+      await api.whatsapp.sendGuestLink(booking.id);
+      setStatus('sent');
+    } catch (err) {
+      setStatus('error');
+      setErrorMsg(err instanceof Error ? err.message : 'Failed to send');
+    }
+  }
+
+  return (
+    <button
+      onClick={send}
+      disabled={status === 'sending'}
+      title={
+        status === 'sent' ? 'Sent via WhatsApp' :
+        alreadySent ? `Sent ${new Date(booking.whatsappSentAt!).toLocaleDateString()} · Click to resend` :
+        'Send guest link via WhatsApp'
+      }
+      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+        status === 'sent' || (alreadySent && status === 'idle')
+          ? 'border-emerald-700 text-emerald-400 hover:bg-emerald-900/30'
+          : status === 'error'
+          ? 'border-red-700 text-red-400 hover:bg-red-900/30'
+          : 'border-green-700 text-green-400 hover:text-green-300 hover:border-green-500/50 hover:bg-slate-800'
+      } ${status === 'sending' ? 'opacity-60 cursor-wait' : ''}`}
+    >
+      {status === 'sending' ? (
+        <div className="w-3 h-3 border border-green-400 border-t-transparent rounded-full animate-spin" />
+      ) : status === 'sent' || (alreadySent && status === 'idle') ? (
+        <Check size={12} className="text-emerald-400" />
+      ) : status === 'error' ? (
+        <AlertTriangle size={12} />
+      ) : (
+        <Send size={12} />
+      )}
+      {status === 'sending' ? 'Sending...' :
+       status === 'sent' ? 'Sent!' :
+       status === 'error' ? 'Retry' :
+       alreadySent ? 'Resend WhatsApp' : 'WhatsApp'}
     </button>
   );
 }
@@ -361,7 +419,12 @@ export default function BookingsPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [modal, setModal] = useState<{ open: boolean; booking?: Booking }>({ open: false });
   const [requestsModal, setRequestsModal] = useState<Booking | null>(null);
+  const [whatsappAvailable, setWhatsappAvailable] = useState(false);
   const [viewMode, setViewMode] = useState<'table' | 'calendar'>('table');
+
+  useEffect(() => {
+    api.whatsapp.status().then((s) => setWhatsappAvailable(s.available)).catch(() => {});
+  }, []);
 
   useEffect(() => {
     Promise.all([api.bookings.list(), api.properties.list()]).then(([b, p]) => {
@@ -472,7 +535,10 @@ export default function BookingsPage() {
                   <td className="px-6 py-4">
                     <p className="font-medium text-slate-200">{b.guestName}</p>
                     <p className="text-xs text-slate-500 mb-1.5">{b.guestEmail}</p>
-                    <GuestLinkButton guestCode={b.guestCode} />
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <GuestLinkButton guestCode={b.guestCode} />
+                      <WhatsAppSendButton booking={b} whatsappAvailable={whatsappAvailable} />
+                    </div>
                   </td>
                   <td className="px-6 py-4 text-slate-300">{b.property?.name}</td>
                   <td className="px-6 py-4 text-slate-400 text-xs">
