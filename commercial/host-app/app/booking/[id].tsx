@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Platform, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
+import * as Clipboard from 'expo-clipboard';
 import { api, Booking } from '../../src/lib/api';
+
+const GUEST_PORTAL_URL = 'https://livarounddashboard-production.up.railway.app';
 
 const STATUS_COLORS: Record<string, string> = {
   CONFIRMED: '#1d4ed8',
@@ -16,6 +19,23 @@ export default function BookingDetailScreen() {
   const [booking, setBooking] = useState<Booking | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  const guestLink = booking?.guestCode ? `${GUEST_PORTAL_URL}/stay/${booking.guestCode}` : null;
+
+  const handleCopyLink = async () => {
+    if (!guestLink) return;
+    await Clipboard.setStringAsync(guestLink);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
+  };
+
+  const handleShareLink = async () => {
+    if (!guestLink) return;
+    try {
+      await Share.share({ message: `Here's your stay link: ${guestLink}` });
+    } catch {}
+  };
 
   const load = () => {
     api.bookings.get(id).then(setBooking).catch(() => {}).finally(() => setLoading(false));
@@ -168,10 +188,30 @@ export default function BookingDetailScreen() {
           <Text style={styles.value}>{booking.guestPhone || '-'}</Text>
         </View>
 
-        {/* Codes */}
+        {/* Codes & Guest Link */}
         <View style={styles.card}>
           <Text style={styles.label}>Guest Code</Text>
           <Text style={styles.codeText}>{booking.guestCode || '-'}</Text>
+          {guestLink && (
+            <View style={styles.linkRow}>
+              <TouchableOpacity
+                style={styles.copyLinkBtn}
+                onPress={handleCopyLink}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.copyLinkBtnText}>
+                  {linkCopied ? 'Copied!' : 'Copy Link'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.shareLinkBtn}
+                onPress={handleShareLink}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.shareLinkBtnText}>Share Guest Link</Text>
+              </TouchableOpacity>
+            </View>
+          )}
           <Text style={styles.label}>Lock Code</Text>
           <Text style={styles.codeText}>{booking.lockCode || '-'}</Text>
         </View>
@@ -214,6 +254,11 @@ const styles = StyleSheet.create({
   label: { fontSize: 12, color: '#64748b', textTransform: 'uppercase', marginTop: 12, marginBottom: 2 },
   value: { fontSize: 15, color: '#e2e8f0' },
   codeText: { fontSize: 18, fontWeight: '700', color: '#3b82f6', fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
+  linkRow: { flexDirection: 'row', gap: 10, marginTop: 12, marginBottom: 4 },
+  copyLinkBtn: { flex: 1, borderRadius: 8, borderWidth: 1, borderColor: '#3b82f6', paddingVertical: 10, alignItems: 'center' },
+  copyLinkBtnText: { color: '#3b82f6', fontSize: 14, fontWeight: '600' },
+  shareLinkBtn: { flex: 1, borderRadius: 8, backgroundColor: '#3b82f6', paddingVertical: 10, alignItems: 'center' },
+  shareLinkBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
   deleteBtn: { backgroundColor: '#7f1d1d', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 8 },
   deleteBtnText: { color: '#fca5a5', fontSize: 15, fontWeight: '700' },
   errorText: { color: '#fca5a5', textAlign: 'center', marginTop: 40, fontSize: 16 },
