@@ -3,6 +3,7 @@ import { prisma } from '../../../../backend/src/lib/prisma';
 import { authenticate, AuthRequest } from '../../../../backend/src/middleware/auth';
 import { tusServer } from '../lib/video-upload';
 import { getIO } from '../lib/socket';
+import { queueVideoProcessing } from '../lib/video-processor';
 
 const router = Router();
 router.use(authenticate);
@@ -89,6 +90,9 @@ router.post('/:id/complete', async (req: AuthRequest, res: Response) => {
         duration: duration || walkthrough.duration,
       },
     });
+
+    // Queue the processing job
+    await queueVideoProcessing(updated.id);
 
     // Emit processing started event via Socket.IO
     const io = getIO();

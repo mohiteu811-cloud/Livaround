@@ -89,6 +89,8 @@ model Property {
   tradesmen           TradesmanProperty[]
   conversations       Conversation[]
   walkthroughs        VideoWalkthrough[]
+  rooms               PropertyRoom[]
+  inventorySnapshots  InventorySnapshot[]
 }
 
 model Booking {
@@ -913,7 +915,8 @@ model VideoWalkthrough {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
-  segments VideoSegment[]
+  segments            VideoSegment[]
+  inventorySnapshots  InventorySnapshot[]
 
   @@index([propertyId])
   @@index([bookingId])
@@ -932,4 +935,65 @@ model VideoSegment {
   createdAt       DateTime         @default(now())
 
   @@index([walkthroughId])
+}
+
+// ── Property Rooms (AI-detected from walkthroughs) ──────────────────────────
+
+model PropertyRoom {
+  id          String   @id @default(cuid())
+  propertyId  String
+  property    Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  label       String   // e.g. "Master Bedroom", "Kitchen", "Living Room"
+  floor       String?  // e.g. "Ground Floor", "1st Floor"
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  inventoryItems WalkthroughInventoryItem[]
+
+  @@index([propertyId])
+}
+
+// ── Inventory Snapshots (point-in-time from walkthrough analysis) ────────────
+
+model InventorySnapshot {
+  id              String           @id @default(cuid())
+  propertyId      String
+  property        Property         @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  walkthroughId   String
+  walkthrough     VideoWalkthrough @relation(fields: [walkthroughId], references: [id], onDelete: Cascade)
+  type            String           @default("BASELINE") // BASELINE | POST_CHECKOUT | ROUTINE
+  status          String           @default("PENDING_REVIEW") // PENDING_REVIEW | CONFIRMED | SUPERSEDED
+  confirmedAt     DateTime?
+  confirmedById   String?
+  notes           String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  items WalkthroughInventoryItem[]
+
+  @@index([propertyId])
+  @@index([walkthroughId])
+}
+
+// ── Walkthrough Inventory Items (AI-detected items per room) ─────────────────
+
+model WalkthroughInventoryItem {
+  id           String            @id @default(cuid())
+  snapshotId   String
+  snapshot     InventorySnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  roomId       String?
+  room         PropertyRoom?     @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  name         String
+  category     String            @default("FURNISHING") // FURNISHING | APPLIANCE | LINEN | KITCHENWARE | ELECTRONIC | DECOR | CONSUMABLE | OTHER
+  quantity     Int               @default(1)
+  condition    String            @default("GOOD") // GOOD | FAIR | POOR | DAMAGED | MISSING
+  confidence   Float?            // AI confidence score 0-1
+  notes        String?
+  frameUrl     String?           // screenshot frame where item was detected
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@index([snapshotId])
+  @@index([roomId])
 }
