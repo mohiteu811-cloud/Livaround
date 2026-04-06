@@ -7,10 +7,14 @@ import { api } from '../../src/lib/api';
 export default function PropertyDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [property, setProperty] = useState<any>(null);
+  const [audits, setAudits] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.properties.get(id).then(setProperty).catch(() => {}).finally(() => setLoading(false));
+    Promise.all([
+      api.properties.get(id).then(setProperty).catch(() => {}),
+      api.audits.listForProperty(id).then(setAudits).catch(() => {}),
+    ]).finally(() => setLoading(false));
   }, [id]);
 
   if (loading) {
@@ -68,6 +72,53 @@ export default function PropertyDetailScreen() {
             <Text style={styles.value}>{property.description}</Text>
           </View>
         )}
+
+        {audits.length > 0 && (
+          <>
+            <Text style={styles.sectionTitle}>Recent Audits</Text>
+            {audits.slice(0, 5).map((audit: any) => (
+              <TouchableOpacity
+                key={audit.id}
+                style={styles.card}
+                onPress={() => router.push(`/audit/${audit.id}`)}
+              >
+                <View style={styles.auditRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.auditGuest}>{audit.booking?.guestName || 'Guest'}</Text>
+                    <Text style={styles.auditDate}>
+                      {audit.booking?.checkOut ? new Date(audit.booking.checkOut).toLocaleDateString() : ''}
+                    </Text>
+                  </View>
+                  <View style={styles.auditStats}>
+                    {audit.itemsMissing > 0 && (
+                      <Text style={[styles.auditBadge, { color: '#fca5a5' }]}>
+                        {audit.itemsMissing} missing
+                      </Text>
+                    )}
+                    {audit.itemsDamaged > 0 && (
+                      <Text style={[styles.auditBadge, { color: '#fdba74' }]}>
+                        {audit.itemsDamaged} damaged
+                      </Text>
+                    )}
+                    {audit.itemsMissing === 0 && audit.itemsDamaged === 0 && (
+                      <Text style={[styles.auditBadge, { color: '#4ade80' }]}>All OK</Text>
+                    )}
+                  </View>
+                </View>
+                <View style={styles.auditStatusRow}>
+                  <Text style={[styles.auditStatus, {
+                    color: audit.status === 'completed' ? '#4ade80' : '#f59e0b',
+                  }]}>
+                    {audit.status === 'completed' ? 'Completed' : 'Pending Review'}
+                  </Text>
+                  {audit.overallScore != null && (
+                    <Text style={styles.auditScore}>Score: {audit.overallScore.toFixed(1)}/5</Text>
+                  )}
+                </View>
+              </TouchableOpacity>
+            ))}
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -90,5 +141,14 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: 12, color: '#94a3b8', marginTop: 2 },
   label: { fontSize: 12, color: '#64748b', textTransform: 'uppercase', marginTop: 12, marginBottom: 2 },
   value: { fontSize: 15, color: '#e2e8f0' },
+  sectionTitle: { fontSize: 14, fontWeight: '600', color: '#94a3b8', textTransform: 'uppercase', marginTop: 8 },
+  auditRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  auditGuest: { fontSize: 15, fontWeight: '600', color: '#f8fafc' },
+  auditDate: { fontSize: 12, color: '#64748b', marginTop: 2 },
+  auditStats: { alignItems: 'flex-end' },
+  auditBadge: { fontSize: 12, fontWeight: '600' },
+  auditStatusRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
+  auditStatus: { fontSize: 12, fontWeight: '500' },
+  auditScore: { fontSize: 12, color: '#94a3b8' },
   errorText: { color: '#fca5a5', textAlign: 'center', marginTop: 40, fontSize: 16 },
 });

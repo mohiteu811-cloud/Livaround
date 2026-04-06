@@ -177,6 +177,18 @@ export const api = {
       request<{ ok: boolean }>(`/api/conversations/${id}/read`, { method: 'PATCH' }),
   },
 
+  audits: {
+    get: (id: string) => request<any>(`/api/audits/${id}`),
+    getFindings: (id: string) => request<any>(`/api/audits/${id}/findings`),
+    updateFinding: (auditId: string, findingId: string, data: { dismissed?: boolean; severity?: string }) =>
+      request<{ ok: boolean }>(`/api/audits/${auditId}/findings/${findingId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    confirm: (id: string) =>
+      request<{ ok: boolean; issuesCreated: number }>(`/api/audits/${id}/confirm`, { method: 'POST' }),
+  },
+
   workers: {
     updateAvailability: (id: string, isAvailable: boolean) =>
       request<Worker>(`/api/workers/${id}`, {

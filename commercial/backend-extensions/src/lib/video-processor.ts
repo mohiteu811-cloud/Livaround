@@ -2,6 +2,8 @@ import { Queue, Worker, Job } from 'bullmq';
 import { prisma } from '../../../../backend/src/lib/prisma';
 import { analyzeWalkthroughVideo } from './gemini-video-analyzer';
 import { extractInventoryFromAnalysis } from './inventory-extractor';
+import { compareSnapshots } from './inventory-comparator';
+import { generateAuditIssues } from './audit-issue-generator';
 import { emitVideoProcessing, emitVideoComplete, emitVideoError } from './socket';
 
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
@@ -30,7 +32,10 @@ export function startVideoProcessingWorker() {
 
       const walkthrough = await prisma.videoWalkthrough.findUnique({
         where: { id: walkthroughId },
-        include: { property: { select: { name: true, type: true, address: true, id: true } } },
+        include: {
+          property: { select: { name: true, type: true, address: true, id: true } },
+          booking: { select: { id: true, guestName: true } },
+        },
       });
 
       if (!walkthrough) throw new Error(`Walkthrough ${walkthroughId} not found`);
@@ -60,32 +65,103 @@ export function startVideoProcessingWorker() {
           analysis
         );
 
-        await updateStage(walkthroughId, propertyId, 'extracting_inventory', 90);
+        await updateStage(walkthroughId, propertyId, 'extracting_inventory', 85);
 
-        // Stage 3: Complete
+        // Stage 3: Post-checkout audit (if applicable)
+        let auditResult: any = null;
+        if (walkthrough.walkthroughType === 'post_checkout' && walkthrough.bookingId) {
+          await updateStage(walkthroughId, propertyId, 'comparing_inventory', 88);
+
+          // Find latest confirmed baseline snapshot for this property
+          const baselineSnapshot = await prisma.inventorySnapshot.findFirst({
+            where: { propertyId, status: 'CONFIRMED', type: 'BASELINE' },
+            orderBy: { createdAt: 'desc' },
+            include: {
+              items: {
+                include: { room: { select: { id: true, label: true, floor: true } } },
+              },
+            },
+          });
+
+          if (baselineSnapshot) {
+            // Load the audit snapshot we just created
+            const auditSnapshot = await prisma.inventorySnapshot.findUnique({
+              where: { id: snapshot.snapshotId },
+              include: {
+                items: {
+                  include: { room: { select: { id: true, label: true, floor: true } } },
+                },
+              },
+            });
+
+            if (auditSnapshot) {
+              const findings = compareSnapshots(baselineSnapshot, auditSnapshot);
+
+              // Create the CheckoutAudit record
+              const audit = await prisma.checkoutAudit.create({
+                data: {
+                  bookingId: walkthrough.bookingId,
+                  propertyId,
+                  walkthroughId,
+                  baselineSnapshotId: baselineSnapshot.id,
+                  auditSnapshotId: auditSnapshot.id,
+                  status: 'review',
+                  itemsMissing: findings.summary.itemsMissing,
+                  itemsDamaged: findings.summary.itemsDamaged,
+                  itemsOk: findings.summary.itemsOk,
+                  overallScore: findings.summary.overallScore,
+                  findings: findings as any,
+                },
+              });
+
+              await updateStage(walkthroughId, propertyId, 'generating_issues', 92);
+
+              // Generate issues for critical findings
+              const issueResult = await generateAuditIssues(
+                audit.id,
+                propertyId,
+                walkthrough.bookingId,
+                findings
+              );
+
+              auditResult = {
+                auditId: audit.id,
+                ...findings.summary,
+                issuesCreated: issueResult.issueIds.length,
+                escalatedCount: issueResult.escalatedCount,
+              };
+
+              console.log(`Checkout audit ${audit.id}: ${findings.summary.itemsMissing} missing, ${findings.summary.itemsDamaged} damaged, ${issueResult.issueIds.length} issues created`);
+            }
+          } else {
+            console.log(`No baseline snapshot for property ${propertyId}, skipping audit comparison`);
+          }
+        }
+
+        // Stage 4: Complete
+        const aiAnalysisData: any = {
+          summary: analysis.summary,
+          totalItemCount: analysis.totalItemCount,
+          roomCount: analysis.rooms.length,
+          snapshotId: snapshot.snapshotId,
+        };
+        if (auditResult) {
+          aiAnalysisData.audit = auditResult;
+        }
+
         await prisma.videoWalkthrough.update({
           where: { id: walkthroughId },
           data: {
             status: 'completed',
             processingStage: 'done',
             processingProgress: 100,
-            aiAnalysis: {
-              summary: analysis.summary,
-              totalItemCount: analysis.totalItemCount,
-              roomCount: analysis.rooms.length,
-              snapshotId: snapshot.snapshotId,
-            },
+            aiAnalysis: aiAnalysisData,
           },
         });
 
         emitVideoComplete(propertyId, {
           walkthroughId,
-          aiAnalysis: {
-            summary: analysis.summary,
-            totalItemCount: analysis.totalItemCount,
-            roomCount: analysis.rooms.length,
-            snapshotId: snapshot.snapshotId,
-          },
+          aiAnalysis: aiAnalysisData,
           duration: walkthrough.duration ?? undefined,
         });
 

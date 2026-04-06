@@ -91,6 +91,7 @@ model Property {
   walkthroughs        VideoWalkthrough[]
   rooms               PropertyRoom[]
   inventorySnapshots  InventorySnapshot[]
+  checkoutAudits      CheckoutAudit[]
 }
 
 model Booking {
@@ -123,6 +124,7 @@ model Booking {
   conversation    Conversation?
   whatsappLogs    WhatsAppLog[]
   walkthroughs    VideoWalkthrough[]
+  checkoutAudits  CheckoutAudit[]
 }
 
 model GuestID {
@@ -917,6 +919,7 @@ model VideoWalkthrough {
 
   segments            VideoSegment[]
   inventorySnapshots  InventorySnapshot[]
+  checkoutAudits      CheckoutAudit[]
 
   @@index([propertyId])
   @@index([bookingId])
@@ -996,4 +999,30 @@ model WalkthroughInventoryItem {
 
   @@index([snapshotId])
   @@index([roomId])
+}
+
+// ── Checkout Audits (post-checkout inventory comparison) ─────────────────────
+
+model CheckoutAudit {
+  id                 String           @id @default(cuid())
+  bookingId          String
+  booking            Booking          @relation(fields: [bookingId], references: [id])
+  propertyId         String
+  property           Property         @relation(fields: [propertyId], references: [id])
+  walkthroughId      String
+  walkthrough        VideoWalkthrough @relation(fields: [walkthroughId], references: [id])
+  baselineSnapshotId String?
+  auditSnapshotId    String?
+  status             String           @default("pending") // pending | processing | review | completed
+  itemsMissing       Int              @default(0)
+  itemsDamaged       Int              @default(0)
+  itemsOk            Int              @default(0)
+  overallScore       Float?           // 0.0-5.0
+  findings           Json?            // structured diff results
+  reviewedById       String?
+  reviewedAt         DateTime?
+  createdAt          DateTime         @default(now())
+
+  @@index([propertyId])
+  @@index([bookingId])
 }
