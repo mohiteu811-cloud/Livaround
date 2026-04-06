@@ -7,6 +7,7 @@ import hostAppRoutes from './src/routes/host-app';
 import guestMessagingRoutes from './src/routes/guest-messaging';
 import internalMessagingRoutes from './src/routes/internal-messaging';
 import aiSuggestionsRoutes from './src/routes/ai-suggestions';
+import walkthroughsRoutes from './src/routes/walkthroughs';
 import { analyzeIssue } from './src/lib/ai-analyzer';
 
 export function register(app: Express, server: http.Server, allowedOrigins: string[]) {
@@ -23,6 +24,7 @@ export function register(app: Express, server: http.Server, allowedOrigins: stri
   app.use('/api/stay', guestMessagingRoutes);
   app.use('/api/internal-conversations', internalMessagingRoutes);
   app.use('/api/ai-suggestions', aiSuggestionsRoutes);
+  app.use('/api/walkthroughs', walkthroughsRoutes);
 
-  console.log('Commercial extensions registered: messaging, internal-messaging, ai-suggestions, host-app');
+  console.log('Commercial extensions registered: messaging, internal-messaging, ai-suggestions, host-app, walkthroughs');
 }

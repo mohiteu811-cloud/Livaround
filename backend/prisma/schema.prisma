@@ -88,6 +88,7 @@ model Property {
   contacts            PropertyContact[]
   tradesmen           TradesmanProperty[]
   conversations       Conversation[]
+  walkthroughs        VideoWalkthrough[]
 }
 
 model Booking {
@@ -119,6 +120,7 @@ model Booking {
   visitors        GuestVisitor[]
   conversation    Conversation?
   whatsappLogs    WhatsAppLog[]
+  walkthroughs    VideoWalkthrough[]
 }
 
 model GuestID {
@@ -884,4 +886,50 @@ model WhatsAppLog {
 
   @@index([bookingId])
   @@index([hostId])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// AI Video Walkthroughs
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model VideoWalkthrough {
+  id                  String    @id @default(cuid())
+  propertyId          String
+  property            Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  uploadedById        String
+  walkthroughType     String    // onboarding | post_checkout | routine
+  recordingMode       String    // continuous | room_by_room
+  status              String    @default("uploading")
+  processingStage     String?
+  processingProgress  Int       @default(0)
+  processingError     String?   @db.Text
+  uploadUrl           String?
+  fileSize            BigInt?
+  duration            Int?
+  bookingId           String?
+  booking             Booking?  @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  aiAnalysis          Json?
+  inventorySnapshotId String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  segments VideoSegment[]
+
+  @@index([propertyId])
+  @@index([bookingId])
+}
+
+model VideoSegment {
+  id              String           @id @default(cuid())
+  walkthroughId   String
+  walkthrough     VideoWalkthrough @relation(fields: [walkthroughId], references: [id], onDelete: Cascade)
+  roomId          String?
+  roomLabel       String?
+  segmentOrder    Int
+  uploadUrl       String?
+  duration        Int?
+  status          String           @default("pending")
+  createdAt       DateTime         @default(now())
+
+  @@index([walkthroughId])
 }

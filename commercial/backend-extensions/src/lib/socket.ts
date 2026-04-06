@@ -490,3 +490,43 @@ export function setupSocketIO(server: http.Server, allowedOrigins: string[]): Se
 
   return io;
 }
+
+// ── Video walkthrough event emitters ─────────────────────────────────────────
+
+export function emitVideoProcessing(propertyId: string, data: {
+  walkthroughId: string;
+  stage: string;
+  progress: number;
+}) {
+  const server = getIO();
+  if (!server) return;
+  server.of('/host').emit('video:processing', {
+    propertyId,
+    ...data,
+  });
+}
+
+export function emitVideoComplete(propertyId: string, data: {
+  walkthroughId: string;
+  aiAnalysis?: any;
+  duration?: number;
+}) {
+  const server = getIO();
+  if (!server) return;
+  server.of('/host').emit('video:complete', {
+    propertyId,
+    ...data,
+  });
+}
+
+export function emitVideoError(propertyId: string, data: {
+  walkthroughId: string;
+  error: string;
+}) {
+  const server = getIO();
+  if (!server) return;
+  server.of('/host').emit('video:error', {
+    propertyId,
+    ...data,
+  });
+}
