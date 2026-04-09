@@ -121,17 +121,24 @@ router.put('/snapshots/:id/items', async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: 'items must be an array' });
     }
 
-    // Process each item update
+    // Process each item update. All mutations are scoped to the snapshot's
+    // own items — a caller cannot touch items belonging to another snapshot
+    // even if they pass those item IDs in the payload. deleteMany/updateMany
+    // silently no-op on mismatches; we check `count` and reject the request
+    // so mistakes surface instead of being swallowed.
     for (const item of items) {
       if (item._delete && item.id) {
-        // Delete
-        await prisma.walkthroughInventoryItem.delete({
-          where: { id: item.id },
+        const result = await prisma.walkthroughInventoryItem.deleteMany({
+          where: { id: item.id, snapshotId: snapshot.id },
         });
+        if (result.count === 0) {
+          return res.status(400).json({
+            error: `Item ${item.id} does not belong to this snapshot`,
+          });
+        }
       } else if (item.id) {
-        // Update existing
-        await prisma.walkthroughInventoryItem.update({
-          where: { id: item.id },
+        const result = await prisma.walkthroughInventoryItem.updateMany({
+          where: { id: item.id, snapshotId: snapshot.id },
           data: {
             name: item.name,
             category: item.category,
@@ -141,8 +148,12 @@ router.put('/snapshots/:id/items', async (req: AuthRequest, res: Response) => {
             roomId: item.roomId,
           },
         });
+        if (result.count === 0) {
+          return res.status(400).json({
+            error: `Item ${item.id} does not belong to this snapshot`,
+          });
+        }
       } else {
-        // Create new
         await prisma.walkthroughInventoryItem.create({
           data: {
             snapshotId: snapshot.id,

@@ -2,13 +2,42 @@ import { Router, Response } from 'express';
 import { prisma } from '../../../../backend/src/lib/prisma';
 import { authenticate, AuthRequest } from '../../../../backend/src/middleware/auth';
 import { compareSnapshots } from '../lib/inventory-comparator';
-import { generateAuditIssues } from '../lib/audit-issue-generator';
+import { createIssuesForFindings } from '../lib/audit-issue-generator';
 
 const router = Router();
 router.use(authenticate);
 
+// ── Access control helper ───────────────────────────────────────────────────
+// Builds a Prisma `where` clause that restricts a CheckoutAudit query to
+// audits the calling user is allowed to see:
+//   - Hosts: audits on any property they own
+//   - Workers: audits on properties they're staffed on via PropertyStaff
+// Returns null if the user has neither role.
+
+async function buildAuditAccessWhere(userId: string, auditId: string) {
+  const [host, worker] = await Promise.all([
+    prisma.host.findUnique({ where: { userId }, select: { id: true } }),
+    prisma.worker.findUnique({ where: { userId }, select: { id: true } }),
+  ]);
+  if (!host && !worker) return null;
+
+  const propertyConditions: any[] = [];
+  if (host) propertyConditions.push({ hostId: host.id });
+  if (worker) {
+    propertyConditions.push({
+      staffAssignments: { some: { workerId: worker.id } },
+    });
+  }
+
+  return {
+    id: auditId,
+    property: { OR: propertyConditions },
+  };
+}
+
 // ── POST /api/audits ─────────────────────────────────────────────────────────
-// Create audit from a post-checkout walkthrough (manual trigger)
+// Manual trigger — create an audit from a completed post-checkout walkthrough.
+// Host-only (manual triggers require full ownership, not worker assignment).
 
 router.post('/', async (req: AuthRequest, res: Response) => {
   try {
@@ -36,13 +65,11 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: 'Walkthrough has no inventory snapshot' });
     }
 
-    // Check if audit already exists for this walkthrough
     const existing = await prisma.checkoutAudit.findFirst({
       where: { walkthroughId: walkthrough.id },
     });
     if (existing) return res.status(409).json({ error: 'Audit already exists', auditId: existing.id });
 
-    // Find baseline snapshot
     const baseline = await prisma.inventorySnapshot.findFirst({
       where: { propertyId: walkthrough.propertyId, status: 'CONFIRMED', type: 'BASELINE' },
       orderBy: { createdAt: 'desc' },
@@ -52,7 +79,6 @@ router.post('/', async (req: AuthRequest, res: Response) => {
     });
     if (!baseline) return res.status(400).json({ error: 'No confirmed baseline snapshot for this property' });
 
-    // Load the audit snapshot
     const auditSnapshot = await prisma.inventorySnapshot.findUnique({
       where: { id: walkthrough.inventorySnapshotId },
       include: {
@@ -61,10 +87,8 @@ router.post('/', async (req: AuthRequest, res: Response) => {
     });
     if (!auditSnapshot) return res.status(400).json({ error: 'Audit snapshot not found' });
 
-    // Compare
     const findings = compareSnapshots(baseline, auditSnapshot);
 
-    // Create audit record
     const audit = await prisma.checkoutAudit.create({
       data: {
         bookingId: walkthrough.bookingId,
@@ -89,15 +113,15 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 });
 
 // ── GET /api/audits/:id ──────────────────────────────────────────────────────
-// Get audit with full details
+// Host or assigned worker can view.
 
 router.get('/:id', async (req: AuthRequest, res: Response) => {
   try {
-    const host = await prisma.host.findUnique({ where: { userId: req.user!.id } });
-    if (!host) return res.status(403).json({ error: 'Host not found' });
+    const where = await buildAuditAccessWhere(req.user!.id, req.params.id);
+    if (!where) return res.status(403).json({ error: 'Not authorized' });
 
     const audit = await prisma.checkoutAudit.findFirst({
-      where: { id: req.params.id, property: { hostId: host.id } },
+      where,
       include: {
         booking: { select: { id: true, guestName: true, checkIn: true, checkOut: true } },
         property: { select: { id: true, name: true, address: true } },
@@ -114,23 +138,21 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 });
 
 // ── GET /api/audits/:id/findings ─────────────────────────────────────────────
-// List findings from stored JSON
 
 router.get('/:id/findings', async (req: AuthRequest, res: Response) => {
   try {
-    const host = await prisma.host.findUnique({ where: { userId: req.user!.id } });
-    if (!host) return res.status(403).json({ error: 'Host not found' });
+    const where = await buildAuditAccessWhere(req.user!.id, req.params.id);
+    if (!where) return res.status(403).json({ error: 'Not authorized' });
 
     const audit = await prisma.checkoutAudit.findFirst({
-      where: { id: req.params.id, property: { hostId: host.id } },
+      where,
       select: { id: true, findings: true, status: true },
     });
     if (!audit) return res.status(404).json({ error: 'Audit not found' });
 
     const findings = audit.findings as any;
-    if (!findings) return res.json({ findings: [], summary: null });
+    if (!findings) return res.json({ findings: [], unchanged: 0, summary: null });
 
-    // Flatten all findings into a single list with type labels
     const allFindings = [
       ...(findings.missing || []),
       ...(findings.damaged || []),
@@ -150,16 +172,14 @@ router.get('/:id/findings', async (req: AuthRequest, res: Response) => {
 });
 
 // ── PATCH /api/audits/:id/findings/:findingId ────────────────────────────────
-// Update a finding (dismiss or adjust severity)
+// Host or assigned worker can dismiss or adjust severity on a finding.
 
 router.patch('/:id/findings/:findingId', async (req: AuthRequest, res: Response) => {
   try {
-    const host = await prisma.host.findUnique({ where: { userId: req.user!.id } });
-    if (!host) return res.status(403).json({ error: 'Host not found' });
+    const where = await buildAuditAccessWhere(req.user!.id, req.params.id);
+    if (!where) return res.status(403).json({ error: 'Not authorized' });
 
-    const audit = await prisma.checkoutAudit.findFirst({
-      where: { id: req.params.id, property: { hostId: host.id } },
-    });
+    const audit = await prisma.checkoutAudit.findFirst({ where });
     if (!audit) return res.status(404).json({ error: 'Audit not found' });
     if (audit.status === 'completed') {
       return res.status(400).json({ error: 'Audit is already completed' });
@@ -171,7 +191,6 @@ router.patch('/:id/findings/:findingId', async (req: AuthRequest, res: Response)
     const { dismissed, severity } = req.body;
     const findingId = req.params.findingId;
 
-    // Search and update across all finding arrays
     let found = false;
     for (const key of ['missing', 'damaged', 'lowStock', 'newItems']) {
       const arr = findings[key];
@@ -189,7 +208,6 @@ router.patch('/:id/findings/:findingId', async (req: AuthRequest, res: Response)
 
     if (!found) return res.status(404).json({ error: 'Finding not found' });
 
-    // Recalculate summary counts (excluding dismissed)
     const activeMissing = (findings.missing || []).filter((f: any) => !f.dismissed);
     const activeDamaged = (findings.damaged || []).filter((f: any) => !f.dismissed);
 
@@ -210,20 +228,17 @@ router.patch('/:id/findings/:findingId', async (req: AuthRequest, res: Response)
 });
 
 // ── POST /api/audits/:id/confirm ─────────────────────────────────────────────
-// Worker/host confirms audit → triggers escalation for non-dismissed findings
+// Host or assigned worker finalizes the audit. Creates Issue records for any
+// non-dismissed findings above threshold. Idempotent via `issueCreated` flag
+// on each finding — re-running never duplicates issues.
 
 router.post('/:id/confirm', async (req: AuthRequest, res: Response) => {
   try {
-    const audit = await prisma.checkoutAudit.findUnique({
-      where: { id: req.params.id },
-      include: { property: { select: { hostId: true } } },
-    });
-    if (!audit) return res.status(404).json({ error: 'Audit not found' });
+    const where = await buildAuditAccessWhere(req.user!.id, req.params.id);
+    if (!where) return res.status(403).json({ error: 'Not authorized' });
 
-    // Allow both host and worker to confirm
-    const host = await prisma.host.findUnique({ where: { userId: req.user!.id } });
-    const worker = await prisma.worker.findUnique({ where: { userId: req.user!.id } });
-    if (!host && !worker) return res.status(403).json({ error: 'Not authorized' });
+    const audit = await prisma.checkoutAudit.findFirst({ where });
+    if (!audit) return res.status(404).json({ error: 'Audit not found' });
 
     if (audit.status === 'completed') {
       return res.status(400).json({ error: 'Audit is already completed' });
@@ -231,10 +246,12 @@ router.post('/:id/confirm', async (req: AuthRequest, res: Response) => {
 
     const findings = audit.findings as any;
 
-    // Generate issues for confirmed (non-dismissed) findings
-    let issueResult = { issueIds: [] as string[], escalatedCount: 0 };
+    // Generate issues for non-dismissed, above-threshold findings that haven't
+    // already been turned into issues. The generator mutates `findings` with
+    // `issueCreated: true` on each processed entry, which we persist below.
+    let issueResult = { issueIds: [] as string[], updatedFindings: findings };
     if (findings) {
-      issueResult = await generateAuditIssues(
+      issueResult = await createIssuesForFindings(
         audit.id,
         audit.propertyId,
         audit.bookingId,
@@ -242,20 +259,19 @@ router.post('/:id/confirm', async (req: AuthRequest, res: Response) => {
       );
     }
 
-    // Mark as completed
     await prisma.checkoutAudit.update({
       where: { id: audit.id },
       data: {
         status: 'completed',
         reviewedById: req.user!.id,
         reviewedAt: new Date(),
+        findings: issueResult.updatedFindings as any,
       },
     });
 
     return res.json({
       ok: true,
       issuesCreated: issueResult.issueIds.length,
-      escalatedCount: issueResult.escalatedCount,
     });
   } catch (err) {
     console.error('Confirm audit error:', err);
@@ -264,7 +280,7 @@ router.post('/:id/confirm', async (req: AuthRequest, res: Response) => {
 });
 
 // ── GET /api/audits/property/:propertyId ─────────────────────────────────────
-// List audits for a property (used by property detail screen)
+// Host-only list view for property dashboard.
 
 router.get('/property/:propertyId', async (req: AuthRequest, res: Response) => {
   try {

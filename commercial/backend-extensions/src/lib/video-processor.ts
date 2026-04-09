@@ -3,7 +3,7 @@ import { prisma } from '../../../../backend/src/lib/prisma';
 import { analyzeWalkthroughVideo } from './gemini-video-analyzer';
 import { extractInventoryFromAnalysis } from './inventory-extractor';
 import { compareSnapshots } from './inventory-comparator';
-import { generateAuditIssues } from './audit-issue-generator';
+import { notifyHostOfAudit } from './audit-issue-generator';
 import { emitVideoProcessing, emitVideoComplete, emitVideoError } from './socket';
 
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
@@ -114,24 +114,24 @@ export function startVideoProcessingWorker() {
                 },
               });
 
-              await updateStage(walkthroughId, propertyId, 'generating_issues', 92);
+              await updateStage(walkthroughId, propertyId, 'notifying_host', 92);
 
-              // Generate issues for critical findings
-              const issueResult = await generateAuditIssues(
+              // Notify host of critical findings (push + socket) — no issues
+              // are created yet; that happens when a worker/host confirms the
+              // audit after reviewing and dismissing any false positives.
+              const notifyResult = await notifyHostOfAudit(
                 audit.id,
                 propertyId,
-                walkthrough.bookingId,
                 findings
               );
 
               auditResult = {
                 auditId: audit.id,
                 ...findings.summary,
-                issuesCreated: issueResult.issueIds.length,
-                escalatedCount: issueResult.escalatedCount,
+                criticalCount: notifyResult.criticalCount,
               };
 
-              console.log(`Checkout audit ${audit.id}: ${findings.summary.itemsMissing} missing, ${findings.summary.itemsDamaged} damaged, ${issueResult.issueIds.length} issues created`);
+              console.log(`Checkout audit ${audit.id}: ${findings.summary.itemsMissing} missing, ${findings.summary.itemsDamaged} damaged, ${notifyResult.criticalCount} critical findings flagged for review`);
             }
           } else {
             console.log(`No baseline snapshot for property ${propertyId}, skipping audit comparison`);
