@@ -7,7 +7,11 @@ import hostAppRoutes from './src/routes/host-app';
 import guestMessagingRoutes from './src/routes/guest-messaging';
 import internalMessagingRoutes from './src/routes/internal-messaging';
 import aiSuggestionsRoutes from './src/routes/ai-suggestions';
+import walkthroughsRoutes from './src/routes/walkthroughs';
+import inventoryRoutes from './src/routes/inventory';
+import auditsRoutes from './src/routes/audits';
 import { analyzeIssue } from './src/lib/ai-analyzer';
+import { startVideoProcessingWorker } from './src/lib/video-processor';
 
 export function register(app: Express, server: http.Server, allowedOrigins: string[]) {
   // Set up Socket.IO for real-time messaging (host, guest, worker namespaces)
@@ -23,6 +27,14 @@ export function register(app: Express, server: http.Server, allowedOrigins: stri
   app.use('/api/stay', guestMessagingRoutes);
   app.use('/api/internal-conversations', internalMessagingRoutes);
   app.use('/api/ai-suggestions', aiSuggestionsRoutes);
+  app.use('/api/walkthroughs', walkthroughsRoutes);
+  app.use('/api/inventory', inventoryRoutes);
+  app.use('/api/audits', auditsRoutes);
 
-  console.log('Commercial extensions registered: messaging, internal-messaging, ai-suggestions, host-app');
+  // Start background workers
+  if (process.env.REDIS_URL) {
+    startVideoProcessingWorker();
+  }
+
+  console.log('Commercial extensions registered: messaging, internal-messaging, ai-suggestions, host-app, walkthroughs, inventory, audits');
 }

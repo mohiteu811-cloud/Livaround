@@ -416,6 +416,19 @@ export const api = {
       request<{ ok: boolean }>(`/api/ai-suggestions/${id}/dismiss`, { method: 'POST' }),
   },
 
+  audits: {
+    get: (id: string) => request<any>(`/api/audits/${id}`),
+    getFindings: (id: string) => request<any>(`/api/audits/${id}/findings`),
+    listForProperty: (propertyId: string) => request<any[]>(`/api/audits/property/${propertyId}`),
+    updateFinding: (auditId: string, findingId: string, data: { dismissed?: boolean; severity?: string }) =>
+      request<{ ok: boolean }>(`/api/audits/${auditId}/findings/${findingId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    confirm: (id: string) =>
+      request<{ ok: boolean; issuesCreated: number }>(`/api/audits/${id}/confirm`, { method: 'POST' }),
+  },
+
   billing: {
     features: () => request<{ plan: string; features: Record<string, boolean> }>('/api/billing/features'),
     status: () => request<any>('/api/billing/status'),
