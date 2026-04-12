@@ -1,7 +1,13 @@
 // ── Lazy TUS server ──────────────────────────────────────────────────────────
-// @tus/server and @tus/s3-store are ESM-only packages. ts-node compiles
-// static `import` statements into `require()`, which crashes on ESM modules.
-// We use dynamic `import()` inside an async init function to avoid this.
+// @tus/server and @tus/s3-store are ESM-only packages. This project's
+// tsconfig uses module:"commonjs", so TypeScript compiles `await import()`
+// back into `require()` — which still crashes on ESM modules. We use
+// `new Function` to preserve the native ESM import() at runtime, bypassing
+// the TypeScript transform.
+
+// Preserved from TS compilation — always emits a real ESM import()
+const nativeImport = new Function('specifier', 'return import(specifier)') as
+  (specifier: string) => Promise<any>;
 
 let _tusServer: any = null;
 let _initFailed = false;
@@ -23,8 +29,8 @@ async function initTusServer(): Promise<any> {
   }
 
   try {
-    const { S3Store } = await import('@tus/s3-store');
-    const { Server: TusServer } = await import('@tus/server');
+    const { S3Store } = await nativeImport('@tus/s3-store');
+    const { Server: TusServer } = await nativeImport('@tus/server');
 
     const s3Store = new S3Store({
       s3ClientConfig: {
