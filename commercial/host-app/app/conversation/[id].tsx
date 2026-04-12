@@ -25,7 +25,8 @@ interface AiSuggestion {
 }
 
 interface MessageWithAi extends Message {
-  aiSuggestion?: AiSuggestion;
+  aiSuggestion?: AiSuggestion;   // legacy single
+  aiSuggestions?: AiSuggestion[]; // multi-action
   visibility?: string;
 }
 
@@ -86,9 +87,12 @@ export default function ConversationScreen() {
 
     const handleAiSuggestion = (suggestion: AiSuggestion) => {
       setMessages((prev) =>
-        prev.map((m) =>
-          m.id === suggestion.messageId ? { ...m, aiSuggestion: suggestion } : m
-        )
+        prev.map((m) => {
+          if (m.id !== suggestion.messageId) return m;
+          const existing = m.aiSuggestions || (m.aiSuggestion ? [m.aiSuggestion] : []);
+          if (existing.some((s) => s.id === suggestion.id)) return m;
+          return { ...m, aiSuggestions: [...existing, suggestion] };
+        })
       );
     };
 
@@ -248,11 +252,16 @@ export default function ConversationScreen() {
     try {
       await api.aiSuggestions.approve(suggestion.id);
       setMessages((prev) =>
-        prev.map((m) =>
-          m.aiSuggestion?.id === suggestion.id
-            ? { ...m, aiSuggestion: { ...m.aiSuggestion!, status: 'APPROVED' } }
-            : m
-        )
+        prev.map((m) => {
+          const suggestions = m.aiSuggestions || (m.aiSuggestion ? [m.aiSuggestion] : []);
+          if (!suggestions.some((s) => s.id === suggestion.id)) return m;
+          return {
+            ...m,
+            aiSuggestions: suggestions.map((s) =>
+              s.id === suggestion.id ? { ...s, status: 'APPROVED' } : s
+            ),
+          };
+        })
       );
     } catch {}
   }
@@ -261,12 +270,49 @@ export default function ConversationScreen() {
     try {
       await api.aiSuggestions.dismiss(suggestion.id);
       setMessages((prev) =>
-        prev.map((m) =>
-          m.aiSuggestion?.id === suggestion.id
-            ? { ...m, aiSuggestion: { ...m.aiSuggestion!, status: 'DISMISSED' } }
-            : m
-        )
+        prev.map((m) => {
+          const suggestions = m.aiSuggestions || (m.aiSuggestion ? [m.aiSuggestion] : []);
+          if (!suggestions.some((s) => s.id === suggestion.id)) return m;
+          return {
+            ...m,
+            aiSuggestions: suggestions.map((s) =>
+              s.id === suggestion.id ? { ...s, status: 'DISMISSED' } : s
+            ),
+          };
+        })
       );
+    } catch {}
+  }
+
+  async function approveAll(suggestions: AiSuggestion[]) {
+    const pendingIds = suggestions.filter((s) => s.status === 'PENDING').map((s) => s.id);
+    if (pendingIds.length === 0) return;
+    try {
+      await api.aiSuggestions.batchApprove(pendingIds);
+      setMessages((prev) =>
+        prev.map((m) => {
+          const all = m.aiSuggestions || (m.aiSuggestion ? [m.aiSuggestion] : []);
+          if (!all.some((s) => pendingIds.includes(s.id))) return m;
+          return {
+            ...m,
+            aiSuggestions: all.map((s) =>
+              pendingIds.includes(s.id) ? { ...s, status: 'APPROVED' } : s
+            ),
+          };
+        })
+      );
+    } catch {}
+  }
+
+  async function sendSuggestedReply(reply: string) {
+    try {
+      const msg = isInternal
+        ? await api.internalConversations.sendMessage(id, reply)
+        : await api.conversations.sendMessage(id, reply);
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === msg.id)) return prev;
+        return [...prev, msg];
+      });
     } catch {}
   }
 
@@ -365,49 +411,89 @@ export default function ConversationScreen() {
           </Text>
         </View>
 
-        {item.aiSuggestion && renderAiCard(item.aiSuggestion)}
+        {(item.aiSuggestions?.length || item.aiSuggestion) &&
+          renderAiCards(item.aiSuggestions || (item.aiSuggestion ? [item.aiSuggestion] : []))}
       </View>
     );
   }
 
-  function renderAiCard(suggestion: AiSuggestion) {
-    if (suggestion.status === 'DISMISSED') return null;
+  function renderAiCards(suggestions: AiSuggestion[]) {
+    const visible = suggestions.filter((s) => s.status !== 'DISMISSED');
+    if (visible.length === 0) return null;
 
-    const isApproved = suggestion.status === 'APPROVED';
-    const isPending = suggestion.status === 'PENDING';
+    const pendingCount = visible.filter((s) => s.status === 'PENDING').length;
+    const suggestedReply = suggestions.find((s) => s.suggestedReply)?.suggestedReply;
+    const isMulti = visible.length > 1;
 
     return (
-      <View style={[styles.aiCard, isPending && styles.aiCardPending, isApproved && styles.aiCardApproved]}>
-        <View style={styles.aiHeader}>
-          <Text style={styles.aiIcon}>{isApproved ? '✓' : '✨'}</Text>
-          <Text style={styles.aiBadgeText}>{suggestion.category}</Text>
-          <Text style={[styles.aiUrgency, { color: urgencyColor(suggestion.urgency) }]}>
-            {suggestion.urgency}
-          </Text>
-        </View>
-        <Text style={styles.aiSummary}>{suggestion.summary}</Text>
-        {suggestion.suggestedReply && isPending && (
-          <Text style={styles.aiReply}>Suggested reply: "{suggestion.suggestedReply}"</Text>
+      <View style={styles.aiContainer}>
+        {/* Header badge */}
+        {isMulti && (
+          <View style={styles.aiMultiHeader}>
+            <Text style={styles.aiMultiIcon}>✨</Text>
+            <Text style={styles.aiMultiTitle}>
+              AI detected {visible.length} action item{visible.length > 1 ? 's' : ''}
+            </Text>
+          </View>
         )}
-        {isPending && (
-          <View style={styles.aiActions}>
-            <TouchableOpacity style={styles.aiApproveBtn} onPress={() => approveSuggestion(suggestion)}>
-              <Text style={styles.aiApproveBtnText}>
-                {suggestion.suggestedAction === 'CREATE_ISSUE' ? 'Create Issue' :
-                 suggestion.suggestedAction === 'CREATE_JOB' ? 'Create Job' :
-                 suggestion.suggestedAction === 'DISPATCH_WORKER' ? 'Dispatch Worker' :
-                 suggestion.suggestedAction === 'AUTO_REPLY' ? 'Send Reply' : 'Approve'}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.aiDismissBtn} onPress={() => dismissSuggestion(suggestion)}>
-              <Text style={styles.aiDismissBtnText}>Dismiss</Text>
+
+        {/* Individual action items */}
+        {visible.map((suggestion) => {
+          const isApproved = suggestion.status === 'APPROVED';
+          const isPending = suggestion.status === 'PENDING';
+
+          return (
+            <View key={suggestion.id} style={[styles.aiCard, isPending && styles.aiCardPending, isApproved && styles.aiCardApproved]}>
+              <View style={styles.aiHeader}>
+                <Text style={styles.aiIcon}>{isApproved ? '✓' : '✨'}</Text>
+                <Text style={styles.aiBadgeText}>{suggestion.category}</Text>
+                <Text style={[styles.aiUrgency, { color: urgencyColor(suggestion.urgency) }]}>
+                  {suggestion.urgency}
+                </Text>
+              </View>
+              <Text style={styles.aiSummary}>{suggestion.summary}</Text>
+              {isPending && !isMulti && (
+                <View style={styles.aiActions}>
+                  <TouchableOpacity style={styles.aiApproveBtn} onPress={() => approveSuggestion(suggestion)}>
+                    <Text style={styles.aiApproveBtnText}>
+                      {suggestion.suggestedAction === 'CREATE_ISSUE' ? 'Create Issue' :
+                       suggestion.suggestedAction === 'CREATE_JOB' ? 'Create Job' :
+                       suggestion.suggestedAction === 'DISPATCH_WORKER' ? 'Dispatch Worker' :
+                       suggestion.suggestedAction === 'AUTO_REPLY' ? 'Send Reply' : 'Approve'}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.aiDismissBtn} onPress={() => dismissSuggestion(suggestion)}>
+                    <Text style={styles.aiDismissBtnText}>Dismiss</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              {isApproved && (
+                <Text style={styles.aiApprovedText}>
+                  {suggestion.createdIssueId ? 'Issue created' : suggestion.createdJobId ? 'Job created' : 'Approved'}
+                </Text>
+              )}
+            </View>
+          );
+        })}
+
+        {/* Suggested reply */}
+        {suggestedReply && pendingCount > 0 && (
+          <View style={styles.aiReplyCard}>
+            <Text style={styles.aiReplyLabel}>Suggested reply:</Text>
+            <Text style={styles.aiReply}>"{suggestedReply}"</Text>
+            <TouchableOpacity style={styles.aiSendReplyBtn} onPress={() => sendSuggestedReply(suggestedReply)}>
+              <Text style={styles.aiSendReplyBtnText}>Send Reply</Text>
             </TouchableOpacity>
           </View>
         )}
-        {isApproved && (
-          <Text style={styles.aiApprovedText}>
-            {suggestion.createdIssueId ? 'Issue created' : suggestion.createdJobId ? 'Job created' : 'Approved'}
-          </Text>
+
+        {/* Batch approve all */}
+        {isMulti && pendingCount > 1 && (
+          <View style={styles.aiBatchActions}>
+            <TouchableOpacity style={styles.aiApproveAllBtn} onPress={() => approveAll(visible)}>
+              <Text style={styles.aiApproveAllBtnText}>Approve All ({pendingCount} items)</Text>
+            </TouchableOpacity>
+          </View>
         )}
       </View>
     );
@@ -599,9 +685,20 @@ const styles = StyleSheet.create({
   emptyChat: { alignItems: 'center', marginTop: 40 },
   emptyChatText: { color: '#64748b', fontSize: 14 },
   // AI cards
-  aiCard: { backgroundColor: '#1e293b', borderRadius: 12, padding: 12, marginBottom: 8, marginLeft: 8, borderLeftWidth: 3, borderLeftColor: '#3b82f6' },
+  aiContainer: { marginLeft: 8, marginBottom: 8, gap: 6 },
+  aiMultiHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#1e293b', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: '#3b82f6' },
+  aiMultiIcon: { fontSize: 16 },
+  aiMultiTitle: { fontSize: 14, fontWeight: '700', color: '#3b82f6' },
+  aiCard: { backgroundColor: '#1e293b', borderRadius: 12, padding: 12, borderLeftWidth: 3, borderLeftColor: '#3b82f6' },
   aiCardPending: { borderLeftColor: '#3b82f6' },
   aiCardApproved: { borderLeftColor: '#22c55e' },
+  aiReplyCard: { backgroundColor: '#1e293b', borderRadius: 12, padding: 12, borderLeftWidth: 3, borderLeftColor: '#8b5cf6' },
+  aiReplyLabel: { fontSize: 11, color: '#94a3b8', fontWeight: '600', marginBottom: 4 },
+  aiSendReplyBtn: { backgroundColor: '#8b5cf6', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, marginTop: 8, alignSelf: 'flex-start' },
+  aiSendReplyBtnText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  aiBatchActions: { marginTop: 2 },
+  aiApproveAllBtn: { backgroundColor: '#2563eb', borderRadius: 10, paddingVertical: 10, alignItems: 'center' },
+  aiApproveAllBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
   aiHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
   aiIcon: { fontSize: 14 },
   aiBadgeText: { backgroundColor: '#334155', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1, fontSize: 10, color: '#94a3b8', fontWeight: '600', overflow: 'hidden' },

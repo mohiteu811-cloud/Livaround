@@ -25,6 +25,7 @@ interface Message {
   visibility?: string;
   createdAt: string;
   aiSuggestion?: AiSuggestion;
+  aiSuggestions?: AiSuggestion[];
 }
 
 interface AiSuggestion {
@@ -407,19 +408,29 @@ export default function ConversationScreen() {
             {new Date(item.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
           </Text>
         </View>
-        {item.aiSuggestion && item.aiSuggestion.status === 'PENDING' && (
-          <View style={styles.aiCard}>
-            <View style={styles.aiHeader}>
-              <Text style={styles.aiIcon}>✨</Text>
-              <Text style={styles.aiBadge}>{item.aiSuggestion.category}</Text>
-              <Text style={[styles.aiUrgency, { color: urgencyColor(item.aiSuggestion.urgency) }]}>
-                {item.aiSuggestion.urgency}
-              </Text>
+        {(() => {
+          const suggestions = item.aiSuggestions || (item.aiSuggestion ? [item.aiSuggestion] : []);
+          const pending = suggestions.filter(s => s.status === 'PENDING');
+          if (pending.length === 0) return null;
+          return (
+            <View style={styles.aiCard}>
+              {pending.length > 1 && (
+                <Text style={styles.aiMultiTitle}>AI detected {pending.length} action items</Text>
+              )}
+              {pending.map((s) => (
+                <View key={s.id} style={styles.aiItemRow}>
+                  <View style={styles.aiHeader}>
+                    <Text style={styles.aiIcon}>✨</Text>
+                    <Text style={styles.aiBadge}>{s.category}</Text>
+                    <Text style={[styles.aiUrgency, { color: urgencyColor(s.urgency) }]}>{s.urgency}</Text>
+                  </View>
+                  <Text style={styles.aiSummary}>{s.summary}</Text>
+                </View>
+              ))}
+              <Text style={styles.aiNote}>Host will review {pending.length > 1 ? 'these suggestions' : 'this suggestion'}</Text>
             </View>
-            <Text style={styles.aiSummary}>{item.aiSuggestion.summary}</Text>
-            <Text style={styles.aiNote}>Host will review this suggestion</Text>
-          </View>
-        )}
+          );
+        })()}
       </View>
     );
   }
@@ -611,7 +622,9 @@ const styles = StyleSheet.create({
   textInputTeamOnly: { borderColor: '#d97706' },
   sendButtonTeamOnly: { backgroundColor: '#d97706' },
   // AI suggestion card (read-only for workers)
-  aiCard: { backgroundColor: '#1e293b', borderRadius: 12, padding: 12, marginBottom: 8, marginLeft: 8, borderLeftWidth: 3, borderLeftColor: '#3b82f6' },
+  aiCard: { backgroundColor: '#1e293b', borderRadius: 12, padding: 12, marginBottom: 8, marginLeft: 8, borderLeftWidth: 3, borderLeftColor: '#3b82f6', gap: 8 },
+  aiMultiTitle: { fontSize: 14, fontWeight: '700', color: '#3b82f6', marginBottom: 2 },
+  aiItemRow: { gap: 4 },
   aiHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
   aiIcon: { fontSize: 14 },
   aiBadge: { backgroundColor: '#334155', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1, fontSize: 10, color: '#94a3b8', fontWeight: '600', overflow: 'hidden' },

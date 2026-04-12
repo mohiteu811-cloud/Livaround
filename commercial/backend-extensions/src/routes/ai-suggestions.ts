@@ -118,6 +118,38 @@ router.post('/:id/approve', async (req: AuthRequest, res: Response) => {
   }
 });
 
+// ── POST /api/ai-suggestions/batch-approve ──────────────────────────────────
+// Approve multiple suggestions at once (e.g. all action items from one message)
+
+router.post('/batch-approve', async (req: AuthRequest, res: Response) => {
+  try {
+    const host = await prisma.host.findUnique({ where: { userId: req.user!.id } });
+    if (!host) return res.status(403).json({ error: 'Host not found' });
+
+    const { suggestionIds } = req.body;
+    if (!Array.isArray(suggestionIds) || suggestionIds.length === 0) {
+      return res.status(400).json({ error: 'suggestionIds array required' });
+    }
+
+    const results = [];
+    for (const id of suggestionIds) {
+      const suggestion = await verifySuggestionOwnership(id, host.id);
+      if (!suggestion || suggestion.status !== 'PENDING') continue;
+      try {
+        const result = await executeAction(id);
+        results.push({ id, ok: true, ...result });
+      } catch (err: any) {
+        results.push({ id, ok: false, error: err.message });
+      }
+    }
+
+    return res.json({ results });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // ── POST /api/ai-suggestions/:id/dismiss ─────────────────────────────────────
 
 router.post('/:id/dismiss', async (req: AuthRequest, res: Response) => {

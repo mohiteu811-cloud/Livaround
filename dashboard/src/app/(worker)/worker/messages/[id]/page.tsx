@@ -19,6 +19,7 @@ interface Message {
   voiceLanguage?: string;
   createdAt: string;
   aiSuggestion?: { id: string; category: string; urgency: string; summary: string; status: string };
+  aiSuggestions?: { id: string; category: string; urgency: string; summary: string; status: string }[];
 }
 
 function isVideoUrl(url: string): boolean {

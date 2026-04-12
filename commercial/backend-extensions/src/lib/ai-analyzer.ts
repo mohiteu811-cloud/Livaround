@@ -26,6 +26,22 @@ interface AiAnalysis {
   };
 }
 
+interface AiActionItem {
+  category: string;
+  urgency: string;
+  summary: string;
+  suggestedAction: string;
+  jobData?: { type: string; notes: string };
+  issueData?: { description: string; severity: string };
+}
+
+interface AiMultiAnalysis {
+  sentiment: string;
+  actionItems: AiActionItem[];
+  suggestedReply: string;
+  overallSummary: string;
+}
+
 export async function analyzeMessageAsync(
   message: { id: string; conversationId: string; content: string; imageUrl?: string | null; senderType: string },
   conversation: { id: string; channelType?: string; hostId: string; propertyId?: string | null; bookingId?: string | null }
@@ -121,16 +137,21 @@ async function performAnalysis(
     .map((m) => `[${m.senderType}] ${m.senderName}: ${m.content}${m.imageUrl ? ' [attached image]' : ''}`)
     .join('\n');
 
-  const systemPrompt = `You are an AI assistant for LivAround, a property management platform. Your job is to analyze messages in ${channelLabel} conversations and detect actionable items.
+  const systemPrompt = `You are an AI assistant for LivAround, a property management platform. Your job is to analyze messages in ${channelLabel} conversations and detect ALL actionable items.
 
-Analyze the latest message and determine:
-1. Category - what type of issue or request this is
-2. Urgency - how quickly this needs attention
-3. Sentiment - the sender's emotional state
-4. Summary - a one-line description
-5. Suggested action - what should be done
-6. Suggested reply - a professional response the host could send
-7. If creating an issue or job, pre-fill the data
+IMPORTANT: A single message may contain MULTIPLE distinct requests or issues. You must detect and return ALL of them as separate action items. For example, "The AC isn't working and we need extra towels" contains TWO separate action items: an AC repair (MAINTENANCE) and a towel delivery (AMENITY_REQUEST).
+
+For each action item, determine:
+1. Category - what type of issue or request
+2. Urgency - how quickly it needs attention
+3. Summary - a one-line description of this specific action item
+4. Suggested action - what should be done
+5. If creating a job, specify the job type and notes
+
+Also provide:
+- The sender's overall sentiment
+- A single suggested reply that addresses ALL action items professionally
+- A brief overall summary
 
 Available categories:
 - MAINTENANCE: broken items, leaks, damage, locks not working
@@ -157,7 +178,7 @@ ${bookingContext ? `\n${bookingContext}` : ''}`;
 
   userContent.push({
     type: 'text',
-    text: `Conversation history:\n${conversationHistory}\n\nAnalyze the latest message above and provide your assessment.`,
+    text: `Conversation history:\n${conversationHistory}\n\nAnalyze the latest message above. Detect ALL actionable items — there may be more than one. Provide your assessment.`,
   });
 
   // If there's an image, include it for vision analysis
@@ -185,50 +206,59 @@ ${bookingContext ? `\n${bookingContext}` : ''}`;
 
   const result = await client.messages.create({
     model,
-    max_tokens: 1024,
+    max_tokens: 2048,
     system: systemPrompt,
     messages: [{ role: 'user', content: userContent }],
     tools: [
       {
         name: 'analyze_message',
-        description: 'Analyze a message and provide structured assessment',
+        description: 'Analyze a message and return ALL detected action items',
         input_schema: {
           type: 'object' as const,
           properties: {
-            category: {
-              type: 'string',
-              enum: [
-                'MAINTENANCE', 'CLEANING', 'SAFETY', 'APPLIANCE', 'PEST', 'NOISE',
-                'AMENITY_REQUEST', 'CHECKIN_ISSUE', 'CHECKOUT', 'COMPLIMENT', 'GENERAL',
-                'JOB_UPDATE', 'SUPPLY_REQUEST', 'SCHEDULE_CONFLICT', 'QUALITY_CONCERN',
-              ],
-            },
-            urgency: { type: 'string', enum: ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] },
             sentiment: { type: 'string', enum: ['POSITIVE', 'NEUTRAL', 'NEGATIVE', 'DISTRESSED'] },
-            summary: { type: 'string', description: 'One-line summary of the issue or request' },
-            suggestedAction: {
-              type: 'string',
-              enum: ['CREATE_ISSUE', 'CREATE_JOB', 'DISPATCH_WORKER', 'AUTO_REPLY', 'NOTIFY_ONLY'],
-            },
-            suggestedReply: { type: 'string', description: 'Suggested reply for the host to send' },
-            issueData: {
-              type: 'object',
-              properties: {
-                description: { type: 'string' },
-                severity: { type: 'string', enum: ['LOW', 'MEDIUM', 'HIGH'] },
-                photoUrl: { type: 'string' },
-              },
-            },
-            jobData: {
-              type: 'object',
-              properties: {
-                type: { type: 'string', enum: ['CLEANING', 'COOKING', 'DRIVING', 'MAINTENANCE'] },
-                propertyId: { type: 'string' },
-                notes: { type: 'string' },
+            overallSummary: { type: 'string', description: 'Brief overall summary of the message' },
+            suggestedReply: { type: 'string', description: 'A single professional reply addressing all action items' },
+            actionItems: {
+              type: 'array',
+              description: 'All distinct actionable items detected in the message. A single message may have 1, 2, or more action items.',
+              items: {
+                type: 'object',
+                properties: {
+                  category: {
+                    type: 'string',
+                    enum: [
+                      'MAINTENANCE', 'CLEANING', 'SAFETY', 'APPLIANCE', 'PEST', 'NOISE',
+                      'AMENITY_REQUEST', 'CHECKIN_ISSUE', 'CHECKOUT', 'COMPLIMENT', 'GENERAL',
+                      'JOB_UPDATE', 'SUPPLY_REQUEST', 'SCHEDULE_CONFLICT', 'QUALITY_CONCERN',
+                    ],
+                  },
+                  urgency: { type: 'string', enum: ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] },
+                  summary: { type: 'string', description: 'One-line summary of this specific action item' },
+                  suggestedAction: {
+                    type: 'string',
+                    enum: ['CREATE_ISSUE', 'CREATE_JOB', 'DISPATCH_WORKER', 'AUTO_REPLY', 'NOTIFY_ONLY'],
+                  },
+                  jobData: {
+                    type: 'object',
+                    properties: {
+                      type: { type: 'string', enum: ['CLEANING', 'COOKING', 'DRIVING', 'MAINTENANCE'] },
+                      notes: { type: 'string' },
+                    },
+                  },
+                  issueData: {
+                    type: 'object',
+                    properties: {
+                      description: { type: 'string' },
+                      severity: { type: 'string', enum: ['LOW', 'MEDIUM', 'HIGH'] },
+                    },
+                  },
+                },
+                required: ['category', 'urgency', 'summary', 'suggestedAction'],
               },
             },
           },
-          required: ['category', 'urgency', 'sentiment', 'summary', 'suggestedAction'],
+          required: ['sentiment', 'overallSummary', 'suggestedReply', 'actionItems'],
         },
       },
     ],
@@ -239,60 +269,88 @@ ${bookingContext ? `\n${bookingContext}` : ''}`;
   const toolUse = result.content.find((block) => block.type === 'tool_use');
   if (!toolUse || toolUse.type !== 'tool_use') return;
 
-  const analysis = toolUse.input as AiAnalysis & { issueData?: any; jobData?: any };
+  const analysis = toolUse.input as AiMultiAnalysis;
 
-  console.log('AI message analysis result:', JSON.stringify({ category: analysis.category, urgency: analysis.urgency, sentiment: analysis.sentiment, summary: analysis.summary, suggestedAction: analysis.suggestedAction, suggestedReply: analysis.suggestedReply }));
+  console.log('AI message analysis result:', JSON.stringify({
+    sentiment: analysis.sentiment,
+    overallSummary: analysis.overallSummary,
+    actionItemCount: analysis.actionItems.length,
+    actionItems: analysis.actionItems.map(a => ({ category: a.category, urgency: a.urgency, summary: a.summary, suggestedAction: a.suggestedAction })),
+  }));
 
-  // Don't create suggestions for compliments or general messages with NOTIFY_ONLY
-  if (analysis.category === 'COMPLIMENT' && analysis.suggestedAction === 'NOTIFY_ONLY') return;
+  // Filter out non-actionable items
+  const actionItems = analysis.actionItems.filter(
+    item => !(item.category === 'COMPLIMENT' && item.suggestedAction === 'NOTIFY_ONLY')
+  );
+  if (actionItems.length === 0) return;
 
-  // Build action payload
-  const actionPayload: any = {};
-  if (analysis.issueData) {
-    actionPayload.issueData = {
-      description: analysis.issueData.description || analysis.summary,
-      severity: analysis.issueData.severity || (analysis.urgency === 'CRITICAL' ? 'HIGH' : analysis.urgency),
-      photoUrl: message.imageUrl || analysis.issueData.photoUrl,
-    };
+  // Create an AiSuggestion for each action item, all linked to the same message
+  const suggestions = [];
+  for (let i = 0; i < actionItems.length; i++) {
+    const item = actionItems[i];
+
+    const actionPayload: any = {};
+    if (item.issueData) {
+      actionPayload.issueData = {
+        description: item.issueData.description || item.summary,
+        severity: item.issueData.severity || (item.urgency === 'CRITICAL' ? 'HIGH' : item.urgency),
+        photoUrl: message.imageUrl || undefined,
+      };
+    }
+    if (item.jobData) {
+      actionPayload.jobData = {
+        type: item.jobData.type || 'MAINTENANCE',
+        propertyId: conversation.propertyId,
+        notes: item.jobData.notes || item.summary,
+      };
+    }
+    // For DISPATCH_WORKER without explicit jobData, auto-fill job type from category
+    if (item.suggestedAction === 'DISPATCH_WORKER' && !item.jobData) {
+      const jobType = item.category === 'CLEANING' ? 'CLEANING' :
+                      item.category === 'AMENITY_REQUEST' ? 'CLEANING' :
+                      'MAINTENANCE';
+      actionPayload.jobData = {
+        type: jobType,
+        propertyId: conversation.propertyId,
+        notes: item.summary,
+      };
+    }
+
+    const suggestion = await prisma.aiSuggestion.create({
+      data: {
+        conversationId: conversation.id,
+        messageId: message.id,
+        category: item.category,
+        urgency: item.urgency,
+        sentiment: analysis.sentiment,
+        summary: item.summary,
+        suggestedAction: item.suggestedAction,
+        // Only put the reply on the first suggestion to avoid duplication
+        suggestedReply: i === 0 ? analysis.suggestedReply : undefined,
+        actionPayload: Object.keys(actionPayload).length > 0 ? actionPayload : undefined,
+        status: 'PENDING',
+      },
+    });
+    suggestions.push(suggestion);
   }
-  if (analysis.jobData) {
-    actionPayload.jobData = {
-      type: analysis.jobData.type || 'MAINTENANCE',
-      propertyId: conversation.propertyId || analysis.jobData.propertyId,
-      notes: analysis.jobData.notes || analysis.summary,
-    };
-  }
 
-  // Save AI suggestion
-  const suggestion = await prisma.aiSuggestion.create({
-    data: {
-      conversationId: conversation.id,
-      messageId: message.id,
-      category: analysis.category,
-      urgency: analysis.urgency,
-      sentiment: analysis.sentiment,
-      summary: analysis.summary,
-      suggestedAction: analysis.suggestedAction,
-      suggestedReply: analysis.suggestedReply,
-      actionPayload: Object.keys(actionPayload).length > 0 ? actionPayload : undefined,
-      status: 'PENDING',
-    },
-  });
-
-  // Emit via Socket.IO
+  // Emit all suggestions via Socket.IO
   try {
     const { getIO } = require('./socket');
     const io = getIO();
     if (io) {
-      io.of('/host').to(`conv:${conversation.id}`).emit('ai_suggestion', suggestion);
-      io.of('/worker').to(`conv:${conversation.id}`).emit('ai_suggestion', suggestion);
+      for (const suggestion of suggestions) {
+        io.of('/host').to(`conv:${conversation.id}`).emit('ai_suggestion', suggestion);
+        io.of('/worker').to(`conv:${conversation.id}`).emit('ai_suggestion', suggestion);
+      }
     }
   } catch (err) {
-    console.error('Failed to emit AI suggestion via socket:', err);
+    console.error('Failed to emit AI suggestions via socket:', err);
   }
 
-  // Send push notification for AI conversation alerts (respects host prefs)
-  if (['HIGH', 'CRITICAL'].includes(analysis.urgency)) {
+  // Send push notification for high-urgency items
+  const highUrgencyItems = actionItems.filter(item => ['HIGH', 'CRITICAL'].includes(item.urgency));
+  if (highUrgencyItems.length > 0) {
     try {
       const host = await prisma.host.findUnique({
         where: { id: conversation.hostId },
@@ -301,10 +359,16 @@ ${bookingContext ? `\n${bookingContext}` : ''}`;
       const prefs = (() => { try { return JSON.parse(host?.notificationPrefs || '{}'); } catch { return {}; } })();
       if (host?.pushToken && prefs.aiConversationAlerts !== false) {
         const { sendPushNotification } = require('../../../../backend/src/lib/pushNotifications');
+        const title = actionItems.length > 1
+          ? `AI detected ${actionItems.length} action items`
+          : `AI Alert: ${actionItems[0].category}`;
+        const body = actionItems.length > 1
+          ? analysis.overallSummary
+          : actionItems[0].summary;
         await sendPushNotification(host.pushToken, {
-          title: `AI Alert: ${analysis.category}`,
-          body: analysis.summary,
-          data: { conversationId: conversation.id, suggestionId: suggestion.id, type: 'ai_suggestion' },
+          title,
+          body,
+          data: { conversationId: conversation.id, suggestionId: suggestions[0].id, type: 'ai_suggestion' },
           sound: 'default',
           priority: 'high',
           channelId: 'messages',

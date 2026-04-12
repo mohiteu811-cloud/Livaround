@@ -27,6 +27,7 @@ interface Message {
   imageUrl?: string;
   createdAt: string;
   aiSuggestion?: AiSuggestion;
+  aiSuggestions?: AiSuggestion[];
 }
 
 const urgencyColors: Record<string, string> = {
