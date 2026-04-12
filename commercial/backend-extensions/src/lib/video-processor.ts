@@ -1,15 +1,12 @@
 import { prisma } from '../../../../backend/src/lib/prisma';
-import { analyzeWalkthroughVideo } from './gemini-video-analyzer';
-import { extractInventoryFromAnalysis } from './inventory-extractor';
-import { compareSnapshots } from './inventory-comparator';
-import { notifyHostOfAudit } from './audit-issue-generator';
 import { emitVideoProcessing, emitVideoComplete, emitVideoError } from './socket';
 
 // ── Lazy BullMQ initialisation ──────────────────────────────────────────────
-// BullMQ is only required when Redis is available. The Queue and Worker are
-// created on first use / explicit start — never at module-scope — so a
-// missing Redis or a bad import can never crash the commercial extension
-// loader (which would silently disable every commercial route).
+// Everything in this file is lazily initialised. Neither BullMQ nor the
+// video-processing dependencies (Gemini SDK, inventory extractor, comparator)
+// are loaded at module scope. This ensures a missing package or env var can
+// never crash the commercial extension loader — which would silently disable
+// every commercial route (dashboard, messaging, etc.).
 
 let Queue: typeof import('bullmq').Queue;
 let Worker: typeof import('bullmq').Worker;
@@ -56,9 +53,28 @@ export async function queueVideoProcessing(walkthroughId: string) {
 }
 
 // ── Worker ───────────────────────────────────────────────────────────────────
+// All heavy processing dependencies (Gemini SDK, inventory extractor,
+// comparator, audit generator) are loaded here via require() — NOT at module
+// scope — so they only need to resolve when the worker actually starts.
 
 export function startVideoProcessingWorker() {
   if (!loadBullMQ()) return null;
+
+  // Lazy-load processing dependencies (only needed inside the worker)
+  let analyzeWalkthroughVideo: typeof import('./gemini-video-analyzer').analyzeWalkthroughVideo;
+  let extractInventoryFromAnalysis: typeof import('./inventory-extractor').extractInventoryFromAnalysis;
+  let compareSnapshots: typeof import('./inventory-comparator').compareSnapshots;
+  let notifyHostOfAudit: typeof import('./audit-issue-generator').notifyHostOfAudit;
+
+  try {
+    analyzeWalkthroughVideo = require('./gemini-video-analyzer').analyzeWalkthroughVideo;
+    extractInventoryFromAnalysis = require('./inventory-extractor').extractInventoryFromAnalysis;
+    compareSnapshots = require('./inventory-comparator').compareSnapshots;
+    notifyHostOfAudit = require('./audit-issue-generator').notifyHostOfAudit;
+  } catch (err: any) {
+    console.error('Video processing dependencies not available:', err.message);
+    return null;
+  }
 
   const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
   const worker = new Worker(
@@ -108,7 +124,6 @@ export function startVideoProcessingWorker() {
         if (walkthrough.walkthroughType === 'post_checkout' && walkthrough.bookingId) {
           await updateStage(walkthroughId, propertyId, 'comparing_inventory', 88);
 
-          // Find latest confirmed baseline snapshot for this property
           const baselineSnapshot = await prisma.inventorySnapshot.findFirst({
             where: { propertyId, status: 'CONFIRMED', type: 'BASELINE' },
             orderBy: { createdAt: 'desc' },
@@ -120,7 +135,6 @@ export function startVideoProcessingWorker() {
           });
 
           if (baselineSnapshot) {
-            // Load the audit snapshot we just created
             const auditSnapshot = await prisma.inventorySnapshot.findUnique({
               where: { id: snapshot.snapshotId },
               include: {
@@ -133,7 +147,6 @@ export function startVideoProcessingWorker() {
             if (auditSnapshot) {
               const findings = compareSnapshots(baselineSnapshot, auditSnapshot);
 
-              // Create the CheckoutAudit record
               const audit = await prisma.checkoutAudit.create({
                 data: {
                   bookingId: walkthrough.bookingId,
@@ -152,9 +165,6 @@ export function startVideoProcessingWorker() {
 
               await updateStage(walkthroughId, propertyId, 'notifying_host', 92);
 
-              // Notify host of critical findings (push + socket) — no issues
-              // are created yet; that happens when a worker/host confirms the
-              // audit after reviewing and dismissing any false positives.
               const notifyResult = await notifyHostOfAudit(
                 audit.id,
                 propertyId,
