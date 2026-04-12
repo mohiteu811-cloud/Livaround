@@ -1,15 +1,13 @@
-import { Server as TusServer } from '@tus/server';
-import { S3Store } from '@tus/s3-store';
-
 // ── Lazy TUS server ──────────────────────────────────────────────────────────
-// The S3Store and TusServer are created on first use, not at module scope.
-// If the R2 env vars are missing, the server gracefully returns 503 instead
-// of crashing the entire commercial extension loader on startup.
+// @tus/server and @tus/s3-store are ESM-only packages. ts-node compiles
+// static `import` statements into `require()`, which crashes on ESM modules.
+// We use dynamic `import()` inside an async init function to avoid this.
 
-let _tusServer: InstanceType<typeof TusServer> | null = null;
+let _tusServer: any = null;
 let _initFailed = false;
+let _initPromise: Promise<any> | null = null;
 
-function getTusServer(): InstanceType<typeof TusServer> | null {
+async function initTusServer(): Promise<any> {
   if (_tusServer) return _tusServer;
   if (_initFailed) return null;
 
@@ -25,6 +23,9 @@ function getTusServer(): InstanceType<typeof TusServer> | null {
   }
 
   try {
+    const { S3Store } = await import('@tus/s3-store');
+    const { Server: TusServer } = await import('@tus/server');
+
     const s3Store = new S3Store({
       s3ClientConfig: {
         bucket,
@@ -47,4 +48,9 @@ function getTusServer(): InstanceType<typeof TusServer> | null {
   }
 }
 
-export { getTusServer };
+export async function getTusServer(): Promise<any> {
+  if (!_initPromise) {
+    _initPromise = initTusServer();
+  }
+  return _initPromise;
+}
