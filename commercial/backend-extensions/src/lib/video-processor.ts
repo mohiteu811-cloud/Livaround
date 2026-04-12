@@ -1,4 +1,3 @@
-import { Queue, Worker, Job } from 'bullmq';
 import { prisma } from '../../../../backend/src/lib/prisma';
 import { analyzeWalkthroughVideo } from './gemini-video-analyzer';
 import { extractInventoryFromAnalysis } from './inventory-extractor';
@@ -6,15 +5,49 @@ import { compareSnapshots } from './inventory-comparator';
 import { notifyHostOfAudit } from './audit-issue-generator';
 import { emitVideoProcessing, emitVideoComplete, emitVideoError } from './socket';
 
-const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
-const connection = { url: REDIS_URL };
+// ── Lazy BullMQ initialisation ──────────────────────────────────────────────
+// BullMQ is only required when Redis is available. The Queue and Worker are
+// created on first use / explicit start — never at module-scope — so a
+// missing Redis or a bad import can never crash the commercial extension
+// loader (which would silently disable every commercial route).
+
+let Queue: typeof import('bullmq').Queue;
+let Worker: typeof import('bullmq').Worker;
+let bullmqLoaded = false;
+let bullmqQueue: InstanceType<typeof import('bullmq').Queue> | null = null;
+
+function loadBullMQ() {
+  if (bullmqLoaded) return true;
+  try {
+    const mod = require('bullmq');
+    Queue = mod.Queue;
+    Worker = mod.Worker;
+    bullmqLoaded = true;
+    return true;
+  } catch (err: any) {
+    console.error('BullMQ not available — video processing disabled:', err.message);
+    return false;
+  }
+}
+
+function getQueue() {
+  if (bullmqQueue) return bullmqQueue;
+  if (!loadBullMQ()) return null;
+
+  const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+  bullmqQueue = new Queue('video-processing', { connection: { url: REDIS_URL } });
+  return bullmqQueue;
+}
 
 // ── Queue ────────────────────────────────────────────────────────────────────
 
-export const videoProcessingQueue = new Queue('video-processing', { connection });
-
 export async function queueVideoProcessing(walkthroughId: string) {
-  await videoProcessingQueue.add('process-walkthrough', { walkthroughId }, {
+  const queue = getQueue();
+  if (!queue) {
+    console.error('Cannot queue video processing: BullMQ not available');
+    return;
+  }
+  await queue.add('process-walkthrough', { walkthroughId }, {
     attempts: 2,
     backoff: { type: 'exponential', delay: 30000 },
     removeOnComplete: 100,
@@ -25,9 +58,12 @@ export async function queueVideoProcessing(walkthroughId: string) {
 // ── Worker ───────────────────────────────────────────────────────────────────
 
 export function startVideoProcessingWorker() {
+  if (!loadBullMQ()) return null;
+
+  const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
   const worker = new Worker(
     'video-processing',
-    async (job: Job<{ walkthroughId: string }>) => {
+    async (job: InstanceType<typeof import('bullmq').Job<{ walkthroughId: string }>>) => {
       const { walkthroughId } = job.data;
 
       const walkthrough = await prisma.videoWalkthrough.findUnique({
@@ -186,7 +222,7 @@ export function startVideoProcessingWorker() {
       }
     },
     {
-      connection,
+      connection: { url: REDIS_URL },
       concurrency: 2,
       limiter: { max: 5, duration: 60000 },
     }
