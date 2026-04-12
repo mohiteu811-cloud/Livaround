@@ -182,13 +182,13 @@ router.get('/property/:propertyId', async (req: AuthRequest, res: Response) => {
 // ── TUS upload handler ───────────────────────────────────────────────────────
 // Handles chunked uploads at /api/walkthroughs/upload/*
 
-router.all('/upload/*', (req, res) => {
-  const tus = getTusServer();
+router.all('/upload/*', async (req, res) => {
+  const tus = await getTusServer();
   if (!tus) return res.status(503).json({ error: 'Upload service not configured' });
   tus.handle(req, res);
 });
-router.all('/upload', (req, res) => {
-  const tus = getTusServer();
+router.all('/upload', async (req, res) => {
+  const tus = await getTusServer();
   if (!tus) return res.status(503).json({ error: 'Upload service not configured' });
   tus.handle(req, res);
 });
