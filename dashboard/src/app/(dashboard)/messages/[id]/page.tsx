@@ -22,7 +22,8 @@ interface AiSuggestion {
 }
 
 interface MessageWithAi extends MessageItem {
-  aiSuggestion?: AiSuggestion;
+  aiSuggestion?: AiSuggestion;   // legacy single
+  aiSuggestions?: AiSuggestion[]; // multi-action
 }
 
 const urgencyColors: Record<string, string> = {
@@ -216,11 +217,16 @@ export default function ConversationPage() {
     try {
       await api.aiSuggestions.approve(suggestion.id);
       setMessages((prev) =>
-        prev.map((m) =>
-          m.aiSuggestion?.id === suggestion.id
-            ? { ...m, aiSuggestion: { ...m.aiSuggestion!, status: 'APPROVED' } }
-            : m
-        )
+        prev.map((m) => {
+          const suggestions = m.aiSuggestions || (m.aiSuggestion ? [m.aiSuggestion] : []);
+          if (!suggestions.some((s) => s.id === suggestion.id)) return m;
+          return {
+            ...m,
+            aiSuggestions: suggestions.map((s) =>
+              s.id === suggestion.id ? { ...s, status: 'APPROVED' } : s
+            ),
+          };
+        })
       );
     } catch {}
   }
@@ -229,55 +235,131 @@ export default function ConversationPage() {
     try {
       await api.aiSuggestions.dismiss(suggestion.id);
       setMessages((prev) =>
-        prev.map((m) =>
-          m.aiSuggestion?.id === suggestion.id
-            ? { ...m, aiSuggestion: { ...m.aiSuggestion!, status: 'DISMISSED' } }
-            : m
-        )
+        prev.map((m) => {
+          const suggestions = m.aiSuggestions || (m.aiSuggestion ? [m.aiSuggestion] : []);
+          if (!suggestions.some((s) => s.id === suggestion.id)) return m;
+          return {
+            ...m,
+            aiSuggestions: suggestions.map((s) =>
+              s.id === suggestion.id ? { ...s, status: 'DISMISSED' } : s
+            ),
+          };
+        })
       );
     } catch {}
   }
 
-  function renderAiCard(suggestion: AiSuggestion) {
-    if (suggestion.status === 'DISMISSED') return null;
-    const isPending = suggestion.status === 'PENDING';
-    const isApproved = suggestion.status === 'APPROVED';
-    const urgencyClass = urgencyColors[suggestion.urgency] || urgencyColors.LOW;
+  async function approveAll(suggestions: AiSuggestion[]) {
+    const pendingIds = suggestions.filter((s) => s.status === 'PENDING').map((s) => s.id);
+    if (pendingIds.length === 0) return;
+    try {
+      await api.aiSuggestions.batchApprove(pendingIds);
+      setMessages((prev) =>
+        prev.map((m) => {
+          const all = m.aiSuggestions || (m.aiSuggestion ? [m.aiSuggestion] : []);
+          if (!all.some((s) => pendingIds.includes(s.id))) return m;
+          return {
+            ...m,
+            aiSuggestions: all.map((s) =>
+              pendingIds.includes(s.id) ? { ...s, status: 'APPROVED' } : s
+            ),
+          };
+        })
+      );
+    } catch {}
+  }
+
+  async function sendSuggestedReply(reply: string) {
+    try {
+      const msg = await api.conversations.sendMessage(id, { content: reply });
+      setMessages((prev) => [...prev, msg]);
+    } catch {}
+  }
+
+  function renderAiCards(suggestions: AiSuggestion[]) {
+    const visible = suggestions.filter((s) => s.status !== 'DISMISSED');
+    if (visible.length === 0) return null;
+
+    const pendingCount = visible.filter((s) => s.status === 'PENDING').length;
+    const suggestedReply = suggestions.find((s) => s.suggestedReply)?.suggestedReply;
+    const isMulti = visible.length > 1;
 
     return (
-      <div className={`ml-2 mt-1 mb-3 p-3 rounded-xl border-l-4 ${isPending ? 'border-l-blue-500 bg-slate-800/60' : 'border-l-green-500 bg-slate-800/40'}`}>
-        <div className="flex items-center gap-2 mb-1.5">
-          {isPending ? <Sparkles size={14} className="text-blue-400" /> : <Check size={14} className="text-green-400" />}
-          <span className="px-2 py-0.5 text-[10px] font-bold bg-slate-700 text-slate-300 rounded">{suggestion.category}</span>
-          <span className={`px-2 py-0.5 text-[10px] font-bold rounded border ${urgencyClass}`}>{suggestion.urgency}</span>
-        </div>
-        <p className="text-sm text-slate-200 mb-1">{suggestion.summary}</p>
-        {suggestion.suggestedReply && isPending && (
-          <p className="text-xs text-slate-400 italic mb-2">Suggested reply: &ldquo;{suggestion.suggestedReply}&rdquo;</p>
+      <div className="ml-2 mt-1 mb-3 space-y-2">
+        {/* Multi-action header badge */}
+        {isMulti && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-blue-500/10 border border-blue-500/30">
+            <Sparkles size={16} className="text-blue-400" />
+            <span className="text-sm font-bold text-blue-400">
+              AI detected {visible.length} action items
+            </span>
+          </div>
         )}
-        {isPending && (
-          <div className="flex gap-2">
+
+        {/* Individual action items */}
+        {visible.map((suggestion) => {
+          const isPending = suggestion.status === 'PENDING';
+          const isApproved = suggestion.status === 'APPROVED';
+          const urgencyClass = urgencyColors[suggestion.urgency] || urgencyColors.LOW;
+
+          return (
+            <div key={suggestion.id} className={`p-3 rounded-xl border-l-4 ${isPending ? 'border-l-blue-500 bg-slate-800/60' : 'border-l-green-500 bg-slate-800/40'}`}>
+              <div className="flex items-center gap-2 mb-1.5">
+                {isPending ? <Sparkles size={14} className="text-blue-400" /> : <Check size={14} className="text-green-400" />}
+                <span className="px-2 py-0.5 text-[10px] font-bold bg-slate-700 text-slate-300 rounded">{suggestion.category}</span>
+                <span className={`px-2 py-0.5 text-[10px] font-bold rounded border ${urgencyClass}`}>{suggestion.urgency}</span>
+              </div>
+              <p className="text-sm text-slate-200 mb-1">{suggestion.summary}</p>
+              {isPending && !isMulti && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => approveSuggestion(suggestion)}
+                    className="px-3 py-1 text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors"
+                  >
+                    {suggestion.suggestedAction === 'CREATE_ISSUE' ? 'Create Issue' :
+                     suggestion.suggestedAction === 'CREATE_JOB' ? 'Create Job' :
+                     suggestion.suggestedAction === 'DISPATCH_WORKER' ? 'Dispatch Worker' :
+                     suggestion.suggestedAction === 'AUTO_REPLY' ? 'Send Reply' : 'Approve'}
+                  </button>
+                  <button
+                    onClick={() => dismissSuggestion(suggestion)}
+                    className="px-3 py-1 text-xs font-semibold bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              )}
+              {isApproved && (
+                <p className="text-xs text-green-400 font-semibold">
+                  {suggestion.createdIssueId ? 'Issue created' : suggestion.createdJobId ? 'Job created' : 'Approved'}
+                </p>
+              )}
+            </div>
+          );
+        })}
+
+        {/* Suggested reply card */}
+        {suggestedReply && pendingCount > 0 && (
+          <div className="p-3 rounded-xl border-l-4 border-l-purple-500 bg-slate-800/60">
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Suggested reply</p>
+            <p className="text-xs text-slate-300 italic mb-2">&ldquo;{suggestedReply}&rdquo;</p>
             <button
-              onClick={() => approveSuggestion(suggestion)}
-              className="px-3 py-1 text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors"
+              onClick={() => sendSuggestedReply(suggestedReply)}
+              className="px-3 py-1 text-xs font-semibold bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors"
             >
-              {suggestion.suggestedAction === 'CREATE_ISSUE' ? 'Create Issue' :
-               suggestion.suggestedAction === 'CREATE_JOB' ? 'Create Job' :
-               suggestion.suggestedAction === 'DISPATCH_WORKER' ? 'Dispatch Worker' :
-               suggestion.suggestedAction === 'AUTO_REPLY' ? 'Send Reply' : 'Approve'}
-            </button>
-            <button
-              onClick={() => dismissSuggestion(suggestion)}
-              className="px-3 py-1 text-xs font-semibold bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition-colors"
-            >
-              Dismiss
+              Send Reply
             </button>
           </div>
         )}
-        {isApproved && (
-          <p className="text-xs text-green-400 font-semibold">
-            {suggestion.createdIssueId ? 'Issue created' : suggestion.createdJobId ? 'Job created' : 'Approved'}
-          </p>
+
+        {/* Batch approve button */}
+        {isMulti && pendingCount > 1 && (
+          <button
+            onClick={() => approveAll(visible)}
+            className="w-full py-2 text-sm font-bold bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-colors"
+          >
+            Approve All ({pendingCount} items)
+          </button>
         )}
       </div>
     );
@@ -401,7 +483,8 @@ export default function ConversationPage() {
                       </p>
                     </div>
                   </div>
-                  {msg.aiSuggestion && renderAiCard(msg.aiSuggestion)}
+                  {(msg.aiSuggestions?.length || msg.aiSuggestion) &&
+                    renderAiCards(msg.aiSuggestions || (msg.aiSuggestion ? [msg.aiSuggestion] : []))}
                 </div>
               );
             })

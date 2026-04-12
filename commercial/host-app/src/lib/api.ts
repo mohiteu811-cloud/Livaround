@@ -414,6 +414,11 @@ export const api = {
       ),
     dismiss: (id: string) =>
       request<{ ok: boolean }>(`/api/ai-suggestions/${id}/dismiss`, { method: 'POST' }),
+    batchApprove: (suggestionIds: string[]) =>
+      request<{ results: { id: string; ok: boolean; createdIssueId?: string; createdJobId?: string; error?: string }[] }>(
+        '/api/ai-suggestions/batch-approve',
+        { method: 'POST', body: JSON.stringify({ suggestionIds }) }
+      ),
   },
 
   audits: {

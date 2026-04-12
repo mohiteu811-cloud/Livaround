@@ -272,7 +272,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
       orderBy: { createdAt: 'desc' },
       take: limit,
       include: {
-        aiSuggestion: true,
+        aiSuggestions: true,
       },
     });
 

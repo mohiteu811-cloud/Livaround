@@ -846,7 +846,7 @@ model Message {
   readByGuest     Boolean       @default(false)
   readByWorker    Boolean       @default(false)
   createdAt       DateTime      @default(now())
-  aiSuggestion    AiSuggestion?
+  aiSuggestions   AiSuggestion[]
 
   @@index([conversationId, createdAt])
 }
@@ -855,7 +855,7 @@ model AiSuggestion {
   id              String        @id @default(cuid())
   conversationId  String?
   conversation    Conversation? @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  messageId       String?       @unique
+  messageId       String?
   message         Message?      @relation(fields: [messageId], references: [id], onDelete: Cascade)
   issueId         String?
   issue           Issue?        @relation(fields: [issueId], references: [id], onDelete: Cascade)
