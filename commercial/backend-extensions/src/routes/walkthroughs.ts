@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { prisma } from '../../../../backend/src/lib/prisma';
 import { authenticate, AuthRequest } from '../../../../backend/src/middleware/auth';
-import { tusServer } from '../lib/video-upload';
+import { getTusServer } from '../lib/video-upload';
 import { getIO } from '../lib/socket';
 import { queueVideoProcessing } from '../lib/video-processor';
 
@@ -183,10 +183,14 @@ router.get('/property/:propertyId', async (req: AuthRequest, res: Response) => {
 // Handles chunked uploads at /api/walkthroughs/upload/*
 
 router.all('/upload/*', (req, res) => {
-  tusServer.handle(req, res);
+  const tus = getTusServer();
+  if (!tus) return res.status(503).json({ error: 'Upload service not configured' });
+  tus.handle(req, res);
 });
 router.all('/upload', (req, res) => {
-  tusServer.handle(req, res);
+  const tus = getTusServer();
+  if (!tus) return res.status(503).json({ error: 'Upload service not configured' });
+  tus.handle(req, res);
 });
 
 export default router;
